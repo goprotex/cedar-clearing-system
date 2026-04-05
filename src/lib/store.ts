@@ -5,6 +5,7 @@ import {
   calculatePastureCost,
   calculateBidTotal,
   estimateDuration,
+  calculateSoilDifficulty,
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
 
@@ -103,6 +104,9 @@ interface BidStore {
   // Recalculate
   recalculate: () => void;
 
+  // Soil
+  fetchSoilData: (pastureId: string, lon: number, lat: number) => void;
+
   // Persistence (local storage for Phase 1)
   saveBid: () => void;
   loadBid: (id: string) => void;
@@ -186,6 +190,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
       drawingMode: false,
     }));
     get().recalculate();
+    // Auto-fetch soil data for the new polygon's centroid
+    get().fetchSoilData(id, centroid[0], centroid[1]);
   },
 
   setDrawingMode: (active) => set({ drawingMode: active }),
@@ -312,6 +318,23 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (typeof window !== 'undefined') {
       const data = localStorage.getItem('ccc_bid_list');
       set({ savedBids: data ? JSON.parse(data) : [] });
+    }
+  },
+
+  fetchSoilData: async (pastureId, lon, lat) => {
+    try {
+      const res = await fetch(`/api/soil?lon=${lon}&lat=${lat}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.soil) {
+        const soilMultiplier = calculateSoilDifficulty(data.soil);
+        get().updatePasture(pastureId, {
+          soilData: data.soil,
+          soilMultiplier,
+        });
+      }
+    } catch {
+      // Soil lookup is best-effort; don't block the user
     }
   },
 }));

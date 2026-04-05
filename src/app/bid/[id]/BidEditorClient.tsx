@@ -1,15 +1,36 @@
 'use client';
 
+import { useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useBidStore } from '@/lib/store';
 import PastureCard from '@/components/bid/PastureCard';
 import BidSummary from '@/components/bid/BidSummary';
 import BidDetails from '@/components/bid/BidDetails';
+import BidOptions from '@/components/bid/BidOptions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import type { BidStatus } from '@/types';
+
+const STATUS_OPTIONS: { value: BidStatus; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'sent', label: 'Sent' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'declined', label: 'Declined' },
+  { value: 'expired', label: 'Expired' },
+];
+
+const STATUS_COLORS: Record<BidStatus, string> = {
+  draft: 'border-slate-500 text-slate-300',
+  sent: 'border-blue-500 text-blue-300',
+  accepted: 'border-emerald-500 text-emerald-300',
+  declined: 'border-red-500 text-red-300',
+  expired: 'border-amber-500 text-amber-300',
+};
 
 // Dynamic import for Mapbox (no SSR)
 const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
@@ -21,13 +42,41 @@ const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
   ),
 });
 
-export default function BidEditorClient() {
+export default function BidEditorClient({ bidId }: { bidId: string }) {
   const {
     currentBid,
     selectedPastureId,
     addPasture,
     saveBid,
+    loadBid,
+    updateBidField,
   } = useBidStore();
+
+  // Load bid from localStorage on mount
+  useEffect(() => {
+    loadBid(bidId);
+  }, [bidId, loadBid]);
+
+  // Auto-save with debounce (3 seconds after last change)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastUpdatedAt = useRef(currentBid.updatedAt);
+
+  useEffect(() => {
+    if (currentBid.updatedAt !== lastUpdatedAt.current && currentBid.pastures.length > 0) {
+      lastUpdatedAt.current = currentBid.updatedAt;
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = setTimeout(() => {
+        saveBid();
+      }, 3000);
+    }
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [currentBid.updatedAt, currentBid.pastures.length, saveBid]);
+
+  const handleSave = useCallback(() => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    saveBid();
+    toast.success('Bid saved');
+  }, [saveBid]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
@@ -41,19 +90,26 @@ export default function BidEditorClient() {
           </Link>
           <span className="text-slate-500">|</span>
           <span className="font-medium">{currentBid.bidNumber}</span>
-          <Badge
-            variant="outline"
-            className="text-xs border-slate-600 text-slate-300"
+          <Select
+            value={currentBid.status}
+            onValueChange={(v) => updateBidField('status', v as BidStatus)}
           >
-            {currentBid.status}
-          </Badge>
+            <SelectTrigger className={`h-7 w-28 text-xs bg-transparent border ${STATUS_COLORS[currentBid.status]}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             className="text-xs border-slate-600 text-slate-300 hover:bg-slate-800"
-            onClick={saveBid}
+            onClick={handleSave}
           >
             Save
           </Button>
@@ -61,9 +117,8 @@ export default function BidEditorClient() {
             size="sm"
             className="text-xs bg-amber-600 hover:bg-amber-700"
             onClick={() => {
-              saveBid();
-              // PDF generation will be Phase 4
-              alert('PDF generation coming in Phase 4');
+              handleSave();
+              toast.info('PDF generation coming in Phase 4');
             }}
           >
             Generate PDF
@@ -95,7 +150,8 @@ export default function BidEditorClient() {
           <Tabs defaultValue="pastures" className="flex flex-col h-full">
             <TabsList className="mx-3 mt-3 shrink-0">
               <TabsTrigger value="pastures" className="text-xs">Pastures</TabsTrigger>
-              <TabsTrigger value="details" className="text-xs">Bid Details</TabsTrigger>
+              <TabsTrigger value="options" className="text-xs">Options</TabsTrigger>
+              <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pastures" className="flex-1 flex flex-col overflow-hidden mt-0 px-3">
@@ -136,6 +192,14 @@ export default function BidEditorClient() {
                   <BidSummary />
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="options" className="flex-1 overflow-hidden mt-0">
+              <ScrollArea className="h-full px-3 pb-4">
+                <div className="py-3">
+                  <BidOptions />
+                </div>
+              </ScrollArea>
             </TabsContent>
 
             <TabsContent value="details" className="flex-1 overflow-hidden mt-0">

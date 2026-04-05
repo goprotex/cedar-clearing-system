@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/rates';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-slate-500',
@@ -18,7 +19,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function BidsListClient() {
   const router = useRouter();
-  const { savedBids, loadBidList, newBid, loadBid, deleteBid, currentBid } = useBidStore();
+  const { savedBids, loadBidList, newBid, loadBid, deleteBid } = useBidStore();
 
   useEffect(() => {
     loadBidList();
@@ -113,7 +114,10 @@ export default function BidsListClient() {
                         className="text-xs text-destructive"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm('Delete this bid?')) deleteBid(bid.id);
+                          if (confirm('Delete this bid?')) {
+                            deleteBid(bid.id);
+                            toast.success('Bid deleted');
+                          }
                         }}
                       >
                         Delete

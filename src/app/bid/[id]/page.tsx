@@ -4,6 +4,7 @@ export const metadata = {
   title: 'Bid Editor — Cactus Creek Clearing',
 };
 
-export default function BidEditorPage() {
-  return <BidEditorClient />;
+export default async function BidEditorPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <BidEditorClient bidId={id} />;
 }

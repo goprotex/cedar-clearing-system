@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -24,6 +24,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
+  const [soilLayerVisible, setSoilLayerVisible] = useState(false);
 
   const {
     currentBid,
@@ -82,6 +83,27 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
         tileSize: 512,
         maxzoom: 14,
+      });
+
+      // USDA SDA Soil map WMS overlay
+      map.addSource('soil-wms', {
+        type: 'raster',
+        tiles: [
+          'https://SDMDataAccess.sc.egov.usda.gov/Spatial/SDM.wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mapunitpoly&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE',
+        ],
+        tileSize: 256,
+      });
+
+      map.addLayer({
+        id: 'soil-overlay',
+        type: 'raster',
+        source: 'soil-wms',
+        paint: {
+          'raster-opacity': 0.45,
+        },
+        layout: {
+          visibility: 'none',
+        },
       });
 
       // Pasture polygons source
@@ -168,6 +190,16 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
+  // Toggle soil WMS layer visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const layer = map.getLayer('soil-overlay');
+    if (layer) {
+      map.setLayoutProperty('soil-overlay', 'visibility', soilLayerVisible ? 'visible' : 'none');
+    }
+  }, [soilLayerVisible]);
+
   // Attach draw event listeners
   useEffect(() => {
     const map = mapRef.current;
@@ -239,6 +271,19 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           </button>
         </div>
       )}
+      {/* Map controls */}
+      <div className="absolute bottom-4 left-4 flex gap-2 z-10">
+        <button
+          onClick={() => setSoilLayerVisible((v) => !v)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg transition-colors ${
+            soilLayerVisible
+              ? 'bg-amber-600 text-white'
+              : 'bg-white/90 text-slate-700 hover:bg-white'
+          }`}
+        >
+          {soilLayerVisible ? '🟫 Soil: ON' : '🟫 Soil'}
+        </button>
+      </div>
     </div>
   );
 }

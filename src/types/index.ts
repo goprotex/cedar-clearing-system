@@ -52,6 +52,7 @@ export interface RateCard {
 
 export interface SoilData {
   series: string;
+  mapUnit: string;
   slope_r: number;
   fragvol_r: number;
   drainagecl: string;
@@ -150,4 +151,24 @@ export interface BidSummary {
   totalAmount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+// ──── Bid Options (multi-option pricing) ────
+
+export interface BidOption {
+  id: string;
+  label: string; // e.g. "Option A: Premium", "Option B: Standard"
+  clearingMethod: ClearingMethod;
+  disposalMethod: DisposalMethod;
+  totalAmount: number;
+  perAcreCost: number;
+  estimatedDaysLow: number;
+  estimatedDaysHigh: number;
+  pastureBreakdown: {
+    pastureId: string;
+    pastureName: string;
+    acreage: number;
+    subtotal: number;
+  }[];
+  recommended: boolean;
 }
