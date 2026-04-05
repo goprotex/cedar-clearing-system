@@ -26,6 +26,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
+  const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
     naip: false,
@@ -117,7 +118,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.addSource('naip-rgb', {
         type: 'raster',
         tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule={"rasterFunction":"NaturalColor"}&f=image',
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
         ],
         tileSize: 256,
       });
@@ -134,7 +135,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.addSource('naip-cir', {
         type: 'raster',
         tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule={"rasterFunction":"FalseColorComposite"}&f=image',
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&bandIds=3,0,1&f=image',
         ],
         tileSize: 256,
       });
@@ -151,7 +152,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.addSource('naip-ndvi', {
         type: 'raster',
         tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule={"rasterFunction":"NDVI_Color"}&f=image',
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
         ],
         tileSize: 256,
       });
@@ -411,40 +412,58 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       {/* ── Layer control panel ── */}
       <div className="absolute bottom-4 left-4 z-10">
-        <div className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg p-2 space-y-1 min-w-[140px]">
-          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 pb-1">
-            Layers
+        {layersPanelOpen ? (
+          <div className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg p-2 space-y-1 min-w-[140px]">
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Layers
+              </span>
+              <button
+                onClick={() => setLayersPanelOpen(false)}
+                className="text-slate-400 hover:text-white text-xs leading-none"
+                title="Collapse"
+              >
+                ✕
+              </button>
+            </div>
+
+            <LayerButton
+              label="🟫 Soil Map"
+              active={layers.soil}
+              onClick={() => toggleLayer('soil')}
+            />
+            <LayerButton
+              label="🛰️ NAIP RGB"
+              active={layers.naip}
+              onClick={() => toggleLayer('naip')}
+            />
+            <LayerButton
+              label="🔴 NAIP CIR"
+              active={layers.naipCIR}
+              onClick={() => toggleLayer('naipCIR')}
+            />
+            <LayerButton
+              label="🌿 NAIP NDVI"
+              active={layers.naipNDVI}
+              onClick={() => toggleLayer('naipNDVI')}
+            />
+
+            <div className="border-t border-slate-700 my-1" />
+
+            <LayerButton
+              label="⛰️ 3D Terrain"
+              active={layers.terrain3d}
+              onClick={() => toggleLayer('terrain3d')}
+            />
           </div>
-
-          <LayerButton
-            label="🟫 Soil Map"
-            active={layers.soil}
-            onClick={() => toggleLayer('soil')}
-          />
-          <LayerButton
-            label="🛰️ NAIP RGB"
-            active={layers.naip}
-            onClick={() => toggleLayer('naip')}
-          />
-          <LayerButton
-            label="🔴 NAIP CIR"
-            active={layers.naipCIR}
-            onClick={() => toggleLayer('naipCIR')}
-          />
-          <LayerButton
-            label="🌿 NAIP NDVI"
-            active={layers.naipNDVI}
-            onClick={() => toggleLayer('naipNDVI')}
-          />
-
-          <div className="border-t border-slate-700 my-1" />
-
-          <LayerButton
-            label="⛰️ 3D Terrain"
-            active={layers.terrain3d}
-            onClick={() => toggleLayer('terrain3d')}
-          />
-        </div>
+        ) : (
+          <button
+            onClick={() => setLayersPanelOpen(true)}
+            className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg px-3 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+          >
+            Layers
+          </button>
+        )}
       </div>
     </div>
   );
