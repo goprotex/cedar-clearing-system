@@ -2,7 +2,9 @@ import type {
   ClearingMethodConfig,
   DensityClass,
   DisposalMethod,
+  MethodAdder,
   Pasture,
+  PastureAdder,
   RateCard,
   SoilData,
   TerrainClass,
@@ -48,6 +50,14 @@ export const DEFAULT_RATE_CARD: RateCard = {
     chip_and_spread: 50,
     stack_for_customer: 15,
   },
+  methodAdders: [
+    { id: 'stump_grinding', label: 'Stump Grinding (Flush)', unit: 'acre', minCost: 75, maxCost: 150, defaultCost: 100 },
+    { id: 'haul_off', label: 'Haul Off', unit: 'acre', minCost: 100, maxCost: 250, defaultCost: 175 },
+    { id: 'burn_pile', label: 'Burn Pile Construction', unit: 'pile', minCost: 50, maxCost: 100, defaultCost: 75 },
+    { id: 'reseeding', label: 'Reseeding', unit: 'acre', minCost: 50, maxCost: 125, defaultCost: 75 },
+    { id: 'oak_protection', label: 'Oak Protection Buffers', unit: 'tree', minCost: 15, maxCost: 30, defaultCost: 20 },
+    { id: 'fence_line', label: 'Fence Line Corridor', unit: 'linear_foot', minCost: 1.50, maxCost: 4.00, defaultCost: 2.50 },
+  ],
   minimumBid: 2500,
   mobilizationFee: 500,
 };
@@ -73,7 +83,7 @@ export function calculateSoilDifficulty(soil: SoilData): number {
 // ──── Pasture Cost Calculation ────
 
 export function calculatePastureCost(
-  pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'density' | 'terrain' | 'clearingMethod' | 'disposalMethod' | 'soilMultiplier' | 'soilMultiplierOverride'>,
+  pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'density' | 'terrain' | 'clearingMethod' | 'disposalMethod' | 'soilMultiplier' | 'soilMultiplierOverride' | 'adders'>,
   rateCard: RateCard
 ): { subtotal: number; methodMultiplier: number; estimatedHrsPerAcre: number } {
   const baseRate = rateCard.baseRates[pasture.vegetationType];
@@ -91,7 +101,12 @@ export function calculatePastureCost(
   const difficultyMult = Math.max(terrainMult, soilMult);
 
   const perAcre = baseRate * densityMult * difficultyMult * methodRateMult + disposalAdder;
-  const subtotal = Math.round(pasture.acreage * perAcre * 100) / 100;
+  const baseCost = pasture.acreage * perAcre;
+
+  // Method-specific adders: quantity × costPerUnit
+  const adderTotal = (pasture.adders ?? []).reduce((sum, a) => sum + a.quantity * a.costPerUnit, 0);
+
+  const subtotal = Math.round((baseCost + adderTotal) * 100) / 100;
 
   // Base hours estimate: 1 hr/acre for rough mulch moderate cedar
   const baseHrs = 1.0;

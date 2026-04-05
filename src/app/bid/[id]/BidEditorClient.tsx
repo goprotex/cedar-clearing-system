@@ -7,6 +7,7 @@ import PastureCard from '@/components/bid/PastureCard';
 import BidSummary from '@/components/bid/BidSummary';
 import BidDetails from '@/components/bid/BidDetails';
 import BidOptions from '@/components/bid/BidOptions';
+import RateCardSettings from '@/components/bid/RateCardSettings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -172,6 +173,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
               <TabsTrigger value="pastures" className="text-xs">Pastures</TabsTrigger>
               <TabsTrigger value="options" className="text-xs">Options</TabsTrigger>
               <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
+              <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pastures" className="flex-1 flex flex-col overflow-hidden mt-0 px-3">
@@ -226,6 +228,14 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
               <ScrollArea className="h-full px-3 pb-4">
                 <div className="py-3">
                   <BidDetails />
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="settings" className="flex-1 overflow-hidden mt-0">
+              <ScrollArea className="h-full px-3 pb-4">
+                <div className="py-3">
+                  <RateCardSettings />
                 </div>
               </ScrollArea>
             </TabsContent>

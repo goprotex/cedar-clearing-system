@@ -36,6 +36,7 @@ function createDefaultPasture(sortOrder: number): Pasture {
     elevationFt: null,
     cedarAnalysis: null,
     seasonalAnalysis: null,
+    adders: [],
     subtotal: 0,
     methodMultiplier: 1.0,
     estimatedHrsPerAcre: 1.0,
@@ -118,6 +119,9 @@ interface BidStore {
 
   // Seasonal analysis
   analyzeSeasonal: (pastureId: string) => Promise<void>;
+
+  // Rate card
+  updateRateCard: (updates: Partial<RateCard>) => void;
 
   // Persistence (local storage for Phase 1)
   saveBid: () => void;
@@ -406,5 +410,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
     } catch {
       // Seasonal analysis is best-effort
     }
+  },
+
+  updateRateCard: (updates) => {
+    set((state) => ({
+      rateCard: { ...state.rateCard, ...updates },
+    }));
+    get().recalculate();
   },
 }));

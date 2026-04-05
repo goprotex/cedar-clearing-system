@@ -210,6 +210,77 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           </div>
         )}
 
+        {/* Method-specific adders */}
+        <div className="space-y-1">
+          <Label className="text-xs font-medium">Add-ons</Label>
+          {(pasture.adders ?? []).map((adder, idx) => {
+            const def = rateCard.methodAdders.find((d) => d.id === adder.adderId);
+            return (
+              <div key={adder.adderId} className="flex items-center gap-1.5 text-xs">
+                <span className="flex-1 truncate">{def?.label ?? adder.adderId}</span>
+                <Input
+                  type="number"
+                  min={0}
+                  value={adder.quantity}
+                  onChange={(e) => {
+                    const updated = [...(pasture.adders ?? [])];
+                    updated[idx] = { ...updated[idx], quantity: Number(e.target.value) || 0 };
+                    updatePasture(pasture.id, { adders: updated });
+                  }}
+                  className="h-7 w-16 text-xs text-right"
+                />
+                <span className="text-muted-foreground w-12">{def?.unit === 'acre' ? 'ac' : def?.unit === 'tree' ? 'tree' : def?.unit === 'pile' ? 'pile' : 'lf'}</span>
+                <span className="text-muted-foreground">@</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={adder.costPerUnit}
+                  onChange={(e) => {
+                    const updated = [...(pasture.adders ?? [])];
+                    updated[idx] = { ...updated[idx], costPerUnit: Number(e.target.value) || 0 };
+                    updatePasture(pasture.id, { adders: updated });
+                  }}
+                  className="h-7 w-16 text-xs text-right"
+                />
+                <button
+                  className="text-muted-foreground hover:text-red-500 text-sm px-1"
+                  onClick={() => {
+                    updatePasture(pasture.id, { adders: (pasture.adders ?? []).filter((_, i) => i !== idx) });
+                  }}
+                >×</button>
+              </div>
+            );
+          })}
+          {rateCard.methodAdders.filter((d) => !(pasture.adders ?? []).some((a) => a.adderId === d.id)).length > 0 && (
+            <Select
+              value=""
+              onValueChange={(adderId) => {
+                if (!adderId) return;
+                const def = rateCard.methodAdders.find((d) => d.id === adderId);
+                if (!def) return;
+                const qty = def.unit === 'acre' ? pasture.acreage : 1;
+                updatePasture(pasture.id, {
+                  adders: [...(pasture.adders ?? []), { adderId, quantity: qty, costPerUnit: def.defaultCost }],
+                });
+              }}
+            >
+              <SelectTrigger className="h-7 text-xs text-muted-foreground">
+                <SelectValue placeholder="+ Add add-on..." />
+              </SelectTrigger>
+              <SelectContent>
+                {rateCard.methodAdders
+                  .filter((d) => !(pasture.adders ?? []).some((a) => a.adderId === d.id))
+                  .map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.label} (${d.minCost}–${d.maxCost}/{d.unit.replace('_', ' ')})
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
         {/* Soil multiplier display */}
         {pasture.acreage > 0 && !pasture.soilData && (
           <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2 animate-pulse">
@@ -366,6 +437,11 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
             <div className="grid grid-cols-2 gap-x-3 text-[11px] text-emerald-900">
               <span>Winter NDVI: {pasture.seasonalAnalysis.winterNDVI ?? '—'}</span>
               <span>Summer NDVI: {pasture.seasonalAnalysis.summerNDVI ?? '—'}</span>
+              {pasture.seasonalAnalysis.cedarPct > 0 && (
+                <span className="col-span-2 font-bold text-red-700 text-xs">
+                  🌲 Cedar (persistence): {pasture.seasonalAnalysis.cedarPct}%
+                </span>
+              )}
               <span className="font-medium text-red-700">
                 🌲 Evergreen: {pasture.seasonalAnalysis.evergreenPct}%
               </span>

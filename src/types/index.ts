@@ -44,6 +44,7 @@ export interface RateCard {
   terrainMultipliers: Record<TerrainClass, number>;
   methodConfigs: ClearingMethodConfig[];
   disposalAdders: Record<DisposalMethod, number>; // $/acre
+  methodAdders: MethodAdder[];
   minimumBid: number;
   mobilizationFee: number;
 }
@@ -84,6 +85,8 @@ export interface Pasture {
   // Cedar analysis
   cedarAnalysis: CedarAnalysis | null;
   seasonalAnalysis: SeasonalAnalysis | null;
+  // Method-specific adders
+  adders: PastureAdder[];
   // Calculated
   subtotal: number;
   methodMultiplier: number;
@@ -144,6 +147,7 @@ export interface SeasonalAnalysis {
   winterNDVI: number | null;
   summerNDVI: number | null;
   ndviChange: number | null;
+  cedarPct: number;
   evergreenPct: number;
   deciduousPct: number;
   dormantPct: number;
@@ -159,6 +163,12 @@ export interface MethodAdder {
   minCost: number;
   maxCost: number;
   defaultCost: number;
+}
+
+export interface PastureAdder {
+  adderId: string;
+  quantity: number;
+  costPerUnit: number;
 }
 
 // ──── Bid ────
