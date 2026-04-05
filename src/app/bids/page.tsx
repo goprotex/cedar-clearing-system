@@ -1,7 +1,7 @@
 import BidsListClient from './BidsListClient';
 
 export const metadata = {
-  title: 'Bids — Cactus Creek Clearing',
+  title: 'Bids — Cedar Hack',
 };
 
 export default function BidsPage() {

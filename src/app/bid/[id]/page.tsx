@@ -1,7 +1,7 @@
 import BidEditorClient from './BidEditorClient';
 
 export const metadata = {
-  title: 'Bid Editor — Cactus Creek Clearing',
+  title: 'Bid Editor — Cedar Hack',
 };
 
 export default async function BidEditorPage({ params }: { params: Promise<{ id: string }> }) {

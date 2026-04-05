@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useBidStore } from '@/lib/store';
 import PastureCard from '@/components/bid/PastureCard';
@@ -52,6 +52,10 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     updateBidField,
   } = useBidStore();
 
+  // Prevent hydration mismatch: Zustand generates random IDs/bid numbers
+  // on server vs client. Delay rendering until client is mounted.
+  const [mounted, setMounted] = useState(false);
+
   // Load bid from localStorage on mount
   useEffect(() => {
     loadBid(bidId);
@@ -61,7 +65,16 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     if (state.currentBid.id !== bidId) {
       state.newBid();
     }
+    setMounted(true);
   }, [bidId, loadBid]);
+
+  if (!mounted) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-400">
+        Loading bid...
+      </div>
+    );
+  }
 
   // Auto-save with debounce (3 seconds after last change)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
