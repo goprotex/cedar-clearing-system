@@ -115,6 +115,18 @@ export interface CedarAnalysisSummary {
 export interface CedarAnalysis {
   gridCells: GeoJSON.FeatureCollection;
   summary: CedarAnalysisSummary;
+  claudeVision: ClaudeVisionAnalysis | null;
+}
+
+export interface ClaudeVisionAnalysis {
+  cedarPct: number;
+  oakPct: number;
+  brushPct: number;
+  grassPct: number;
+  barePct: number;
+  cedarDensity: string;
+  confidence: number;
+  notes: string;
 }
 
 // ──── Method-Specific Adders ────

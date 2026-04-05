@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
 
+export const maxDuration = 55; // Vercel function timeout
+
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
+const NAIP_EXPORT =
+  'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage';
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
 
@@ -86,6 +91,135 @@ function getClassColor(classification: VegClass, ndvi: number): string {
       return '#65a30d';
     case 'bare':
       return '#9ca3af';
+  }
+}
+
+// ── Claude Vision prompt ──
+
+const CEDAR_VISION_PROMPT = `You are an expert arborist and vegetation analyst specializing in Texas Hill Country vegetation, particularly Ashe Juniper (cedar) identification.
+
+You are looking at two aerial images of the same ranch pasture in the Texas Hill Country:
+1. FIRST IMAGE: Natural color (RGB) aerial photo at 0.6m resolution from NAIP
+2. SECOND IMAGE: Color Infrared (CIR) — bands are NIR/Red/Green. In CIR:
+   - Bright pink/red = healthy broadleaf vegetation (live oak, deciduous trees)
+   - Dark maroon/brown-red = evergreen conifers (Ashe Juniper/cedar)
+   - Light pink = grass/pasture
+   - White/cyan = bare ground, roads, rock
+
+Key identification features for Ashe Juniper (cedar):
+- In RGB: Dark green, dense dome/conical canopy, grows in clusters
+- In CIR: Dark maroon/brown (NOT bright pink — that's oak)
+- Evergreen year-round (stays dark green even in winter)
+- Often found on hillsides, along fence lines, in draws
+
+Key identification features for Live Oak:
+- In RGB: Lighter green, broad spreading canopy, larger individual crowns
+- In CIR: Bright pink/red (high NIR reflectance)
+- Semi-evergreen in Texas (may thin in late winter)
+
+Analyze both images and estimate vegetation percentages. Return ONLY valid JSON:
+{
+  "cedarPct": <number 0-100>,
+  "oakPct": <number 0-100>,
+  "brushPct": <number 0-100>,
+  "grassPct": <number 0-100>,
+  "barePct": <number 0-100>,
+  "cedarDensity": "<light|moderate|heavy|extreme>",
+  "confidence": <number 0-100>,
+  "notes": "<2-3 sentence professional assessment of vegetation pattern, cedar distribution, and any clearing recommendations>"
+}`;
+
+// ── Claude Vision analysis ──
+
+interface ClaudeVisionResult {
+  cedarPct: number;
+  oakPct: number;
+  brushPct: number;
+  grassPct: number;
+  barePct: number;
+  cedarDensity: string;
+  confidence: number;
+  notes: string;
+}
+
+async function runClaudeVision(
+  bbox: number[],
+  claudeKey: string
+): Promise<ClaudeVisionResult | null> {
+  try {
+    const bboxStr = `${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]}`;
+    const rgbUrl = `${NAIP_EXPORT}?bbox=${bboxStr}&bboxSR=4326&imageSR=4326&size=1024,1024&format=png&f=image`;
+    const cirUrl = `${NAIP_EXPORT}?bbox=${bboxStr}&bboxSR=4326&imageSR=4326&size=1024,1024&format=png&bandIds=3,0,1&f=image`;
+
+    // Fetch both images in parallel
+    const [rgbRes, cirRes] = await Promise.all([
+      fetch(rgbUrl, { signal: AbortSignal.timeout(15000) }),
+      fetch(cirUrl, { signal: AbortSignal.timeout(15000) }),
+    ]);
+
+    if (!rgbRes.ok || !cirRes.ok) return null;
+
+    const [rgbBuf, cirBuf] = await Promise.all([
+      rgbRes.arrayBuffer(),
+      cirRes.arrayBuffer(),
+    ]);
+
+    const rgbB64 = Buffer.from(rgbBuf).toString('base64');
+    const cirB64 = Buffer.from(cirBuf).toString('base64');
+
+    // Call Claude API with both images
+    const claudeRes = await fetch(ANTHROPIC_API, {
+      method: 'POST',
+      headers: {
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/png', data: rgbB64 },
+              },
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/png', data: cirB64 },
+              },
+              { type: 'text', text: CEDAR_VISION_PROMPT },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!claudeRes.ok) return null;
+
+    const claudeData = await claudeRes.json();
+    const text: string = claudeData?.content?.[0]?.text || '';
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      cedarPct: Number(parsed.cedarPct) || 0,
+      oakPct: Number(parsed.oakPct) || 0,
+      brushPct: Number(parsed.brushPct) || 0,
+      grassPct: Number(parsed.grassPct) || 0,
+      barePct: Number(parsed.barePct) || 0,
+      cedarDensity: parsed.cedarDensity || 'moderate',
+      confidence: Number(parsed.confidence) || 50,
+      notes: String(parsed.notes || ''),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -242,8 +376,15 @@ export async function POST(req: NextRequest) {
       gridSpacingM: Math.round(spacingKm * 1000),
     };
 
+    // Step 2: Claude Vision analysis (if API key available)
+    let claudeVision: ClaudeVisionResult | null = null;
+    const claudeKey = process.env.CLAUDE_VISION;
+    if (claudeKey) {
+      claudeVision = await runClaudeVision(bbox, claudeKey);
+    }
+
     return NextResponse.json(
-      { gridCells, summary },
+      { gridCells, summary, claudeVision },
       { headers: { 'Cache-Control': 'private, max-age=3600' } }
     );
   } catch (err) {

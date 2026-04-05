@@ -260,33 +260,71 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
               setAnalyzing(false);
             }}
           >
-            {analyzing ? 'Analyzing NAIP imagery...' : '🤖 Analyze Cedar (AI)'}
+            {analyzing ? 'Analyzing imagery with AI...' : '🤖 Analyze Cedar (AI)'}
           </Button>
         )}
         {pasture.cedarAnalysis && (
-          <div className="text-xs text-muted-foreground bg-red-50 border border-red-200 rounded p-2 space-y-1">
-            <div className="font-semibold text-red-800 flex items-center justify-between">
-              <span>🤖 Cedar Analysis</span>
-              <Badge variant="outline" className="text-[10px] border-red-300 text-red-600">
-                {pasture.cedarAnalysis.summary.confidence}% conf
-              </Badge>
+          <div className="text-xs space-y-2">
+            {/* Spectral Analysis */}
+            <div className="text-muted-foreground bg-muted/50 border rounded p-2 space-y-1">
+              <div className="font-semibold text-foreground flex items-center justify-between">
+                <span>📊 Spectral Analysis (NAIP)</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {pasture.cedarAnalysis.summary.confidence}% conf
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 text-[11px]">
+                <span className="text-red-700 font-medium">
+                  Cedar: {pasture.cedarAnalysis.summary.cedar.pct}%
+                  ({pasture.cedarAnalysis.summary.estimatedCedarAcres} ac)
+                </span>
+                <span>Oak: {pasture.cedarAnalysis.summary.oak.pct}%</span>
+                <span>Brush: {pasture.cedarAnalysis.summary.mixedBrush.pct}%</span>
+                <span>Grass: {pasture.cedarAnalysis.summary.grass.pct}%</span>
+                <span>Bare: {pasture.cedarAnalysis.summary.bare.pct}%</span>
+                <span>NDVI avg: {pasture.cedarAnalysis.summary.averageNDVI}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                {pasture.cedarAnalysis.summary.totalSamples} samples @ {pasture.cedarAnalysis.summary.gridSpacingM}m grid
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 text-[11px]">
-              <span className="text-red-700 font-medium">
-                Cedar: {pasture.cedarAnalysis.summary.cedar.pct}%
-                ({pasture.cedarAnalysis.summary.estimatedCedarAcres} ac)
-              </span>
-              <span>Oak: {pasture.cedarAnalysis.summary.oak.pct}%</span>
-              <span>Brush: {pasture.cedarAnalysis.summary.mixedBrush.pct}%</span>
-              <span>Grass: {pasture.cedarAnalysis.summary.grass.pct}%</span>
-              <span>Bare: {pasture.cedarAnalysis.summary.bare.pct}%</span>
-              <span>NDVI avg: {pasture.cedarAnalysis.summary.averageNDVI}</span>
-            </div>
-            <div className="text-[10px] text-muted-foreground pt-0.5">
-              {pasture.cedarAnalysis.summary.totalSamples} samples @ {pasture.cedarAnalysis.summary.gridSpacingM}m grid
-              {' · '}
+
+            {/* Claude Vision Analysis */}
+            {pasture.cedarAnalysis.claudeVision && (
+              <div className="bg-violet-50 border border-violet-200 rounded p-2 space-y-1">
+                <div className="font-semibold text-violet-800 flex items-center justify-between">
+                  <span>🧠 AI Vision Analysis</span>
+                  <Badge variant="outline" className="text-[10px] border-violet-300 text-violet-600">
+                    {pasture.cedarAnalysis.claudeVision.confidence}% conf
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 text-[11px] text-violet-900">
+                  <span className="font-medium">
+                    Cedar: {pasture.cedarAnalysis.claudeVision.cedarPct}%
+                    <span className="text-[10px] text-violet-600 ml-1">
+                      ({pasture.cedarAnalysis.claudeVision.cedarDensity})
+                    </span>
+                  </span>
+                  <span>Oak: {pasture.cedarAnalysis.claudeVision.oakPct}%</span>
+                  <span>Brush: {pasture.cedarAnalysis.claudeVision.brushPct}%</span>
+                  <span>Grass: {pasture.cedarAnalysis.claudeVision.grassPct}%</span>
+                  <span>Bare: {pasture.cedarAnalysis.claudeVision.barePct}%</span>
+                </div>
+                <p className="text-[11px] text-violet-800 leading-relaxed pt-0.5 italic">
+                  {pasture.cedarAnalysis.claudeVision.notes}
+                </p>
+              </div>
+            )}
+
+            {!pasture.cedarAnalysis.claudeVision && (
+              <div className="text-[10px] text-muted-foreground bg-muted/30 rounded p-1.5 text-center">
+                AI Vision unavailable — check CLAUDE_VISION env var
+              </div>
+            )}
+
+            <div className="text-center">
               <button
-                className="underline hover:no-underline text-red-600"
+                className="text-[10px] underline hover:no-underline text-muted-foreground"
                 onClick={async () => {
                   setAnalyzing(true);
                   await analyzeCedar(pasture.id);
