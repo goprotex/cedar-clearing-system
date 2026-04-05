@@ -56,6 +56,10 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   // on server vs client. Delay rendering until client is mounted.
   const [mounted, setMounted] = useState(false);
 
+  // Auto-save with debounce (3 seconds after last change)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastUpdatedAt = useRef(currentBid.updatedAt);
+
   // Load bid from localStorage on mount
   useEffect(() => {
     loadBid(bidId);
@@ -67,18 +71,6 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     }
     setMounted(true);
   }, [bidId, loadBid]);
-
-  if (!mounted) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-400">
-        Loading bid...
-      </div>
-    );
-  }
-
-  // Auto-save with debounce (3 seconds after last change)
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastUpdatedAt = useRef(currentBid.updatedAt);
 
   useEffect(() => {
     if (currentBid.updatedAt !== lastUpdatedAt.current && currentBid.pastures.length > 0) {
@@ -98,6 +90,15 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   }, [saveBid]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+
+  // All hooks above — safe to early-return now
+  if (!mounted) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-400">
+        Loading bid...
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col">
