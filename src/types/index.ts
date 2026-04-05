@@ -81,11 +81,40 @@ export interface Pasture {
   soilMultiplierOverride: number | null;
   // Elevation
   elevationFt: number | null;
+  // Cedar analysis
+  cedarAnalysis: CedarAnalysis | null;
   // Calculated
   subtotal: number;
   methodMultiplier: number;
   estimatedHrsPerAcre: number;
   notes: string;
+}
+
+// ──── Cedar Analysis ────
+
+export type CedarVegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
+
+export interface CedarClassCount {
+  count: number;
+  pct: number;
+}
+
+export interface CedarAnalysisSummary {
+  totalSamples: number;
+  cedar: CedarClassCount;
+  oak: CedarClassCount;
+  mixedBrush: CedarClassCount;
+  grass: CedarClassCount;
+  bare: CedarClassCount;
+  estimatedCedarAcres: number;
+  averageNDVI: number;
+  confidence: number;
+  gridSpacingM: number;
+}
+
+export interface CedarAnalysis {
+  gridCells: GeoJSON.FeatureCollection;
+  summary: CedarAnalysisSummary;
 }
 
 // ──── Method-Specific Adders ────

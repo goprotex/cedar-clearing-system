@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { Bid, BidSummary, CustomLineItem, Pasture, RateCard } from '@/types';
+import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard } from '@/types';
 import {
   calculatePastureCost,
   calculateBidTotal,
@@ -34,6 +34,7 @@ function createDefaultPasture(sortOrder: number): Pasture {
     soilMultiplier: 1.0,
     soilMultiplierOverride: null,
     elevationFt: null,
+    cedarAnalysis: null,
     subtotal: 0,
     methodMultiplier: 1.0,
     estimatedHrsPerAcre: 1.0,
@@ -110,6 +111,9 @@ interface BidStore {
 
   // Elevation
   fetchElevation: (pastureId: string, lon: number, lat: number) => Promise<void>;
+
+  // Cedar detection
+  analyzeCedar: (pastureId: string) => Promise<void>;
 
   // Persistence (local storage for Phase 1)
   saveBid: () => void;
@@ -354,6 +358,28 @@ export const useBidStore = create<BidStore>((set, get) => ({
       }
     } catch {
       // Elevation lookup is best-effort
+    }
+  },
+
+  analyzeCedar: async (pastureId) => {
+    const pasture = get().currentBid.pastures.find((p) => p.id === pastureId);
+    if (!pasture || pasture.acreage === 0) return;
+    if (pasture.polygon.geometry.coordinates.length === 0) return;
+
+    try {
+      const res = await fetch('/api/cedar-detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coordinates: pasture.polygon.geometry.coordinates,
+          acreage: pasture.acreage,
+        }),
+      });
+      if (!res.ok) return;
+      const data: CedarAnalysis = await res.json();
+      get().updatePasture(pastureId, { cedarAnalysis: data });
+    } catch {
+      // Cedar analysis is best-effort
     }
   },
 }));

@@ -20,7 +20,7 @@ interface MapContainerProps {
   accessToken: string;
 }
 
-type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d';
+type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI';
 
 export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -33,6 +33,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     naipCIR: false,
     naipNDVI: false,
     terrain3d: false,
+    cedarAI: false,
   });
   const [opacities, setOpacities] = useState<Record<LayerKey, number>>({
     soil: 0.45,
@@ -40,6 +41,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     naipCIR: 0.85,
     naipNDVI: 0.75,
     terrain3d: 1.3, // terrain exaggeration (0.5–2.5)
+    cedarAI: 0.7,
   });
 
   const {
@@ -178,6 +180,35 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         data: { type: 'FeatureCollection', features: [] },
       });
 
+      // ── Cedar AI overlay source ──
+      map.addSource('cedar-analysis', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'cedar-fill',
+        type: 'fill',
+        source: 'cedar-analysis',
+        paint: {
+          'fill-color': ['get', 'color'],
+          'fill-opacity': 0.7,
+        },
+        layout: { visibility: 'none' },
+      });
+
+      map.addLayer({
+        id: 'cedar-border',
+        type: 'line',
+        source: 'cedar-analysis',
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': 0.5,
+          'line-opacity': 0.5,
+        },
+        layout: { visibility: 'none' },
+      });
+
       // Fill layer
       map.addLayer({
         id: 'pastures-fill',
@@ -267,6 +298,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       naipCIR: 'naip-cir-overlay',
       naipNDVI: 'naip-ndvi-overlay',
       terrain3d: '', // handled separately
+      cedarAI: '',   // handled below (two layers)
     };
 
     // Toggle raster layers and set opacity
@@ -281,6 +313,17 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         );
         map.setPaintProperty(layerId, 'raster-opacity', opacities[key as LayerKey]);
       }
+    }
+
+    // Toggle cedar AI overlay (fill + border)
+    for (const cedarLayerId of ['cedar-fill', 'cedar-border']) {
+      const layer = map.getLayer(cedarLayerId);
+      if (layer) {
+        map.setLayoutProperty(cedarLayerId, 'visibility', layers.cedarAI ? 'visible' : 'none');
+      }
+    }
+    if (map.getLayer('cedar-fill')) {
+      map.setPaintProperty('cedar-fill', 'fill-opacity', opacities.cedarAI);
     }
 
     // Toggle 3D terrain
@@ -375,6 +418,25 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
     source.setData({ type: 'FeatureCollection', features });
   }, [currentBid.pastures, selectedPastureId]);
+
+  // ── Sync cedar analysis overlay data ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const source = map.getSource('cedar-analysis') as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+
+    // Merge all pastures' cedar analysis grid cells into one FeatureCollection
+    const allFeatures: GeoJSON.Feature[] = [];
+    for (const p of currentBid.pastures) {
+      if (p.cedarAnalysis?.gridCells?.features) {
+        allFeatures.push(...p.cedarAnalysis.gridCells.features);
+      }
+    }
+
+    source.setData({ type: 'FeatureCollection', features: allFeatures });
+  }, [currentBid.pastures]);
 
   // ── Fly to selected pasture when it changes ──
   useEffect(() => {
@@ -474,6 +536,16 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacityStep={0.1}
               onToggle={() => toggleLayer('terrain3d')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, terrain3d: v }))}
+            />
+
+            <div className="border-t border-slate-700 my-1" />
+
+            <LayerRow
+              label="🤖 AI Cedar"
+              active={layers.cedarAI}
+              opacity={opacities.cedarAI}
+              onToggle={() => toggleLayer('cedarAI')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, cedarAI: v }))}
             />
           </div>
         ) : (

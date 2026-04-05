@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Pasture, ClearingMethod, DensityClass, DisposalMethod, TerrainClass, VegetationType } from '@/types';
 import { useBidStore } from '@/lib/store';
 import {
@@ -23,7 +24,8 @@ interface PastureCardProps {
 }
 
 export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
-  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard } = useBidStore();
+  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar } = useBidStore();
+  const [analyzing, setAnalyzing] = useState(false);
 
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
 
@@ -229,6 +231,59 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                   Flood: {pasture.soilData.flodfreqcl}
                 </Badge>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Cedar AI analysis */}
+        {pasture.acreage > 0 && !pasture.cedarAnalysis && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs border-red-300 text-red-700 hover:bg-red-50"
+            disabled={analyzing}
+            onClick={async () => {
+              setAnalyzing(true);
+              await analyzeCedar(pasture.id);
+              setAnalyzing(false);
+            }}
+          >
+            {analyzing ? 'Analyzing NAIP imagery...' : '🤖 Analyze Cedar (AI)'}
+          </Button>
+        )}
+        {pasture.cedarAnalysis && (
+          <div className="text-xs text-muted-foreground bg-red-50 border border-red-200 rounded p-2 space-y-1">
+            <div className="font-semibold text-red-800 flex items-center justify-between">
+              <span>🤖 Cedar Analysis</span>
+              <Badge variant="outline" className="text-[10px] border-red-300 text-red-600">
+                {pasture.cedarAnalysis.summary.confidence}% conf
+              </Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 text-[11px]">
+              <span className="text-red-700 font-medium">
+                Cedar: {pasture.cedarAnalysis.summary.cedar.pct}%
+                ({pasture.cedarAnalysis.summary.estimatedCedarAcres} ac)
+              </span>
+              <span>Oak: {pasture.cedarAnalysis.summary.oak.pct}%</span>
+              <span>Brush: {pasture.cedarAnalysis.summary.mixedBrush.pct}%</span>
+              <span>Grass: {pasture.cedarAnalysis.summary.grass.pct}%</span>
+              <span>Bare: {pasture.cedarAnalysis.summary.bare.pct}%</span>
+              <span>NDVI avg: {pasture.cedarAnalysis.summary.averageNDVI}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground pt-0.5">
+              {pasture.cedarAnalysis.summary.totalSamples} samples @ {pasture.cedarAnalysis.summary.gridSpacingM}m grid
+              {' · '}
+              <button
+                className="underline hover:no-underline text-red-600"
+                onClick={async () => {
+                  setAnalyzing(true);
+                  await analyzeCedar(pasture.id);
+                  setAnalyzing(false);
+                }}
+                disabled={analyzing}
+              >
+                {analyzing ? 'Re-analyzing...' : 'Re-analyze'}
+              </button>
             </div>
           </div>
         )}
