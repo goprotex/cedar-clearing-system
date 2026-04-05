@@ -5,7 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import { calculateAcreage, getCentroid } from '@/lib/geo';
+import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
 
 const VEGETATION_COLORS: Record<string, string> = {
@@ -20,11 +20,19 @@ interface MapContainerProps {
   accessToken: string;
 }
 
+type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d';
+
 export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
-  const [soilLayerVisible, setSoilLayerVisible] = useState(false);
+  const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
+    soil: false,
+    naip: false,
+    naipCIR: false,
+    naipNDVI: false,
+    terrain3d: false,
+  });
 
   const {
     currentBid,
@@ -80,7 +88,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     map.addControl(draw, 'top-right');
 
     map.on('load', () => {
-      // Add 3D terrain source
+      // ── DEM source (for 3D terrain) ──
       map.addSource('mapbox-dem', {
         type: 'raster-dem',
         url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
@@ -88,7 +96,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         maxzoom: 14,
       });
 
-      // USDA SDA Soil map WMS overlay
+      // ── USDA SDA Soil map WMS overlay ──
       map.addSource('soil-wms', {
         type: 'raster',
         tiles: [
@@ -101,15 +109,62 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         id: 'soil-overlay',
         type: 'raster',
         source: 'soil-wms',
-        paint: {
-          'raster-opacity': 0.45,
-        },
-        layout: {
-          visibility: 'none',
-        },
+        paint: { 'raster-opacity': 0.45 },
+        layout: { visibility: 'none' },
       });
 
-      // Pasture polygons source
+      // ── NAIP Natural Color overlay (USGS ImageServer) ──
+      map.addSource('naip-rgb', {
+        type: 'raster',
+        tiles: [
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule={"rasterFunction":"NaturalColor"}&f=image',
+        ],
+        tileSize: 256,
+      });
+
+      map.addLayer({
+        id: 'naip-overlay',
+        type: 'raster',
+        source: 'naip-rgb',
+        paint: { 'raster-opacity': 0.85 },
+        layout: { visibility: 'none' },
+      });
+
+      // ── NAIP CIR (False Color Composite: NIR, Red, Green) ──
+      map.addSource('naip-cir', {
+        type: 'raster',
+        tiles: [
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule={"rasterFunction":"FalseColorComposite"}&f=image',
+        ],
+        tileSize: 256,
+      });
+
+      map.addLayer({
+        id: 'naip-cir-overlay',
+        type: 'raster',
+        source: 'naip-cir',
+        paint: { 'raster-opacity': 0.85 },
+        layout: { visibility: 'none' },
+      });
+
+      // ── NAIP NDVI (Computed NDVI color) ──
+      map.addSource('naip-ndvi', {
+        type: 'raster',
+        tiles: [
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule={"rasterFunction":"NDVI_Color"}&f=image',
+        ],
+        tileSize: 256,
+      });
+
+      map.addLayer({
+        id: 'naip-ndvi-overlay',
+        type: 'raster',
+        source: 'naip-ndvi',
+        paint: { 'raster-opacity': 0.75 },
+        layout: { visibility: 'none' },
+      });
+
+      // ── Pasture polygons source ──
       map.addSource('pastures', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -193,15 +248,71 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-  // Toggle soil WMS layer visibility
+  // ── Toggle layer visibility ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const layer = map.getLayer('soil-overlay');
-    if (layer) {
-      map.setLayoutProperty('soil-overlay', 'visibility', soilLayerVisible ? 'visible' : 'none');
+
+    const layerMap: Record<LayerKey, string> = {
+      soil: 'soil-overlay',
+      naip: 'naip-overlay',
+      naipCIR: 'naip-cir-overlay',
+      naipNDVI: 'naip-ndvi-overlay',
+      terrain3d: '', // handled separately
+    };
+
+    // Toggle raster layers
+    for (const [key, layerId] of Object.entries(layerMap)) {
+      if (!layerId) continue;
+      const layer = map.getLayer(layerId);
+      if (layer) {
+        map.setLayoutProperty(
+          layerId,
+          'visibility',
+          layers[key as LayerKey] ? 'visible' : 'none'
+        );
+      }
     }
-  }, [soilLayerVisible]);
+
+    // Toggle 3D terrain
+    if (layers.terrain3d) {
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.3 });
+      // Add sky layer for atmosphere if not present
+      if (!map.getLayer('sky')) {
+        map.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 90.0],
+            'sky-atmosphere-sun-intensity': 15,
+          },
+        });
+      }
+    } else {
+      map.setTerrain(null);
+      if (map.getLayer('sky')) {
+        map.removeLayer('sky');
+      }
+    }
+  }, [layers]);
+
+  // Ensure NAIP layers are mutually exclusive (only one at a time)
+  const toggleLayer = useCallback((key: LayerKey) => {
+    setLayers((prev) => {
+      const next = { ...prev };
+      // NAIP variants are mutually exclusive
+      if (key === 'naip' || key === 'naipCIR' || key === 'naipNDVI') {
+        if (!prev[key]) {
+          next.naip = false;
+          next.naipCIR = false;
+          next.naipNDVI = false;
+        }
+      }
+      next[key] = !prev[key];
+      return next;
+    });
+  }, []);
 
   // Attach draw event listeners
   useEffect(() => {
@@ -256,9 +367,32 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     source.setData({ type: 'FeatureCollection', features });
   }, [currentBid.pastures, selectedPastureId]);
 
+  // ── Fly to selected pasture when it changes ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedPastureId) return;
+
+    const pasture = currentBid.pastures.find((p) => p.id === selectedPastureId);
+    if (!pasture || pasture.acreage === 0) return;
+
+    // Only fly if polygon has coordinates
+    if (pasture.polygon.geometry.coordinates.length === 0) return;
+
+    const bbox = getBBox(pasture.polygon);
+    map.fitBounds(
+      [
+        [bbox[0], bbox[1]],
+        [bbox[2], bbox[3]],
+      ],
+      { padding: 80, maxZoom: 17, duration: 1000 }
+    );
+  }, [selectedPastureId, currentBid.pastures]);
+
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full" />
+
+      {/* Drawing mode banner */}
       {drawingMode && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium z-10">
           Click on the map to draw pasture boundary. Double-click to finish.
@@ -274,19 +408,68 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           </button>
         </div>
       )}
-      {/* Map controls */}
-      <div className="absolute bottom-4 left-4 flex gap-2 z-10">
-        <button
-          onClick={() => setSoilLayerVisible((v) => !v)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg transition-colors ${
-            soilLayerVisible
-              ? 'bg-amber-600 text-white'
-              : 'bg-white/90 text-slate-700 hover:bg-white'
-          }`}
-        >
-          {soilLayerVisible ? '🟫 Soil: ON' : '🟫 Soil'}
-        </button>
+
+      {/* ── Layer control panel ── */}
+      <div className="absolute bottom-4 left-4 z-10">
+        <div className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg p-2 space-y-1 min-w-[140px]">
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 pb-1">
+            Layers
+          </div>
+
+          <LayerButton
+            label="🟫 Soil Map"
+            active={layers.soil}
+            onClick={() => toggleLayer('soil')}
+          />
+          <LayerButton
+            label="🛰️ NAIP RGB"
+            active={layers.naip}
+            onClick={() => toggleLayer('naip')}
+          />
+          <LayerButton
+            label="🔴 NAIP CIR"
+            active={layers.naipCIR}
+            onClick={() => toggleLayer('naipCIR')}
+          />
+          <LayerButton
+            label="🌿 NAIP NDVI"
+            active={layers.naipNDVI}
+            onClick={() => toggleLayer('naipNDVI')}
+          />
+
+          <div className="border-t border-slate-700 my-1" />
+
+          <LayerButton
+            label="⛰️ 3D Terrain"
+            active={layers.terrain3d}
+            onClick={() => toggleLayer('terrain3d')}
+          />
+        </div>
       </div>
     </div>
+  );
+}
+
+function LayerButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+        active
+          ? 'bg-amber-600 text-white'
+          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      {label}
+      {active && <span className="float-right text-[10px] opacity-75">ON</span>}
+    </button>
   );
 }

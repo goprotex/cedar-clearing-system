@@ -79,6 +79,8 @@ export interface Pasture {
   soilData: SoilData | null;
   soilMultiplier: number;
   soilMultiplierOverride: number | null;
+  // Elevation
+  elevationFt: number | null;
   // Calculated
   subtotal: number;
   methodMultiplier: number;

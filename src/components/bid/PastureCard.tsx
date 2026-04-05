@@ -214,6 +214,9 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
               <span>Rock: {pasture.soilData.fragvol_r}%</span>
               <span>Drainage: {pasture.soilData.drainagecl}</span>
               <span>Bedrock: {pasture.soilData.resdept_r ? `${pasture.soilData.resdept_r} cm` : 'Deep'}</span>
+              {pasture.elevationFt !== null && pasture.elevationFt !== undefined && (
+                <span>Elevation: {pasture.elevationFt.toLocaleString()} ft</span>
+              )}
             </div>
             <div className="flex items-center justify-between pt-0.5">
               <span>

@@ -33,6 +33,7 @@ function createDefaultPasture(sortOrder: number): Pasture {
     soilData: null,
     soilMultiplier: 1.0,
     soilMultiplierOverride: null,
+    elevationFt: null,
     subtotal: 0,
     methodMultiplier: 1.0,
     estimatedHrsPerAcre: 1.0,
@@ -106,6 +107,9 @@ interface BidStore {
 
   // Soil
   fetchSoilData: (pastureId: string, lon: number, lat: number) => Promise<void>;
+
+  // Elevation
+  fetchElevation: (pastureId: string, lon: number, lat: number) => Promise<void>;
 
   // Persistence (local storage for Phase 1)
   saveBid: () => void;
@@ -192,6 +196,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
     get().recalculate();
     // Auto-fetch soil data for the new polygon's centroid
     get().fetchSoilData(id, centroid[0], centroid[1]);
+    // Auto-fetch elevation
+    get().fetchElevation(id, centroid[0], centroid[1]);
   },
 
   setDrawingMode: (active) => set({ drawingMode: active }),
@@ -335,6 +341,19 @@ export const useBidStore = create<BidStore>((set, get) => ({
       }
     } catch {
       // Soil lookup is best-effort; don't block the user
+    }
+  },
+
+  fetchElevation: async (pastureId, lon, lat) => {
+    try {
+      const res = await fetch(`/api/elevation?lon=${lon}&lat=${lat}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.elevationFt !== null && data.elevationFt !== undefined) {
+        get().updatePasture(pastureId, { elevationFt: data.elevationFt });
+      }
+    } catch {
+      // Elevation lookup is best-effort
     }
   },
 }));
