@@ -24,8 +24,9 @@ interface PastureCardProps {
 }
 
 export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
-  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar } = useBidStore();
+  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar, analyzeSeasonal } = useBidStore();
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingSeasonal, setAnalyzingSeasonal] = useState(false);
 
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
 
@@ -333,6 +334,70 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                 disabled={analyzing}
               >
                 {analyzing ? 'Re-analyzing...' : 'Re-analyze'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Seasonal NDVI Analysis */}
+        {!pasture.seasonalAnalysis && pasture.polygon.geometry.coordinates.length > 0 && pasture.acreage > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+            disabled={analyzingSeasonal}
+            onClick={async () => {
+              setAnalyzingSeasonal(true);
+              await analyzeSeasonal(pasture.id);
+              setAnalyzingSeasonal(false);
+            }}
+          >
+            {analyzingSeasonal ? 'Fetching Sentinel-2 imagery...' : '🌡️ Seasonal NDVI Analysis'}
+          </Button>
+        )}
+        {pasture.seasonalAnalysis && (
+          <div className="text-xs space-y-1 bg-emerald-50 border border-emerald-200 rounded p-2">
+            <div className="font-semibold text-emerald-800 flex items-center justify-between">
+              <span>🌡️ Seasonal NDVI</span>
+              <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600">
+                {pasture.seasonalAnalysis.confidence}% conf
+              </Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 text-[11px] text-emerald-900">
+              <span>Winter NDVI: {pasture.seasonalAnalysis.winterNDVI ?? '—'}</span>
+              <span>Summer NDVI: {pasture.seasonalAnalysis.summerNDVI ?? '—'}</span>
+              <span className="font-medium text-red-700">
+                🌲 Evergreen: {pasture.seasonalAnalysis.evergreenPct}%
+              </span>
+              <span className="text-amber-700">
+                🍂 Deciduous: {pasture.seasonalAnalysis.deciduousPct}%
+              </span>
+              <span>Dormant/Bare: {pasture.seasonalAnalysis.dormantPct}%</span>
+              {pasture.seasonalAnalysis.ndviChange !== null && (
+                <span>NDVI Δ: {pasture.seasonalAnalysis.ndviChange > 0 ? '+' : ''}{pasture.seasonalAnalysis.ndviChange}</span>
+              )}
+            </div>
+            {pasture.seasonalAnalysis.winterScene && (
+              <div className="text-[10px] text-muted-foreground">
+                Winter: {pasture.seasonalAnalysis.winterScene.date} ({pasture.seasonalAnalysis.winterScene.cloudCover}% cloud)
+              </div>
+            )}
+            {pasture.seasonalAnalysis.summerScene && (
+              <div className="text-[10px] text-muted-foreground">
+                Summer: {pasture.seasonalAnalysis.summerScene.date} ({pasture.seasonalAnalysis.summerScene.cloudCover}% cloud)
+              </div>
+            )}
+            <div className="text-center pt-0.5">
+              <button
+                className="text-[10px] underline hover:no-underline text-muted-foreground"
+                onClick={async () => {
+                  setAnalyzingSeasonal(true);
+                  await analyzeSeasonal(pasture.id);
+                  setAnalyzingSeasonal(false);
+                }}
+                disabled={analyzingSeasonal}
+              >
+                {analyzingSeasonal ? 'Re-analyzing...' : 'Re-analyze'}
               </button>
             </div>
           </div>

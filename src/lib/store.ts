@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard } from '@/types';
+import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard, SeasonalAnalysis } from '@/types';
 import {
   calculatePastureCost,
   calculateBidTotal,
@@ -35,6 +35,7 @@ function createDefaultPasture(sortOrder: number): Pasture {
     soilMultiplierOverride: null,
     elevationFt: null,
     cedarAnalysis: null,
+    seasonalAnalysis: null,
     subtotal: 0,
     methodMultiplier: 1.0,
     estimatedHrsPerAcre: 1.0,
@@ -114,6 +115,9 @@ interface BidStore {
 
   // Cedar detection
   analyzeCedar: (pastureId: string) => Promise<void>;
+
+  // Seasonal analysis
+  analyzeSeasonal: (pastureId: string) => Promise<void>;
 
   // Persistence (local storage for Phase 1)
   saveBid: () => void;
@@ -380,6 +384,27 @@ export const useBidStore = create<BidStore>((set, get) => ({
       get().updatePasture(pastureId, { cedarAnalysis: data });
     } catch {
       // Cedar analysis is best-effort
+    }
+  },
+
+  analyzeSeasonal: async (pastureId) => {
+    const pasture = get().currentBid.pastures.find((p) => p.id === pastureId);
+    if (!pasture || pasture.acreage === 0) return;
+    if (pasture.polygon.geometry.coordinates.length === 0) return;
+
+    try {
+      const res = await fetch('/api/seasonal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coordinates: pasture.polygon.geometry.coordinates,
+        }),
+      });
+      if (!res.ok) return;
+      const data: SeasonalAnalysis = await res.json();
+      get().updatePasture(pastureId, { seasonalAnalysis: data });
+    } catch {
+      // Seasonal analysis is best-effort
     }
   },
 }));

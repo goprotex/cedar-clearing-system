@@ -83,6 +83,7 @@ export interface Pasture {
   elevationFt: number | null;
   // Cedar analysis
   cedarAnalysis: CedarAnalysis | null;
+  seasonalAnalysis: SeasonalAnalysis | null;
   // Calculated
   subtotal: number;
   methodMultiplier: number;
@@ -127,6 +128,26 @@ export interface ClaudeVisionAnalysis {
   cedarDensity: string;
   confidence: number;
   notes: string;
+}
+
+// ──── Seasonal Analysis ────
+
+export interface SeasonalScene {
+  id: string;
+  date: string;
+  cloudCover: number;
+}
+
+export interface SeasonalAnalysis {
+  winterScene: SeasonalScene | null;
+  summerScene: SeasonalScene | null;
+  winterNDVI: number | null;
+  summerNDVI: number | null;
+  ndviChange: number | null;
+  evergreenPct: number;
+  deciduousPct: number;
+  dormantPct: number;
+  confidence: number;
 }
 
 // ──── Method-Specific Adders ────
