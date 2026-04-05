@@ -34,6 +34,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     naipNDVI: false,
     terrain3d: false,
   });
+  const [opacities, setOpacities] = useState<Record<LayerKey, number>>({
+    soil: 0.45,
+    naip: 0.85,
+    naipCIR: 0.85,
+    naipNDVI: 0.75,
+    terrain3d: 1.3, // terrain exaggeration (0.5–2.5)
+  });
 
   const {
     currentBid,
@@ -249,7 +256,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
-  // ── Toggle layer visibility ──
+  // ── Toggle layer visibility + opacity ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -262,7 +269,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       terrain3d: '', // handled separately
     };
 
-    // Toggle raster layers
+    // Toggle raster layers and set opacity
     for (const [key, layerId] of Object.entries(layerMap)) {
       if (!layerId) continue;
       const layer = map.getLayer(layerId);
@@ -272,12 +279,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           'visibility',
           layers[key as LayerKey] ? 'visible' : 'none'
         );
+        map.setPaintProperty(layerId, 'raster-opacity', opacities[key as LayerKey]);
       }
     }
 
     // Toggle 3D terrain
     if (layers.terrain3d) {
-      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.3 });
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
       // Add sky layer for atmosphere if not present
       if (!map.getLayer('sky')) {
         map.addLayer({
@@ -296,7 +304,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         map.removeLayer('sky');
       }
     }
-  }, [layers]);
+  }, [layers, opacities]);
 
   // Ensure NAIP layers are mutually exclusive (only one at a time)
   const toggleLayer = useCallback((key: LayerKey) => {
@@ -413,7 +421,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {/* ── Layer control panel ── */}
       <div className="absolute bottom-4 left-4 z-10">
         {layersPanelOpen ? (
-          <div className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg p-2 space-y-1 min-w-[140px]">
+          <div className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg p-2 min-w-[170px]">
             <div className="flex items-center justify-between px-1 pb-1">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Layers
@@ -427,33 +435,45 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               </button>
             </div>
 
-            <LayerButton
-              label="🟫 Soil Map"
+            <LayerRow
+              label="🟫 Soil"
               active={layers.soil}
-              onClick={() => toggleLayer('soil')}
+              opacity={opacities.soil}
+              onToggle={() => toggleLayer('soil')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, soil: v }))}
             />
-            <LayerButton
-              label="🛰️ NAIP RGB"
+            <LayerRow
+              label="🛰️ RGB"
               active={layers.naip}
-              onClick={() => toggleLayer('naip')}
+              opacity={opacities.naip}
+              onToggle={() => toggleLayer('naip')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, naip: v }))}
             />
-            <LayerButton
-              label="🔴 NAIP CIR"
+            <LayerRow
+              label="🔴 CIR"
               active={layers.naipCIR}
-              onClick={() => toggleLayer('naipCIR')}
+              opacity={opacities.naipCIR}
+              onToggle={() => toggleLayer('naipCIR')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, naipCIR: v }))}
             />
-            <LayerButton
-              label="🌿 NAIP NDVI"
+            <LayerRow
+              label="🌿 NDVI"
               active={layers.naipNDVI}
-              onClick={() => toggleLayer('naipNDVI')}
+              opacity={opacities.naipNDVI}
+              onToggle={() => toggleLayer('naipNDVI')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, naipNDVI: v }))}
             />
 
             <div className="border-t border-slate-700 my-1" />
 
-            <LayerButton
-              label="⛰️ 3D Terrain"
+            <LayerRow
+              label="⛰️ 3D"
               active={layers.terrain3d}
-              onClick={() => toggleLayer('terrain3d')}
+              opacity={opacities.terrain3d}
+              opacityRange={[0.5, 2.5]}
+              opacityStep={0.1}
+              onToggle={() => toggleLayer('terrain3d')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, terrain3d: v }))}
             />
           </div>
         ) : (
@@ -469,26 +489,52 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   );
 }
 
-function LayerButton({
+function LayerRow({
   label,
   active,
-  onClick,
+  opacity,
+  opacityRange = [0, 1],
+  opacityStep = 0.05,
+  onToggle,
+  onOpacity,
 }: {
   label: string;
   active: boolean;
-  onClick: () => void;
+  opacity: number;
+  opacityRange?: [number, number];
+  opacityStep?: number;
+  onToggle: () => void;
+  onOpacity: (v: number) => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-        active
-          ? 'bg-amber-600 text-white'
-          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-      }`}
-    >
-      {label}
-      {active && <span className="float-right text-[10px] opacity-75">ON</span>}
-    </button>
+    <div className="space-y-0.5">
+      <button
+        onClick={onToggle}
+        className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors ${
+          active
+            ? 'bg-amber-600 text-white'
+            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+        }`}
+      >
+        {label}
+        {active && <span className="float-right text-[10px] opacity-75">ON</span>}
+      </button>
+      {active && (
+        <div className="flex items-center gap-1.5 px-2 pb-0.5">
+          <input
+            type="range"
+            min={opacityRange[0]}
+            max={opacityRange[1]}
+            step={opacityStep}
+            value={opacity}
+            onChange={(e) => onOpacity(parseFloat(e.target.value))}
+            className="w-full h-1 accent-amber-500 cursor-pointer"
+          />
+          <span className="text-[9px] text-slate-400 w-7 text-right tabular-nums">
+            {Math.round((opacity / opacityRange[1]) * 100)}%
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
