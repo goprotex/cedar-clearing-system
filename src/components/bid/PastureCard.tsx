@@ -57,6 +57,18 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                 {formatCurrency(pasture.subtotal)}
               </Badge>
             )}
+            <button
+              title="Remove pasture"
+              className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Remove "${pasture.name}"? This cannot be undone.`)) {
+                  removePasture(pasture.id);
+                }
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
           </div>
         </div>
       </CardHeader>
@@ -310,20 +322,6 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           onChange={(e) => updatePasture(pasture.id, { notes: e.target.value })}
           className="text-xs h-16 resize-none"
         />
-
-        {/* Remove */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full text-xs text-destructive hover:text-destructive"
-          onClick={() => {
-            if (confirm(`Remove "${pasture.name}"? This cannot be undone.`)) {
-              removePasture(pasture.id);
-            }
-          }}
-        >
-          Remove Pasture
-        </Button>
       </CardContent>
     </Card>
   );
