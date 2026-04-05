@@ -11,7 +11,7 @@ function isValidCoord(lon: number, lat: number): boolean {
 }
 
 function buildSoilQuery(lon: number, lat: number): string {
-  // Parameterized spatial point query — no user-supplied strings in SQL
+  // lon/lat are float-validated before reaching here — safe to interpolate
   return `
     SELECT TOP 1
       mu.muname,

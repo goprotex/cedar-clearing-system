@@ -55,6 +55,12 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   // Load bid from localStorage on mount
   useEffect(() => {
     loadBid(bidId);
+    // If no saved data was found for this ID, the store still holds
+    // the previous (stale) bid. Reset to a fresh bid keyed to this ID.
+    const state = useBidStore.getState();
+    if (state.currentBid.id !== bidId) {
+      state.newBid();
+    }
   }, [bidId, loadBid]);
 
   // Auto-save with debounce (3 seconds after last change)
@@ -86,7 +92,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
       <header className="h-14 bg-slate-900 text-white flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/bids" className="text-amber-500 font-bold text-lg hover:text-amber-400">
-            CCC
+            CH
           </Link>
           <span className="text-slate-500">|</span>
           <span className="font-medium">{currentBid.bidNumber}</span>

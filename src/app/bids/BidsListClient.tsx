@@ -42,7 +42,7 @@ export default function BidsListClient() {
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-amber-500">Cactus Creek Clearing</h1>
+              <h1 className="text-2xl font-bold text-amber-500">Cedar Hack</h1>
               <p className="text-slate-400 text-sm mt-1">AI-Powered Clearing Company Operating System</p>
             </div>
             <Button

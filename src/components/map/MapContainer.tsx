@@ -42,6 +42,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       const feature = e.features[0] as GeoJSON.Feature<GeoJSON.Polygon>;
       if (!feature || feature.geometry.type !== 'Polygon') return;
 
+      // Validate polygon has at least 3 distinct points (GeoJSON closes the ring, so >=4 coords)
+      if (feature.geometry.coordinates[0].length < 4) return;
+
       const acreage = calculateAcreage(feature);
       const centroid = getCentroid(feature);
       setPasturePolygon(selectedPastureId, feature, acreage, centroid);

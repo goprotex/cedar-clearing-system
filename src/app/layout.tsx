@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cactus Creek Clearing",
+  title: "Cedar Hack",
   description: "AI-Powered Clearing Company Operating System",
 };
 

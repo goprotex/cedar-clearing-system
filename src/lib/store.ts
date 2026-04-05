@@ -105,7 +105,7 @@ interface BidStore {
   recalculate: () => void;
 
   // Soil
-  fetchSoilData: (pastureId: string, lon: number, lat: number) => void;
+  fetchSoilData: (pastureId: string, lon: number, lat: number) => Promise<void>;
 
   // Persistence (local storage for Phase 1)
   saveBid: () => void;
@@ -260,7 +260,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
           ...currentBid,
           pastures: updatedPastures,
           totalAcreage: Math.round(totalAcreage * 100) / 100,
-          totalAmount,
+          totalAmount: isNaN(totalAmount) ? 0 : totalAmount,
           estimatedDaysLow: low,
           estimatedDaysHigh: high,
         },

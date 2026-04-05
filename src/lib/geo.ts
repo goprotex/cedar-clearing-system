@@ -5,6 +5,7 @@ import * as turf from '@turf/turf';
  */
 export function calculateAcreage(polygon: GeoJSON.Feature<GeoJSON.Polygon>): number {
   const sqMeters = turf.area(polygon);
+  if (sqMeters <= 0) return 0;
   return Math.round((sqMeters / 4046.8564224) * 100) / 100;
 }
 
