@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 // USDA Soil Data Access REST proxy
 // Queries SSURGO for soil properties at a point (centroid of pasture polygon)
 
+export const maxDuration = 25; // Vercel function timeout (seconds)
+
 const SDA_URL = 'https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest';
 
 // Validate coordinates are within continental US bounds
@@ -11,7 +13,7 @@ function isValidCoord(lon: number, lat: number): boolean {
 }
 
 function buildSoilQuery(lon: number, lat: number): string {
-  // lon/lat are float-validated before reaching here — safe to interpolate
+  // Simplified query: get mukey from point, then grab the dominant component
   return `
     SELECT TOP 1
       mu.muname,
@@ -22,23 +24,11 @@ function buildSoilQuery(lon: number, lat: number): string {
       c.flodfreqcl,
       ch.fragvol_r,
       cr.resdepth_r
-    FROM sacatalog AS sc
-    INNER JOIN legend AS l ON sc.areasymbol = l.areasymbol
-    INNER JOIN mapunit AS mu ON l.lkey = mu.lkey
-    INNER JOIN component AS c ON mu.mukey = c.mukey
+    FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT(${lon} ${lat})') AS mk
+    INNER JOIN mapunit AS mu ON mk.mukey = mu.mukey
+    INNER JOIN component AS c ON mu.mukey = c.mukey AND c.majcompflag = 'Yes'
     LEFT JOIN chorizon AS ch ON c.cokey = ch.cokey AND ch.hzdept_r = 0
     LEFT JOIN corestrictions AS cr ON c.cokey = cr.cokey
-    WHERE c.cokey IN (
-      SELECT DISTINCT c2.cokey
-      FROM component AS c2
-      INNER JOIN mapunit AS mu2 ON c2.mukey = mu2.mukey
-      INNER JOIN SDA_Get_Mukey_from_intersection_with_WktWgs84('POINT(${lon} ${lat})') AS mk ON mu2.mukey = mk.mukey
-      WHERE c2.comppct_r = (
-        SELECT MAX(c3.comppct_r)
-        FROM component AS c3
-        WHERE c3.mukey = mu2.mukey AND c3.majcompflag = 'Yes'
-      )
-    )
     ORDER BY c.comppct_r DESC
   `;
 }
@@ -66,6 +56,7 @@ export async function GET(request: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, format: 'JSON' }),
+      signal: AbortSignal.timeout(20000),
     });
 
     if (!response.ok) {
