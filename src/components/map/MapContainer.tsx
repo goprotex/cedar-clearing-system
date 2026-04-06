@@ -343,10 +343,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.setPaintProperty('cedar-fill', 'fill-opacity', opacities.cedarAI);
     }
 
-    // Toggle 3D terrain
-    if (layers.terrain3d || layers.hologram) {
-      const exag = layers.hologram ? opacities.terrain3d : opacities.terrain3d;
-      map.setTerrain({ source: 'mapbox-dem', exaggeration: exag });
+    // Toggle 3D terrain — disabled when hologram is active (trees render at y=0,
+    // but terrain DEM raises the satellite surface above them, hiding them)
+    if (layers.terrain3d && !layers.hologram) {
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
       // Add sky layer for atmosphere if not present
       if (!map.getLayer('sky')) {
         map.addLayer({
@@ -421,9 +421,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram auto-enables terrain, auto-hides cedar AI squares
+      // Hologram auto-hides cedar AI squares and disables terrain
+      // (terrain DEM raises surface above y=0 where 3D trees render)
       if (key === 'hologram' && !prev.hologram) {
-        next.terrain3d = true;
+        next.terrain3d = false;
         next.cedarAI = false; // hide flat squares, 3D trees replace them
       }
       next[key] = !prev[key];

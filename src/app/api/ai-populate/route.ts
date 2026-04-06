@@ -62,15 +62,7 @@ interface PopulateRequest {
       averageNDVI: number;
       confidence: number;
     };
-    claudeVision: {
-      cedarPct: number;
-      oakPct: number;
-      brushPct: number;
-      grassPct: number;
-      barePct: number;
-      cedarDensity: string;
-      notes: string;
-    } | null;
+
   } | null;
   seasonalAnalysis: {
     winterNDVI: number | null;
@@ -119,10 +111,7 @@ export async function POST(req: NextRequest) {
     parts.push(`Spectral Analysis (NAIP): Cedar ${s.cedar.pct.toFixed(0)}%, Oak ${s.oak.pct.toFixed(0)}%, Mixed Brush ${s.mixedBrush.pct.toFixed(0)}%, Grass ${s.grass.pct.toFixed(0)}%, Bare ${s.bare.pct.toFixed(0)}%`);
     parts.push(`Estimated cedar acres: ${s.estimatedCedarAcres.toFixed(1)}, Avg NDVI: ${s.averageNDVI.toFixed(3)}, Confidence: ${(s.confidence * 100).toFixed(0)}%`);
 
-    if (data.cedarAnalysis.claudeVision) {
-      const cv = data.cedarAnalysis.claudeVision;
-      parts.push(`Claude Vision (satellite): Cedar ${cv.cedarPct}%, Oak ${cv.oakPct}%, Brush ${cv.brushPct}%, Grass ${cv.grassPct}%, Bare ${cv.barePct}%. Density: ${cv.cedarDensity}. Notes: ${cv.notes}`);
-    }
+
   }
 
   if (data.seasonalAnalysis) {

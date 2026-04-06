@@ -5,21 +5,43 @@ export const maxDuration = 55; // Vercel function timeout
 
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
-const NAIP_EXPORT =
-  'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage';
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
+
+interface BandIndices {
+  ndvi: number;   // (NIR-R)/(NIR+R) — vegetation greenness
+  gndvi: number;  // (NIR-G)/(NIR+G) — chlorophyll content
+  savi: number;   // ((NIR-R)/(NIR+R+0.5))*1.5 — soil-adjusted vegetation
+  exg: number;    // 2*G - R - B (normalized) — excess green
+  nirRatio: number; // NIR / brightness — canopy density indicator
+}
 
 interface SampleResult {
   lng: number;
   lat: number;
   ndvi: number;
+  gndvi: number;
+  savi: number;
   classification: VegClass;
   confidence: number;
+  bandVotes: number; // how many indices agreed on classification (0-4)
 }
 
-// ── Classification logic ──
+// ── Band index computation ──
+
+function computeIndices(r: number, g: number, b: number, nir: number): BandIndices {
+  const brightness = (r + g + b) / 3;
+  const L = 0.5; // SAVI soil adjustment factor
+  return {
+    ndvi: (nir + r) > 0 ? (nir - r) / (nir + r) : 0,
+    gndvi: (nir + g) > 0 ? (nir - g) / (nir + g) : 0,
+    savi: (nir + r + L) > 0 ? ((nir - r) / (nir + r + L)) * (1 + L) : 0,
+    exg: brightness > 0 ? (2 * g - r - b) / (r + g + b) : 0,
+    nirRatio: brightness > 0 ? nir / brightness : 0,
+  };
+}
+
+// ── Multi-band classification with cross-verification ──
 
 function classifyVegetation(
   r: number,
@@ -27,54 +49,88 @@ function classifyVegetation(
   b: number,
   nir: number | null,
   ndvi: number
-): { classification: VegClass; confidence: number } {
+): { classification: VegClass; confidence: number; bandVotes: number; gndvi: number; savi: number } {
   // RGB-only fallback (no NIR band)
   if (nir === null) {
     const brightness = (r + g + b) / 3;
-    if (brightness < 80 && g > r) return { classification: 'cedar', confidence: 0.4 };
-    if (brightness < 120 && g > b) return { classification: 'mixed_brush', confidence: 0.35 };
-    if (g > r && g > b) return { classification: 'grass', confidence: 0.4 };
-    return { classification: 'bare', confidence: 0.45 };
+    if (brightness < 80 && g > r) return { classification: 'cedar', confidence: 0.3, bandVotes: 0, gndvi: 0, savi: 0 };
+    if (brightness < 120 && g > b) return { classification: 'mixed_brush', confidence: 0.25, bandVotes: 0, gndvi: 0, savi: 0 };
+    if (g > r && g > b) return { classification: 'grass', confidence: 0.3, bandVotes: 0, gndvi: 0, savi: 0 };
+    return { classification: 'bare', confidence: 0.35, bandVotes: 0, gndvi: 0, savi: 0 };
   }
 
-  // 4-band NAIP classification (RGB + NIR)
+  const idx = computeIndices(r, g, b, nir);
+  const brightness = (r + g + b) / 3;
+  const redGreenRatio = r / Math.max(g, 1);
+
+  // ── Pass 1: Primary classification from NDVI ──
 
   // Bare ground / rock / road
-  if (ndvi < 0.12) {
-    return { classification: 'bare', confidence: 0.85 };
+  if (idx.ndvi < 0.12) {
+    // Cross-verify: SAVI should also be low, ExG near zero
+    let votes = 1; // NDVI says bare
+    if (idx.savi < 0.15) votes++;
+    if (idx.exg < 0.05) votes++;
+    if (idx.gndvi < 0.15) votes++;
+    const conf = Math.min(0.95, 0.7 + votes * 0.05);
+    return { classification: 'bare', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
   // Grass / sparse vegetation
-  if (ndvi >= 0.12 && ndvi < 0.28) {
-    return { classification: 'grass', confidence: 0.7 };
+  if (idx.ndvi >= 0.12 && idx.ndvi < 0.28) {
+    let votes = 1; // NDVI says grass
+    if (idx.savi >= 0.1 && idx.savi < 0.35) votes++;
+    if (idx.exg > 0 && idx.exg < 0.15) votes++;
+    if (idx.nirRatio < 1.6) votes++;
+    const conf = Math.min(0.85, 0.55 + votes * 0.07);
+    return { classification: 'grass', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // Dense vegetation zone (NDVI >= 0.28)
-  const brightness = (r + g + b) / 3;
-  const nirRatio = nir / Math.max(brightness, 1);
-  const redGreenRatio = r / Math.max(g, 1);
+  // ── Pass 2: Dense vegetation zone (NDVI >= 0.28) — multi-band cedar detection ──
 
-  // Ashe Juniper (cedar) in Texas Hill Country:
-  //   - Evergreen → high NDVI year-round
-  //   - Dense dark canopy → low visible brightness
-  //   - High NIR reflectance → high NIR/brightness ratio
-  //   - Low red channel (strong chlorophyll absorption)
-  if (ndvi > 0.35 && brightness < 95 && r < 90 && nirRatio > 1.8) {
-    const conf = Math.min(0.85, 0.6 + (ndvi - 0.35) * 0.5 + (1 - brightness / 150) * 0.15);
-    return { classification: 'cedar', confidence: conf };
+  // Cedar vote accumulator: each index independently votes "cedar"
+  let cedarVotes = 0;
+  const totalChecks = 5;
+
+  // Vote 1: NDVI high (dense evergreen canopy)
+  if (idx.ndvi > 0.35) cedarVotes++;
+
+  // Vote 2: GNDVI moderate-to-high but LOWER than NDVI
+  //   Cedar has less chlorophyll variation than deciduous → GNDVI/NDVI ratio < 0.85
+  //   Deciduous oak has GNDVI nearly equal to NDVI
+  if (idx.gndvi > 0.2 && (idx.gndvi / Math.max(idx.ndvi, 0.01)) < 0.85) cedarVotes++;
+
+  // Vote 3: Low visible brightness with high NIR (dense dark canopy)
+  if (brightness < 100 && idx.nirRatio > 1.7) cedarVotes++;
+
+  // Vote 4: SAVI confirms dense vegetation even accounting for soil
+  if (idx.savi > 0.35) cedarVotes++;
+
+  // Vote 5: Low red reflectance (strong red absorption from chlorophyll)
+  if (r < 90 && redGreenRatio < 0.9) cedarVotes++;
+
+  // Cedar classification: need at least 3 of 5 votes
+  if (cedarVotes >= 3) {
+    const voteRatio = cedarVotes / totalChecks;
+    const conf = Math.min(0.95, 0.5 + voteRatio * 0.35 + (idx.ndvi - 0.28) * 0.2);
+    return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  if (ndvi > 0.28 && brightness < 110 && r < 100 && g > 50) {
-    const conf = Math.min(0.75, 0.5 + (ndvi - 0.28) * 0.3);
-    return { classification: 'cedar', confidence: conf };
+  // 2-vote cedar: possible cedar but lower confidence
+  if (cedarVotes === 2 && idx.ndvi > 0.28 && brightness < 110) {
+    return { classification: 'cedar', confidence: 0.5, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // Brighter vegetation with higher red → deciduous (oak, etc.)
-  if (ndvi > 0.28 && brightness >= 95 && redGreenRatio > 0.85) {
-    return { classification: 'oak', confidence: 0.6 };
+  // Deciduous (oak): brighter canopy, GNDVI close to NDVI (high chlorophyll), higher red
+  if (idx.ndvi > 0.28 && brightness >= 95 && redGreenRatio > 0.85) {
+    let oakVotes = 1;
+    if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.8) oakVotes++; // GNDVI ≈ NDVI → deciduous
+    if (idx.nirRatio < 1.8) oakVotes++;
+    const conf = Math.min(0.8, 0.45 + oakVotes * 0.1);
+    return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  return { classification: 'mixed_brush', confidence: 0.5 };
+  return { classification: 'mixed_brush', confidence: 0.45, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
 }
 
 function getClassColor(classification: VegClass, ndvi: number): string {
@@ -91,135 +147,6 @@ function getClassColor(classification: VegClass, ndvi: number): string {
       return '#65a30d';
     case 'bare':
       return '#9ca3af';
-  }
-}
-
-// ── Claude Vision prompt ──
-
-const CEDAR_VISION_PROMPT = `You are an expert arborist and vegetation analyst specializing in Texas Hill Country vegetation, particularly Ashe Juniper (cedar) identification.
-
-You are looking at two aerial images of the same ranch pasture in the Texas Hill Country:
-1. FIRST IMAGE: Natural color (RGB) aerial photo at 0.6m resolution from NAIP
-2. SECOND IMAGE: Color Infrared (CIR) — bands are NIR/Red/Green. In CIR:
-   - Bright pink/red = healthy broadleaf vegetation (live oak, deciduous trees)
-   - Dark maroon/brown-red = evergreen conifers (Ashe Juniper/cedar)
-   - Light pink = grass/pasture
-   - White/cyan = bare ground, roads, rock
-
-Key identification features for Ashe Juniper (cedar):
-- In RGB: Dark green, dense dome/conical canopy, grows in clusters
-- In CIR: Dark maroon/brown (NOT bright pink — that's oak)
-- Evergreen year-round (stays dark green even in winter)
-- Often found on hillsides, along fence lines, in draws
-
-Key identification features for Live Oak:
-- In RGB: Lighter green, broad spreading canopy, larger individual crowns
-- In CIR: Bright pink/red (high NIR reflectance)
-- Semi-evergreen in Texas (may thin in late winter)
-
-Analyze both images and estimate vegetation percentages. Return ONLY valid JSON:
-{
-  "cedarPct": <number 0-100>,
-  "oakPct": <number 0-100>,
-  "brushPct": <number 0-100>,
-  "grassPct": <number 0-100>,
-  "barePct": <number 0-100>,
-  "cedarDensity": "<light|moderate|heavy|extreme>",
-  "confidence": <number 0-100>,
-  "notes": "<2-3 sentence professional assessment of vegetation pattern, cedar distribution, and any clearing recommendations>"
-}`;
-
-// ── Claude Vision analysis ──
-
-interface ClaudeVisionResult {
-  cedarPct: number;
-  oakPct: number;
-  brushPct: number;
-  grassPct: number;
-  barePct: number;
-  cedarDensity: string;
-  confidence: number;
-  notes: string;
-}
-
-async function runClaudeVision(
-  bbox: number[],
-  claudeKey: string
-): Promise<ClaudeVisionResult | null> {
-  try {
-    const bboxStr = `${bbox[0]},${bbox[1]},${bbox[2]},${bbox[3]}`;
-    const rgbUrl = `${NAIP_EXPORT}?bbox=${bboxStr}&bboxSR=4326&imageSR=4326&size=1024,1024&format=png&f=image`;
-    const cirUrl = `${NAIP_EXPORT}?bbox=${bboxStr}&bboxSR=4326&imageSR=4326&size=1024,1024&format=png&bandIds=3,0,1&f=image`;
-
-    // Fetch both images in parallel
-    const [rgbRes, cirRes] = await Promise.all([
-      fetch(rgbUrl, { signal: AbortSignal.timeout(15000) }),
-      fetch(cirUrl, { signal: AbortSignal.timeout(15000) }),
-    ]);
-
-    if (!rgbRes.ok || !cirRes.ok) return null;
-
-    const [rgbBuf, cirBuf] = await Promise.all([
-      rgbRes.arrayBuffer(),
-      cirRes.arrayBuffer(),
-    ]);
-
-    const rgbB64 = Buffer.from(rgbBuf).toString('base64');
-    const cirB64 = Buffer.from(cirBuf).toString('base64');
-
-    // Call Claude API with both images
-    const claudeRes = await fetch(ANTHROPIC_API, {
-      method: 'POST',
-      headers: {
-        'x-api-key': claudeKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: 'image/png', data: rgbB64 },
-              },
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: 'image/png', data: cirB64 },
-              },
-              { type: 'text', text: CEDAR_VISION_PROMPT },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-
-    if (!claudeRes.ok) return null;
-
-    const claudeData = await claudeRes.json();
-    const text: string = claudeData?.content?.[0]?.text || '';
-
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      cedarPct: Number(parsed.cedarPct) || 0,
-      oakPct: Number(parsed.oakPct) || 0,
-      brushPct: Number(parsed.brushPct) || 0,
-      grassPct: Number(parsed.grassPct) || 0,
-      barePct: Number(parsed.barePct) || 0,
-      cedarDensity: parsed.cedarDensity || 'moderate',
-      confidence: Number(parsed.confidence) || 50,
-      notes: String(parsed.notes || ''),
-    };
-  } catch {
-    return null;
   }
 }
 
@@ -287,7 +214,7 @@ export async function POST(req: NextRequest) {
             const pixelStr: string = data?.value || '';
 
             if (!pixelStr || pixelStr === 'NoData') {
-              return { lng, lat, ndvi: 0, classification: 'bare', confidence: 0.3 };
+              return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
             }
 
             const vals = pixelStr
@@ -304,8 +231,8 @@ export async function POST(req: NextRequest) {
               ndvi = (nir - r) / (nir + r);
             }
 
-            const { classification, confidence } = classifyVegetation(r, g, b, nir, ndvi);
-            return { lng, lat, ndvi, classification, confidence };
+            const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
+            return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
           } catch {
             return null;
           }
@@ -346,7 +273,10 @@ export async function POST(req: NextRequest) {
         properties: {
           classification: s.classification,
           ndvi: Math.round(s.ndvi * 1000) / 1000,
+          gndvi: Math.round(s.gndvi * 1000) / 1000,
+          savi: Math.round(s.savi * 1000) / 1000,
           confidence: Math.round(s.confidence * 100) / 100,
+          bandVotes: s.bandVotes,
           color: getClassColor(s.classification, s.ndvi),
         },
       })),
@@ -363,6 +293,12 @@ export async function POST(req: NextRequest) {
     const cedarPct = total > 0 ? cedarCount / total : 0;
     const avgNdvi = results.reduce((sum, r) => sum + r.ndvi, 0) / total;
     const avgConf = results.reduce((sum, r) => sum + r.confidence, 0) / total;
+    const avgBandVotes = results.reduce((sum, r) => sum + r.bandVotes, 0) / total;
+    const avgGndvi = results.reduce((sum, r) => sum + r.gndvi, 0) / total;
+    const avgSavi = results.reduce((sum, r) => sum + r.savi, 0) / total;
+
+    // High-confidence cedar: cells where ≥3 bands agreed
+    const highConfCedar = results.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
 
     const summary = {
       totalSamples: total,
@@ -373,19 +309,16 @@ export async function POST(req: NextRequest) {
       bare: { count: bareCount, pct: Math.round((bareCount / total) * 100) },
       estimatedCedarAcres: Math.round(cedarPct * ac * 10) / 10,
       averageNDVI: Math.round(avgNdvi * 1000) / 1000,
+      averageGNDVI: Math.round(avgGndvi * 1000) / 1000,
+      averageSAVI: Math.round(avgSavi * 1000) / 1000,
       confidence: Math.round(avgConf * 100),
+      avgBandVotes: Math.round(avgBandVotes * 10) / 10,
+      highConfidenceCedarCells: highConfCedar,
       gridSpacingM: Math.round(spacingKm * 1000),
     };
 
-    // Step 2: Claude Vision analysis (if API key available)
-    let claudeVision: ClaudeVisionResult | null = null;
-    const claudeKey = process.env.CLAUDE_VISION;
-    if (claudeKey) {
-      claudeVision = await runClaudeVision(bbox, claudeKey);
-    }
-
     return NextResponse.json(
-      { gridCells, summary, claudeVision },
+      { gridCells, summary },
       { headers: { 'Cache-Control': 'private, max-age=3600' } }
     );
   } catch (err) {

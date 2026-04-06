@@ -492,7 +492,6 @@ export const useBidStore = create<BidStore>((set, get) => ({
           cedarAnalysis: pasture.cedarAnalysis
             ? {
                 summary: pasture.cedarAnalysis.summary,
-                claudeVision: pasture.cedarAnalysis.claudeVision,
               }
             : null,
           seasonalAnalysis: pasture.seasonalAnalysis,

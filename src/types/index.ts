@@ -114,25 +114,17 @@ export interface CedarAnalysisSummary {
   bare: CedarClassCount;
   estimatedCedarAcres: number;
   averageNDVI: number;
+  averageGNDVI: number;
+  averageSAVI: number;
   confidence: number;
+  avgBandVotes: number;
+  highConfidenceCedarCells: number;
   gridSpacingM: number;
 }
 
 export interface CedarAnalysis {
   gridCells: GeoJSON.FeatureCollection;
   summary: CedarAnalysisSummary;
-  claudeVision: ClaudeVisionAnalysis | null;
-}
-
-export interface ClaudeVisionAnalysis {
-  cedarPct: number;
-  oakPct: number;
-  brushPct: number;
-  grassPct: number;
-  barePct: number;
-  cedarDensity: string;
-  confidence: number;
-  notes: string;
 }
 
 // ──── Seasonal Analysis ────
