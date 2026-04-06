@@ -200,26 +200,17 @@ export async function POST(req: NextRequest) {
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
 
-    // Fixed 5m grid spacing — high-resolution regardless of property size
-    const spacingKm = 0.005; // 5m
+    // 60m cells with 40% overlap — sample points every 36m, cell polygons 60m wide
+    const cellSizeKm = 0.06;  // 60m cell
+    const spacingKm = 0.036;  // 36m between points (60m * 0.6 = 40% overlap)
 
     const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
 
-    // Cap at 5000 sample points — randomly sample for even spatial coverage on huge properties
-    const MAX_SAMPLES = 5000;
-    let samplePoints = pointsInPoly;
-    if (pointsInPoly.length > MAX_SAMPLES) {
-      // Fisher-Yates shuffle then take first MAX_SAMPLES
-      const arr = [...pointsInPoly];
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      samplePoints = arr.slice(0, MAX_SAMPLES);
-    }
+    // Use all points — 60m/40% overlap keeps count manageable even for large properties
+    const samplePoints = pointsInPoly;
 
     if (samplePoints.length === 0) {
       return NextResponse.json(
@@ -289,10 +280,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build cell polygons for map overlay
+    // Build cell polygons for map overlay (60m cells = 30m half-size)
     const centerLat = (bbox[1] + bbox[3]) / 2;
-    const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
-    const halfLatDeg = spacingKm / 2 / 111.32;
+    const halfLngDeg = cellSizeKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
+    const halfLatDeg = cellSizeKm / 2 / 111.32;
 
     const gridCells: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
@@ -355,6 +346,8 @@ export async function POST(req: NextRequest) {
       avgBandVotes: Math.round(avgBandVotes * 10) / 10,
       highConfidenceCedarCells: highConfCedar,
       gridSpacingM: Math.round(spacingKm * 1000),
+      cellSizeM: Math.round(cellSizeKm * 1000),
+      overlapPct: 40,
     };
 
     return NextResponse.json(

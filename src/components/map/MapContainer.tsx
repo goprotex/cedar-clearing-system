@@ -31,6 +31,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const treeLayerRef = useRef<TreeLayer3D | null>(null);
+  const lastFlyToPastureRef = useRef<string | null>(null);
+  const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -343,9 +345,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.setPaintProperty('cedar-fill', 'fill-opacity', opacities.cedarAI);
     }
 
-    // Toggle 3D terrain — disabled when hologram is active (trees render at y=0,
-    // but terrain DEM raises the satellite surface above them, hiding them)
-    if (layers.terrain3d && !layers.hologram) {
+    // Toggle 3D terrain
+    if (layers.terrain3d) {
       map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
       // Add sky layer for atmosphere if not present
       if (!map.getLayer('sky')) {
@@ -364,6 +365,11 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       if (map.getLayer('sky')) {
         map.removeLayer('sky');
       }
+    }
+
+    // Force NDVI to 100% when hologram is active
+    if (layers.hologram && layers.naipNDVI && map.getLayer('naip-ndvi-overlay')) {
+      map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
     }
 
     // ── Hologram mode: 3D tree layer ──
@@ -421,10 +427,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram auto-hides cedar AI squares and disables terrain
-      // (terrain DEM raises surface above y=0 where 3D trees render)
+      // Hologram: enable terrain, switch to NDVI base map, hide cedar AI squares
       if (key === 'hologram' && !prev.hologram) {
-        next.terrain3d = false;
+        // Save pre-hologram NAIP state to restore later
+        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d };
+        next.terrain3d = true;
+        next.naip = false;
+        next.naipCIR = false;
+        next.naipNDVI = true; // NDVI as base map in hologram mode
         next.cedarAI = false; // hide flat squares, 3D trees replace them
         // Pitch the camera to see 3D trees from an angle
         const map = mapRef.current;
@@ -432,8 +442,16 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
         }
       }
-      // Reset camera when hologram turns off
+      // Restore previous state when hologram turns off
       if (key === 'hologram' && prev.hologram) {
+        const saved = preHoloLayersRef.current;
+        if (saved) {
+          next.naip = saved.naip;
+          next.naipCIR = saved.naipCIR;
+          next.naipNDVI = saved.naipNDVI;
+          next.terrain3d = saved.terrain3d;
+          preHoloLayersRef.current = null;
+        }
         const map = mapRef.current;
         if (map) {
           map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
@@ -598,10 +616,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     tl.updateMarkedTrees(allMarked);
   }, [currentBid.pastures, layers.hologram]);
 
-  // ── Fly to selected pasture when it changes ──
+  // ── Fly to selected pasture when selection changes ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !selectedPastureId) return;
+
+    // Only fly when the selected pasture actually changes, not on data updates
+    if (lastFlyToPastureRef.current === selectedPastureId) return;
+    lastFlyToPastureRef.current = selectedPastureId;
 
     const pasture = currentBid.pastures.find((p) => p.id === selectedPastureId);
     if (!pasture || pasture.acreage === 0) return;
