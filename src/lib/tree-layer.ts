@@ -280,51 +280,53 @@ export function extractTreesFromAnalysis(
       const confidence = (props.confidence as number) ?? 0.5;
 
       // Higher NDVI = denser vegetation = more trees
-      // Dense cedar stands can have 200-400+ stems/acre — we need LOTS of trees per cell
-      let treeCount = 30;
-      if (ndvi > 0.6) treeCount += 50;       // very dense canopy → 80+
-      else if (ndvi > 0.5) treeCount += 40;  // dense → 70+
-      else if (ndvi > 0.4) treeCount += 30;  // moderate-dense → 60+
-      else if (ndvi > 0.3) treeCount += 20;  // moderate → 50+
-      else if (ndvi > 0.2) treeCount += 10;  // light-moderate → 40+
-      else if (ndvi > 0.1) treeCount += 5;   // light → 35+
+      // Realistic density: moderate count, larger individual trees
+      let treeCount = 5;
+      if (ndvi > 0.6) treeCount += 10;       // very dense canopy → 15
+      else if (ndvi > 0.5) treeCount += 8;   // dense → 13
+      else if (ndvi > 0.4) treeCount += 6;   // moderate-dense → 11
+      else if (ndvi > 0.3) treeCount += 4;   // moderate → 9
+      else if (ndvi > 0.2) treeCount += 2;   // light-moderate → 7
+      else if (ndvi > 0.1) treeCount += 1;   // light → 6
 
       // High confidence cells get more trees (bandVotes 3-5 out of 5)
-      if (bandVotes >= 5) treeCount += 20;
-      else if (bandVotes >= 4) treeCount += 15;
-      else if (bandVotes >= 3) treeCount += 8;
-      else if (bandVotes >= 2) treeCount += 3;
+      if (bandVotes >= 5) treeCount += 4;
+      else if (bandVotes >= 4) treeCount += 3;
+      else if (bandVotes >= 3) treeCount += 2;
+      else if (bandVotes >= 2) treeCount += 1;
 
-      // Get cell centroid from polygon
+      // Get cell bounds from polygon (not just centroid)
       const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
-      const cLng = coords.reduce((s, c) => s + c[0], 0) / coords.length;
-      const cLat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
+      const lngs = coords.map(c => c[0]);
+      const lats = coords.map(c => c[1]);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
 
       for (let t = 0; t < treeCount; t++) {
-        // Cluster trees toward cell center with gaussian-like jitter
-        const jitter1 = (rand() - 0.5 + rand() - 0.5) * 0.5; // triangular distribution
-        const jitter2 = (rand() - 0.5 + rand() - 0.5) * 0.5;
-        const offsetLng = jitter1 * halfSpacingDeg * 1.8;
-        const offsetLat = jitter2 * halfSpacingDeg * 1.8;
+        // Uniform random distribution across the ENTIRE cell area — no clustering
+        const lng = minLng + rand() * (maxLng - minLng);
+        const lat = minLat + rand() * (maxLat - minLat);
 
         // Scale tree size by NDVI — higher NDVI = taller, wider canopy
-        const ndviScale = 0.6 + Math.min(ndvi, 0.7) * 0.8; // 0.6–1.16
+        const ndviScale = 0.7 + Math.min(ndvi, 0.7) * 1.0; // 0.7–1.4
 
         let height: number, canopy: number;
         if (species === 'cedar') {
-          height = (2 + rand() * 4) * ndviScale;    // ~1.5-7m
-          canopy = (1.2 + rand() * 2) * ndviScale;  // ~0.7-3.7m
+          height = (4 + rand() * 8) * ndviScale;    // ~3-17m
+          canopy = (3 + rand() * 5) * ndviScale;    // ~2-11m
         } else if (species === 'oak') {
-          height = (2.5 + rand() * 3.5) * ndviScale; // ~1.5-7m
-          canopy = (2 + rand() * 3) * ndviScale;     // ~1.2-5.8m
+          height = (5 + rand() * 7) * ndviScale;    // ~3.5-17m
+          canopy = (5 + rand() * 7) * ndviScale;    // ~3.5-17m
         } else {
-          height = (1.5 + rand() * 2.5) * ndviScale; // ~1-4.6m
-          canopy = (1 + rand() * 2) * ndviScale;     // ~0.6-3.5m
+          height = (3 + rand() * 5) * ndviScale;    // ~2-11m
+          canopy = (3 + rand() * 4) * ndviScale;    // ~2-10m
         }
 
         trees.push({
-          lng: cLng + offsetLng,
-          lat: cLat + offsetLat,
+          lng,
+          lat,
           species,
           height: Math.round(height * 10) / 10,
           canopyDiameter: Math.round(canopy * 10) / 10,
@@ -522,11 +524,13 @@ export class TreeLayer3D {
     // Query terrain elevation so trees render on top of DEM surface
     let elevation = 0;
     if (this.map.getTerrain()) {
-      const el = this.map.queryTerrainElevation({
-        lng: this.originLngLat[0],
-        lat: this.originLngLat[1],
-      } as mapboxgl.LngLat);
-      if (el != null) elevation = el;
+      try {
+        const lngLat = new mapboxgl.LngLat(this.originLngLat[0], this.originLngLat[1]);
+        const el = this.map.queryTerrainElevation(lngLat);
+        if (el != null && isFinite(el)) elevation = el;
+      } catch {
+        // Terrain not ready yet — use 0
+      }
     }
     const merc = mapboxgl.MercatorCoordinate.fromLngLat(this.originLngLat, elevation);
     const scale = merc.meterInMercatorCoordinateUnits();
@@ -880,7 +884,7 @@ export class TreeLayer3D {
 
     if (this.trees.length === 0) return;
 
-    const count = Math.min(this.trees.length * 2, 8000);
+    const count = Math.min(this.trees.length * 4, 6000);
     this.particlePositions = new Float32Array(count * 3);
     this.particleVelocities = new Float32Array(count * 3);
 
