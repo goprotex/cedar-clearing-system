@@ -10,7 +10,6 @@ import BidOptions from '@/components/bid/BidOptions';
 import RateCardSettings from '@/components/bid/RateCardSettings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
@@ -167,8 +166,8 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
         </div>
 
         {/* Right sidebar */}
-        <div className="w-[400px] bg-white border-l flex flex-col shrink-0">
-          <Tabs defaultValue="pastures" className="flex flex-col h-full">
+        <div className="w-[400px] bg-white border-l flex flex-col shrink-0 overflow-hidden">
+          <Tabs defaultValue="pastures" className="flex flex-col h-full overflow-hidden">
             <TabsList className="mx-3 mt-3 shrink-0">
               <TabsTrigger value="pastures" className="text-xs">Pastures</TabsTrigger>
               <TabsTrigger value="options" className="text-xs">Options</TabsTrigger>
@@ -176,9 +175,9 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
               <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="pastures" className="flex-1 flex flex-col overflow-hidden mt-0 px-3">
+            <TabsContent value="pastures" className="flex-1 min-h-0 flex flex-col overflow-hidden mt-0">
               {/* Add pasture button */}
-              <div className="py-3 shrink-0">
+              <div className="py-3 px-3 shrink-0">
                 <Button
                   onClick={addPasture}
                   className="w-full bg-amber-600 hover:bg-amber-700 text-sm"
@@ -187,8 +186,8 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
                 </Button>
               </div>
 
-              {/* Pasture list */}
-              <ScrollArea className="flex-1 -mx-3 px-3">
+              {/* Pasture list — native scroll */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-3">
                 <div className="space-y-3 pb-4">
                   {currentBid.pastures.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground text-sm">
@@ -205,39 +204,33 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
                       />
                     ))
                   )}
-                </div>
-              </ScrollArea>
 
-              {/* Bid summary pinned at bottom */}
-              {currentBid.pastures.length > 0 && (
-                <div className="py-3 shrink-0">
-                  <BidSummary />
+                  {/* Bid summary at end of scroll */}
+                  {currentBid.pastures.length > 0 && (
+                    <div className="pt-2">
+                      <BidSummary />
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </TabsContent>
 
-            <TabsContent value="options" className="flex-1 overflow-hidden mt-0">
-              <ScrollArea className="h-full px-3 pb-4">
-                <div className="py-3">
-                  <BidOptions />
-                </div>
-              </ScrollArea>
+            <TabsContent value="options" className="flex-1 min-h-0 overflow-y-auto mt-0">
+              <div className="px-3 py-3 pb-4">
+                <BidOptions />
+              </div>
             </TabsContent>
 
-            <TabsContent value="details" className="flex-1 overflow-hidden mt-0">
-              <ScrollArea className="h-full px-3 pb-4">
-                <div className="py-3">
-                  <BidDetails />
-                </div>
-              </ScrollArea>
+            <TabsContent value="details" className="flex-1 min-h-0 overflow-y-auto mt-0">
+              <div className="px-3 py-3 pb-4">
+                <BidDetails />
+              </div>
             </TabsContent>
 
-            <TabsContent value="settings" className="flex-1 overflow-hidden mt-0">
-              <ScrollArea className="h-full px-3 pb-4">
-                <div className="py-3">
-                  <RateCardSettings />
-                </div>
-              </ScrollArea>
+            <TabsContent value="settings" className="flex-1 min-h-0 overflow-y-auto mt-0">
+              <div className="px-3 py-3 pb-4">
+                <RateCardSettings />
+              </div>
             </TabsContent>
           </Tabs>
         </div>

@@ -819,6 +819,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           </button>
         </div>
       )}
+
+      {/* Hologram: no trees hint */}
+      {layers.hologram && !currentBid.pastures.some(p => p.cedarAnalysis?.gridCells?.features?.length) && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 holo-panel px-4 py-2 rounded-lg shadow-lg text-xs text-cyan-300 max-w-xs text-center">
+          🔮 No tree data yet — run <span className="font-bold text-cyan-100">Analyze Cedar (AI)</span> on a pasture to generate 3D hologram trees
+        </div>
+      )}
     </div>
   );
 }
