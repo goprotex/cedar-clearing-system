@@ -63,70 +63,103 @@ function classifyVegetation(
   const brightness = (r + g + b) / 3;
   const redGreenRatio = r / Math.max(g, 1);
 
-  // ── Pass 1: Primary classification from NDVI ──
-
-  // Bare ground / rock / road
-  if (idx.ndvi < 0.12) {
-    // Cross-verify: SAVI should also be low, ExG near zero
-    let votes = 1; // NDVI says bare
-    if (idx.savi < 0.15) votes++;
-    if (idx.exg < 0.05) votes++;
-    if (idx.gndvi < 0.15) votes++;
+  // ── Pass 1: Bare ground — must be BRIGHT + low NDVI ──
+  // Real bare ground (soil, rock, caliche, roads) reflects strongly in visible bands.
+  // Dark pixels with low NDVI are NOT bare — they're cedar shadow/understory.
+  if (idx.ndvi < 0.08 && brightness > 90) {
+    let votes = 1;
+    if (idx.savi < 0.1) votes++;
+    if (idx.exg < 0.02) votes++;
+    if (idx.gndvi < 0.1) votes++;
     const conf = Math.min(0.95, 0.7 + votes * 0.05);
     return { classification: 'bare', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // Grass / sparse vegetation
-  if (idx.ndvi >= 0.12 && idx.ndvi < 0.28) {
-    let votes = 1; // NDVI says grass
-    if (idx.savi >= 0.1 && idx.savi < 0.35) votes++;
+  // Very low NDVI but dark → cedar shadow/understory, not bare
+  if (idx.ndvi < 0.08 && brightness <= 90) {
+    return { classification: 'cedar', confidence: 0.4, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
+  }
+
+  // ── Pass 2: Dark pixels with low-moderate NDVI (0.08-0.22) ──
+  // In thick cedar stands, inter-canopy shadows and dark canopy edges produce
+  // NDVI 0.08-0.22 with low brightness. Grass/pasture is bright; cedar is dark.
+  if (idx.ndvi >= 0.08 && idx.ndvi < 0.22) {
+    // Dark pixel → cedar shadow or dense dark canopy
+    if (brightness < 80) {
+      let votes = 1;
+      if (idx.nirRatio > 1.2) votes++; // NIR still penetrates shadow
+      if (r < 70) votes++; // low red = not soil
+      const conf = Math.min(0.7, 0.35 + votes * 0.1);
+      return { classification: 'cedar', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
+    }
+    // Bright pixel with low NDVI → actual grass/sparse vegetation
+    let votes = 1;
+    if (idx.savi >= 0.05 && idx.savi < 0.25) votes++;
     if (idx.exg > 0 && idx.exg < 0.15) votes++;
-    if (idx.nirRatio < 1.6) votes++;
-    const conf = Math.min(0.85, 0.55 + votes * 0.07);
+    if (brightness >= 100) votes++;
+    const conf = Math.min(0.8, 0.5 + votes * 0.07);
     return { classification: 'grass', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // ── Pass 2: Dense vegetation zone (NDVI >= 0.28) — multi-band cedar detection ──
+  // ── Pass 3: Moderate NDVI (0.22-0.35) — transitional zone ──
+  if (idx.ndvi >= 0.22 && idx.ndvi < 0.35) {
+    // Cedar vote accumulator for transitional zone
+    let cedarVotes = 0;
+    if (brightness < 90) cedarVotes++;           // dark canopy
+    if (idx.nirRatio > 1.4) cedarVotes++;        // moderate NIR dominance
+    if (r < 85) cedarVotes++;                    // low red reflectance
+    if (idx.gndvi / Math.max(idx.ndvi, 0.01) < 0.9) cedarVotes++; // GNDVI < NDVI → evergreen
+    if (idx.savi > 0.2) cedarVotes++;            // soil-adjusted veg present
+
+    if (cedarVotes >= 2) {
+      const conf = Math.min(0.8, 0.4 + cedarVotes * 0.08 + (idx.ndvi - 0.22) * 0.5);
+      return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
+    }
+
+    // Bright with moderate NDVI → could be oak or grass
+    if (brightness >= 95 && redGreenRatio > 0.85) {
+      return { classification: 'oak', confidence: 0.5, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
+    }
+    return { classification: 'grass', confidence: 0.5, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
+  }
+
+  // ── Pass 4: High NDVI (>= 0.35) — dense vegetation, multi-band cedar detection ──
 
   // Cedar vote accumulator: each index independently votes "cedar"
   let cedarVotes = 0;
   const totalChecks = 5;
 
-  // Vote 1: NDVI high (dense evergreen canopy)
-  if (idx.ndvi > 0.35) cedarVotes++;
+  // Vote 1: Very high NDVI (dense evergreen canopy)
+  if (idx.ndvi > 0.40) cedarVotes++;
 
-  // Vote 2: GNDVI moderate-to-high but LOWER than NDVI
-  //   Cedar has less chlorophyll variation than deciduous → GNDVI/NDVI ratio < 0.85
-  //   Deciduous oak has GNDVI nearly equal to NDVI
-  if (idx.gndvi > 0.2 && (idx.gndvi / Math.max(idx.ndvi, 0.01)) < 0.85) cedarVotes++;
+  // Vote 2: GNDVI lower than NDVI → evergreen signature
+  //   Cedar: GNDVI/NDVI ratio < 0.85 (less chlorophyll variation)
+  //   Deciduous oak: GNDVI ≈ NDVI (high chlorophyll, bright leaves)
+  if (idx.gndvi > 0.15 && (idx.gndvi / Math.max(idx.ndvi, 0.01)) < 0.85) cedarVotes++;
 
   // Vote 3: Low visible brightness with high NIR (dense dark canopy)
-  if (brightness < 100 && idx.nirRatio > 1.7) cedarVotes++;
+  if (brightness < 100 && idx.nirRatio > 1.5) cedarVotes++;
 
   // Vote 4: SAVI confirms dense vegetation even accounting for soil
-  if (idx.savi > 0.35) cedarVotes++;
+  if (idx.savi > 0.30) cedarVotes++;
 
   // Vote 5: Low red reflectance (strong red absorption from chlorophyll)
-  if (r < 90 && redGreenRatio < 0.9) cedarVotes++;
+  if (r < 90 && redGreenRatio < 0.95) cedarVotes++;
 
-  // Cedar classification: need at least 3 of 5 votes
-  if (cedarVotes >= 3) {
+  // Cedar classification: need at least 2 of 5 votes at high NDVI
+  if (cedarVotes >= 2) {
     const voteRatio = cedarVotes / totalChecks;
-    const conf = Math.min(0.95, 0.5 + voteRatio * 0.35 + (idx.ndvi - 0.28) * 0.2);
+    const conf = Math.min(0.95, 0.5 + voteRatio * 0.3 + (idx.ndvi - 0.35) * 0.3);
     return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // 2-vote cedar: possible cedar but lower confidence
-  if (cedarVotes === 2 && idx.ndvi > 0.28 && brightness < 110) {
-    return { classification: 'cedar', confidence: 0.5, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
-  }
-
-  // Deciduous (oak): brighter canopy, GNDVI close to NDVI (high chlorophyll), higher red
-  if (idx.ndvi > 0.28 && brightness >= 95 && redGreenRatio > 0.85) {
+  // Deciduous (oak): brighter canopy, GNDVI close to NDVI, higher red
+  if (brightness >= 90 && redGreenRatio > 0.85) {
     let oakVotes = 1;
     if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.8) oakVotes++; // GNDVI ≈ NDVI → deciduous
     if (idx.nirRatio < 1.8) oakVotes++;
-    const conf = Math.min(0.8, 0.45 + oakVotes * 0.1);
+    if (brightness >= 110) oakVotes++; // oak canopy brighter than cedar
+    const conf = Math.min(0.8, 0.4 + oakVotes * 0.1);
     return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
