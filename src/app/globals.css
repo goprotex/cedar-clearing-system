@@ -128,3 +128,68 @@
     @apply font-sans;
   }
 }
+
+/* ─── Hologram Mode ─── */
+
+.hologram-mode {
+  position: relative;
+}
+
+/* Subtle vignette + border glow */
+.hologram-mode::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 60px rgba(0, 255, 180, 0.06),
+    inset 0 0 120px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 255, 200, 0.12);
+}
+
+/* Animated scan lines */
+.holo-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 255, 200, 0.015) 3px,
+    rgba(0, 255, 200, 0.015) 4px
+  );
+  animation: holo-scan 8s linear infinite;
+}
+
+@keyframes holo-scan {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 200px; }
+}
+
+/* Hologram panel styling */
+.holo-panel {
+  background: rgba(0, 20, 30, 0.85);
+  border: 1px solid rgba(0, 255, 200, 0.2);
+  box-shadow:
+    0 0 15px rgba(0, 255, 200, 0.1),
+    inset 0 1px 0 rgba(0, 255, 200, 0.1);
+}
+
+/* Hologram button */
+.holo-button {
+  background: rgba(0, 20, 30, 0.85);
+  border: 1px solid rgba(0, 255, 200, 0.25);
+  color: rgba(0, 255, 200, 0.8);
+  box-shadow: 0 0 12px rgba(0, 255, 200, 0.15);
+  transition: all 0.3s ease;
+}
+.holo-button:hover {
+  background: rgba(0, 40, 50, 0.9);
+  border-color: rgba(0, 255, 200, 0.5);
+  color: rgba(0, 255, 200, 1);
+  box-shadow: 0 0 20px rgba(0, 255, 200, 0.3);
+}

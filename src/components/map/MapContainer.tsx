@@ -7,6 +7,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
+import { TreeLayer3D, extractTreesFromAnalysis } from '@/lib/tree-layer';
+import type { PastureWall } from '@/lib/tree-layer';
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -20,12 +22,14 @@ interface MapContainerProps {
   accessToken: string;
 }
 
-type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI';
+type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI' | 'hologram';
+type Species = 'cedar' | 'oak' | 'mixed';
 
 export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
+  const treeLayerRef = useRef<TreeLayer3D | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -34,6 +38,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     naipNDVI: false,
     terrain3d: false,
     cedarAI: false,
+    hologram: false,
   });
   const [opacities, setOpacities] = useState<Record<LayerKey, number>>({
     soil: 0.45,
@@ -42,6 +47,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     naipNDVI: 0.75,
     terrain3d: 1.3, // terrain exaggeration (0.5–2.5)
     cedarAI: 0.7,
+    hologram: 1.0,
+  });
+  const [speciesVisible, setSpeciesVisible] = useState<Record<Species, boolean>>({
+    cedar: true, oak: true, mixed: true,
   });
 
   const {
@@ -86,6 +95,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       center: currentBid.propertyCenter,
       zoom: currentBid.mapZoom,
+      preserveDrawingBuffer: true, // needed for screenshot capture
+      antialias: true,
     });
 
     const draw = new MapboxDraw({
@@ -299,6 +310,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       naipNDVI: 'naip-ndvi-overlay',
       terrain3d: '', // handled separately
       cedarAI: '',   // handled below (two layers)
+      hologram: '',  // handled separately (3D tree layer)
     };
 
     // Toggle raster layers and set opacity
@@ -327,8 +339,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
 
     // Toggle 3D terrain
-    if (layers.terrain3d) {
-      map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
+    if (layers.terrain3d || layers.hologram) {
+      const exag = layers.hologram ? opacities.terrain3d : opacities.terrain3d;
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: exag });
       // Add sky layer for atmosphere if not present
       if (!map.getLayer('sky')) {
         map.addLayer({
@@ -347,7 +360,44 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         map.removeLayer('sky');
       }
     }
-  }, [layers, opacities]);
+
+    // ── Hologram mode: 3D tree layer ──
+    if (layers.hologram) {
+      if (!treeLayerRef.current) {
+        const treeLayer = new TreeLayer3D(currentBid.propertyCenter);
+        treeLayerRef.current = treeLayer;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        map.addLayer(treeLayer as any);
+
+        // Extract trees from all pastures' cedar analysis
+        const trees = extractTreesFromAnalysis(currentBid.pastures);
+        if (trees.length > 0) treeLayer.updateTrees(trees);
+
+        // Extract polygon walls
+        const walls: PastureWall[] = currentBid.pastures
+          .filter(p => p.polygon.geometry.coordinates.length > 0)
+          .map(p => ({
+            id: p.id,
+            coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
+            color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
+          }));
+        treeLayer.updatePolygonWalls(walls);
+      }
+
+      // Sync species visibility
+      const tl = treeLayerRef.current;
+      if (tl) {
+        for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
+          tl.setSpeciesVisible(sp, speciesVisible[sp]);
+        }
+      }
+    } else {
+      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+        map.removeLayer('3d-trees');
+        treeLayerRef.current = null;
+      }
+    }
+  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
 
   // Ensure NAIP layers are mutually exclusive (only one at a time)
   const toggleLayer = useCallback((key: LayerKey) => {
@@ -361,10 +411,26 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
+      // Hologram auto-enables terrain
+      if (key === 'hologram' && !prev.hologram) {
+        next.terrain3d = true;
+      }
       next[key] = !prev[key];
       return next;
     });
   }, []);
+
+  // Screenshot capture
+  const captureScreenshot = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const canvas = map.getCanvas();
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `hologram-${currentBid.bidNumber}-${Date.now()}.png`;
+    link.href = dataUrl;
+    link.click();
+  }, [currentBid.bidNumber]);
 
   // Attach draw event listeners
   useEffect(() => {
@@ -436,7 +502,22 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
 
     source.setData({ type: 'FeatureCollection', features: allFeatures });
-  }, [currentBid.pastures]);
+
+    // Update 3D tree layer if hologram is active
+    if (treeLayerRef.current && layers.hologram) {
+      const trees = extractTreesFromAnalysis(currentBid.pastures);
+      treeLayerRef.current.updateTrees(trees);
+
+      const walls: PastureWall[] = currentBid.pastures
+        .filter(p => p.polygon.geometry.coordinates.length > 0)
+        .map(p => ({
+          id: p.id,
+          coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
+          color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
+        }));
+      treeLayerRef.current.updatePolygonWalls(walls);
+    }
+  }, [currentBid.pastures, layers.hologram]);
 
   // ── Fly to selected pasture when it changes ──
   useEffect(() => {
@@ -460,8 +541,11 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   }, [selectedPastureId, currentBid.pastures]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className={`relative w-full h-full ${layers.hologram ? 'hologram-mode' : ''}`}>
       <div ref={mapContainerRef} className="w-full h-full" />
+
+      {/* Hologram scan-line overlay */}
+      {layers.hologram && <div className="holo-scanlines" />}
 
       {/* Drawing mode banner */}
       {drawingMode && (
@@ -483,9 +567,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {/* ── Layer control panel ── */}
       <div className="absolute bottom-4 left-4 z-10">
         {layersPanelOpen ? (
-          <div className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg p-2 min-w-[170px]">
+          <div className={`backdrop-blur rounded-lg shadow-lg p-2 min-w-[170px] ${layers.hologram ? 'holo-panel' : 'bg-slate-900/90'}`}>
             <div className="flex items-center justify-between px-1 pb-1">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${layers.hologram ? 'text-cyan-400' : 'text-slate-400'}`}>
                 Layers
               </span>
               <button
@@ -503,6 +587,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacity={opacities.soil}
               onToggle={() => toggleLayer('soil')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, soil: v }))}
+              holoMode={layers.hologram}
             />
             <LayerRow
               label="🛰️ RGB"
@@ -510,6 +595,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacity={opacities.naip}
               onToggle={() => toggleLayer('naip')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, naip: v }))}
+              holoMode={layers.hologram}
             />
             <LayerRow
               label="🔴 CIR"
@@ -517,6 +603,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacity={opacities.naipCIR}
               onToggle={() => toggleLayer('naipCIR')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, naipCIR: v }))}
+              holoMode={layers.hologram}
             />
             <LayerRow
               label="🌿 NDVI"
@@ -524,9 +611,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacity={opacities.naipNDVI}
               onToggle={() => toggleLayer('naipNDVI')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, naipNDVI: v }))}
+              holoMode={layers.hologram}
             />
 
-            <div className="border-t border-slate-700 my-1" />
+            <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
 
             <LayerRow
               label="⛰️ 3D"
@@ -536,9 +624,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacityStep={0.1}
               onToggle={() => toggleLayer('terrain3d')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, terrain3d: v }))}
+              holoMode={layers.hologram}
             />
 
-            <div className="border-t border-slate-700 my-1" />
+            <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
 
             <LayerRow
               label="🤖 AI Cedar"
@@ -546,17 +635,72 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               opacity={opacities.cedarAI}
               onToggle={() => toggleLayer('cedarAI')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, cedarAI: v }))}
+              holoMode={layers.hologram}
             />
+
+            <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
+
+            {/* Hologram 3D toggle */}
+            <LayerRow
+              label="🔮 Hologram"
+              active={layers.hologram}
+              opacity={opacities.hologram}
+              onToggle={() => toggleLayer('hologram')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, hologram: v }))}
+              holoMode={layers.hologram}
+            />
+
+            {/* Species filters (only show when hologram is active) */}
+            {layers.hologram && (
+              <div className="mt-1 pt-1 border-t border-cyan-800/50">
+                <span className="text-[9px] text-cyan-500 uppercase tracking-wider px-2 font-semibold">
+                  Species
+                </span>
+                <SpeciesToggle
+                  label="Cedar"
+                  color="#00ff88"
+                  active={speciesVisible.cedar}
+                  onToggle={() => setSpeciesVisible(v => ({ ...v, cedar: !v.cedar }))}
+                />
+                <SpeciesToggle
+                  label="Oak"
+                  color="#ffaa00"
+                  active={speciesVisible.oak}
+                  onToggle={() => setSpeciesVisible(v => ({ ...v, oak: !v.oak }))}
+                />
+                <SpeciesToggle
+                  label="Mixed"
+                  color="#00ccff"
+                  active={speciesVisible.mixed}
+                  onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <button
             onClick={() => setLayersPanelOpen(true)}
-            className="bg-slate-900/90 backdrop-blur rounded-lg shadow-lg px-3 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+            className={`backdrop-blur rounded-lg shadow-lg px-3 py-2 text-xs font-medium transition-colors ${
+              layers.hologram
+                ? 'holo-panel text-cyan-300 hover:text-white'
+                : 'bg-slate-900/90 text-slate-300 hover:text-white'
+            }`}
           >
             Layers
           </button>
         )}
       </div>
+
+      {/* Screenshot button (hologram mode) */}
+      {layers.hologram && (
+        <button
+          onClick={captureScreenshot}
+          className="absolute bottom-4 right-4 z-10 holo-button px-3 py-2 rounded-lg text-xs font-medium"
+          title="Capture hologram screenshot"
+        >
+          📸 Capture
+        </button>
+      )}
     </div>
   );
 }
@@ -569,6 +713,7 @@ function LayerRow({
   opacityStep = 0.05,
   onToggle,
   onOpacity,
+  holoMode = false,
 }: {
   label: string;
   active: boolean;
@@ -577,15 +722,20 @@ function LayerRow({
   opacityStep?: number;
   onToggle: () => void;
   onOpacity: (v: number) => void;
+  holoMode?: boolean;
 }) {
   return (
     <div className="space-y-0.5">
       <button
         onClick={onToggle}
-        className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-colors ${
+        className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
           active
-            ? 'bg-amber-600 text-white'
-            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            ? holoMode
+              ? 'bg-cyan-600/60 text-cyan-100 shadow-[0_0_8px_rgba(0,255,200,0.3)]'
+              : 'bg-amber-600 text-white'
+            : holoMode
+              ? 'text-cyan-300/70 hover:bg-cyan-900/40 hover:text-cyan-200'
+              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
         }`}
       >
         {label}
@@ -600,13 +750,46 @@ function LayerRow({
             step={opacityStep}
             value={opacity}
             onChange={(e) => onOpacity(parseFloat(e.target.value))}
-            className="w-full h-1 accent-amber-500 cursor-pointer"
+            className={`w-full h-1 cursor-pointer ${holoMode ? 'accent-cyan-400' : 'accent-amber-500'}`}
           />
-          <span className="text-[9px] text-slate-400 w-7 text-right tabular-nums">
+          <span className={`text-[9px] w-7 text-right tabular-nums ${holoMode ? 'text-cyan-500' : 'text-slate-400'}`}>
             {Math.round((opacity / opacityRange[1]) * 100)}%
           </span>
         </div>
       )}
     </div>
+  );
+}
+
+function SpeciesToggle({
+  label,
+  color,
+  active,
+  onToggle,
+}: {
+  label: string;
+  color: string;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`w-full flex items-center gap-2 px-2 py-0.5 text-[11px] font-medium rounded transition-all duration-200 ${
+        active
+          ? 'text-white/90'
+          : 'text-white/30 line-through'
+      }`}
+    >
+      <span
+        className="w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-300"
+        style={{
+          backgroundColor: active ? color : 'transparent',
+          border: `1.5px solid ${color}`,
+          boxShadow: active ? `0 0 6px ${color}` : 'none',
+        }}
+      />
+      {label}
+    </button>
   );
 }
