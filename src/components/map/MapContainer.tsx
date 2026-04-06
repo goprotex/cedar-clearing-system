@@ -648,7 +648,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         {layersPanelOpen ? (
           <div className={`backdrop-blur rounded-lg shadow-lg p-2 min-w-[170px] ${layers.hologram ? 'holo-panel' : 'bg-slate-900/90'}`}>
             <div className="flex items-center justify-between px-1 pb-1">
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${layers.hologram ? 'text-cyan-400' : 'text-slate-400'}`}>
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${layers.hologram ? 'text-green-400' : 'text-slate-400'}`}>
                 Layers
               </span>
               <button
@@ -693,7 +693,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               holoMode={layers.hologram}
             />
 
-            <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
+            <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
 
             <LayerRow
               label="⛰️ 3D"
@@ -706,7 +706,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               holoMode={layers.hologram}
             />
 
-            <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
+            <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
 
             <LayerRow
               label="🤖 AI Cedar"
@@ -731,13 +731,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
             {/* Species filters (only show when hologram is active) */}
             {layers.hologram && (
-              <div className="mt-1 pt-1 border-t border-cyan-800/50">
-                <span className="text-[9px] text-cyan-500 uppercase tracking-wider px-2 font-semibold">
+              <div className="mt-1 pt-1 border-t border-green-800/50">
+                <span className="text-[9px] text-green-500 uppercase tracking-wider px-2 font-semibold">
                   Species
                 </span>
                 <SpeciesToggle
                   label="Cedar"
-                  color="#00ff88"
+                  color="#00ff41"
                   active={speciesVisible.cedar}
                   onToggle={() => setSpeciesVisible(v => ({ ...v, cedar: !v.cedar }))}
                 />
@@ -749,7 +749,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 />
                 <SpeciesToggle
                   label="Mixed"
-                  color="#00ccff"
+                  color="#22dd44"
                   active={speciesVisible.mixed}
                   onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))}
                 />
@@ -761,7 +761,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             onClick={() => setLayersPanelOpen(true)}
             className={`backdrop-blur rounded-lg shadow-lg px-3 py-2 text-xs font-medium transition-colors ${
               layers.hologram
-                ? 'holo-panel text-cyan-300 hover:text-white'
+                ? 'holo-panel text-green-300 hover:text-white'
                 : 'bg-slate-900/90 text-slate-300 hover:text-white'
             }`}
           >
@@ -825,8 +825,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       {/* Hologram: no trees hint */}
       {layers.hologram && !currentBid.pastures.some(p => p.cedarAnalysis?.gridCells?.features?.length) && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 holo-panel px-4 py-2 rounded-lg shadow-lg text-xs text-cyan-300 max-w-xs text-center">
-          🔮 No tree data yet — run <span className="font-bold text-cyan-100">Analyze Cedar (AI)</span> on a pasture to generate 3D hologram trees
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 holo-panel px-4 py-2 rounded-lg shadow-lg text-xs text-green-300 max-w-xs text-center">
+          🔮 No tree data yet — run <span className="font-bold text-green-100">Spectral Analysis</span> on a pasture to generate 3D hologram trees
         </div>
       )}
     </div>
@@ -859,10 +859,10 @@ function LayerRow({
         className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
           active
             ? holoMode
-              ? 'bg-cyan-600/60 text-cyan-100 shadow-[0_0_8px_rgba(0,255,200,0.3)]'
+              ? 'bg-green-700/60 text-green-100 shadow-[0_0_8px_rgba(0,255,65,0.3)]'
               : 'bg-amber-600 text-white'
             : holoMode
-              ? 'text-cyan-300/70 hover:bg-cyan-900/40 hover:text-cyan-200'
+              ? 'text-green-300/70 hover:bg-green-900/40 hover:text-green-200'
               : 'text-slate-300 hover:bg-slate-800 hover:text-white'
         }`}
       >
@@ -878,9 +878,9 @@ function LayerRow({
             step={opacityStep}
             value={opacity}
             onChange={(e) => onOpacity(parseFloat(e.target.value))}
-            className={`w-full h-1 cursor-pointer ${holoMode ? 'accent-cyan-400' : 'accent-amber-500'}`}
+            className={`w-full h-1 cursor-pointer ${holoMode ? 'accent-green-400' : 'accent-amber-500'}`}
           />
-          <span className={`text-[9px] w-7 text-right tabular-nums ${holoMode ? 'text-cyan-500' : 'text-slate-400'}`}>
+          <span className={`text-[9px] w-7 text-right tabular-nums ${holoMode ? 'text-green-500' : 'text-slate-400'}`}>
             {Math.round((opacity / opacityRange[1]) * 100)}%
           </span>
         </div>

@@ -29,12 +29,12 @@ type Species = 'cedar' | 'oak' | 'mixed';
 // ─── Hologram Color Palette ───
 
 const HOLO = {
-  cedar:  { base: new THREE.Color(0x00ff88), glow: new THREE.Color(0x44ffbb) },
+  cedar:  { base: new THREE.Color(0x00ff41), glow: new THREE.Color(0x33ff66) },
   oak:    { base: new THREE.Color(0xffaa00), glow: new THREE.Color(0xffcc44) },
-  mixed:  { base: new THREE.Color(0x00ccff), glow: new THREE.Color(0x66ddff) },
-  grid:   new THREE.Color(0x00ff88),
-  wall:   new THREE.Color(0x00eeff),
-  particle: new THREE.Color(0x44ffcc),
+  mixed:  { base: new THREE.Color(0x22dd44), glow: new THREE.Color(0x55ff77) },
+  grid:   new THREE.Color(0x00ff41),
+  wall:   new THREE.Color(0x00ff41),
+  particle: new THREE.Color(0x33ff55),
   save:   new THREE.Color(0x00ff44), // bright green shield
   remove: new THREE.Color(0xff2244), // red target
 };
@@ -280,15 +280,17 @@ export function extractTreesFromAnalysis(
       const confidence = (props.confidence as number) ?? 0.5;
 
       // Higher NDVI = denser vegetation = more trees
-      // Base: 4 trees, scale up by NDVI (range ~0.1-0.8) and band agreement
-      let treeCount = 4;
-      if (ndvi > 0.5) treeCount += 6;        // very dense → 10 base
-      else if (ndvi > 0.35) treeCount += 4;  // dense → 8 base
-      else if (ndvi > 0.2) treeCount += 2;   // moderate → 6 base
+      // Base: 12 trees, scale up by NDVI and band agreement
+      let treeCount = 12;
+      if (ndvi > 0.5) treeCount += 14;       // very dense → 26 base
+      else if (ndvi > 0.35) treeCount += 10; // dense → 22 base
+      else if (ndvi > 0.2) treeCount += 6;   // moderate → 18 base
+      else if (ndvi > 0.1) treeCount += 3;   // light → 15 base
 
       // High confidence cells get more trees (bandVotes 3-5 out of 5)
-      if (bandVotes >= 4) treeCount += 3;
-      else if (bandVotes >= 3) treeCount += 1;
+      if (bandVotes >= 4) treeCount += 6;
+      else if (bandVotes >= 3) treeCount += 3;
+      else if (bandVotes >= 2) treeCount += 1;
 
       // Get cell centroid from polygon
       const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
@@ -299,8 +301,8 @@ export function extractTreesFromAnalysis(
         // Cluster trees toward cell center with gaussian-like jitter
         const jitter1 = (rand() - 0.5 + rand() - 0.5) * 0.5; // triangular distribution
         const jitter2 = (rand() - 0.5 + rand() - 0.5) * 0.5;
-        const offsetLng = jitter1 * halfSpacingDeg * 1.6;
-        const offsetLat = jitter2 * halfSpacingDeg * 1.6;
+        const offsetLng = jitter1 * halfSpacingDeg * 1.8;
+        const offsetLat = jitter2 * halfSpacingDeg * 1.8;
 
         // Scale tree size by NDVI — higher NDVI = taller, wider canopy
         const ndviScale = 0.6 + Math.min(ndvi, 0.7) * 0.8; // 0.6–1.16
@@ -388,10 +390,19 @@ export class TreeLayer3D {
   private removeRingMaterial: THREE.ShaderMaterial;
   private markedTrees: MarkedTree[] = [];
 
+  // Trunk + shadow meshes
+  private trunkMeshes: Record<Species, THREE.InstancedMesh | null> = {
+    cedar: null, oak: null, mixed: null,
+  };
+  private shadowMeshes: Record<Species, THREE.InstancedMesh | null> = {
+    cedar: null, oak: null, mixed: null,
+  };
+
   // State
   private trees: TreePosition[] = [];
   private speciesVisible: Record<Species, boolean> = { cedar: true, oak: true, mixed: true };
   private animTime = 0;
+  private growthProgress = 0; // 0→1 growth animation
   private disposed = false;
   private originLngLat: [number, number];
   private lastZoom = 0;
@@ -489,6 +500,18 @@ export class TreeLayer3D {
       this.lastZoom = zoom;
     }
 
+    // Growth animation: scale trees from 0→1 over ~2 seconds
+    if (this.growthProgress < 1) {
+      this.growthProgress = Math.min(1, this.growthProgress + 0.008); // ~2s at 60fps
+      const t = this.growthProgress;
+      // Ease-out elastic-like curve
+      const scale = t < 1 ? 1 - Math.pow(1 - t, 3) : 1;
+      for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
+        if (this.meshes[sp]) this.meshes[sp]!.scale.setY(scale);
+        if (this.trunkMeshes[sp]) this.trunkMeshes[sp]!.scale.setY(scale);
+      }
+    }
+
     // Update particles
     this.updateParticles();
 
@@ -530,6 +553,7 @@ export class TreeLayer3D {
 
   updateTrees(trees: TreePosition[]) {
     this.trees = trees;
+    this.growthProgress = 0; // restart growth animation
     this.rebuildMeshes();
     this.rebuildGrid();
     this.rebuildParticles();
@@ -539,8 +563,11 @@ export class TreeLayer3D {
 
   setSpeciesVisible(species: Species, visible: boolean) {
     this.speciesVisible[species] = visible;
-    if (this.meshes[species]) this.meshes[species]!.visible = visible && this.lastZoom > 13;
-    if (this.dotMeshes[species]) this.dotMeshes[species]!.visible = visible && this.lastZoom <= 13;
+    const close = this.lastZoom > 13;
+    if (this.meshes[species]) this.meshes[species]!.visible = visible && close;
+    if (this.trunkMeshes[species]) this.trunkMeshes[species]!.visible = visible && close;
+    if (this.shadowMeshes[species]) this.shadowMeshes[species]!.visible = visible && close;
+    if (this.dotMeshes[species]) this.dotMeshes[species]!.visible = visible && !close;
   }
 
   getSpeciesVisible(): Record<Species, boolean> {
@@ -591,8 +618,12 @@ export class TreeLayer3D {
     for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
       if (this.meshes[sp]) { this.scene.remove(this.meshes[sp]!); this.meshes[sp]!.dispose(); }
       if (this.dotMeshes[sp]) { this.scene.remove(this.dotMeshes[sp]!); this.dotMeshes[sp]!.dispose(); }
+      if (this.trunkMeshes[sp]) { this.scene.remove(this.trunkMeshes[sp]!); this.trunkMeshes[sp]!.dispose(); }
+      if (this.shadowMeshes[sp]) { this.scene.remove(this.shadowMeshes[sp]!); this.shadowMeshes[sp]!.dispose(); }
       this.meshes[sp] = null;
       this.dotMeshes[sp] = null;
+      this.trunkMeshes[sp] = null;
+      this.shadowMeshes[sp] = null;
     }
 
     if (this.trees.length === 0) return;
@@ -601,20 +632,43 @@ export class TreeLayer3D {
     const grouped: Record<Species, TreePosition[]> = { cedar: [], oak: [], mixed: [] };
     for (const t of this.trees) grouped[t.species].push(t);
 
-    // Geometries
-    const cedarGeo = new THREE.ConeGeometry(1, 1, 8); // unit cone, scaled per instance
+    // Geometries — cedar = inverted cone (point down), oak = sphere on cylinder trunk
+    const cedarGeo = new THREE.ConeGeometry(1, 1, 8);
+    cedarGeo.rotateZ(Math.PI); // flip upside down — point facing ground
     cedarGeo.translate(0, 0.5, 0); // base at origin
+
+    // Oak canopy = sphere (upper half)
     const oakGeo = new THREE.SphereGeometry(1, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    oakGeo.translate(0, 0.3, 0);
+    oakGeo.translate(0, 0.5, 0);
+
     const mixedGeo = new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    mixedGeo.translate(0, 0.25, 0);
+    mixedGeo.translate(0, 0.4, 0);
+
     const dotGeo = new THREE.CircleGeometry(1, 8);
     dotGeo.rotateX(-Math.PI / 2);
     dotGeo.translate(0, 0.5, 0);
 
+    // Trunk geometry (thin cylinder)
+    const trunkGeo = new THREE.CylinderGeometry(0.08, 0.12, 1, 6);
+    trunkGeo.translate(0, 0.5, 0); // base at origin
+
+    // Shadow disc (flat circle on ground)
+    const shadowGeo = new THREE.CircleGeometry(1, 12);
+    shadowGeo.rotateX(-Math.PI / 2);
+    shadowGeo.translate(0, 0.1, 0);
+
     const geos: Record<Species, THREE.BufferGeometry> = {
       cedar: cedarGeo, oak: oakGeo, mixed: mixedGeo,
     };
+
+    // Shadow material (dark translucent green glow)
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: HOLO.cedar.base,
+      transparent: true,
+      opacity: 0.12,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
 
     const dummy = new THREE.Object3D();
 
@@ -622,15 +676,17 @@ export class TreeLayer3D {
       const arr = grouped[sp];
       if (arr.length === 0) continue;
 
-      // Full geometry mesh
+      // Full geometry mesh (canopy)
       const mesh = new THREE.InstancedMesh(geos[sp], this.materials[sp], arr.length);
       for (let i = 0; i < arr.length; i++) {
         const t = arr[i];
         const pos = this.lngLatToScene(t.lng, t.lat);
         const radiusX = t.canopyDiameter / 2;
         const radiusZ = t.canopyDiameter / 2;
-        dummy.position.set(pos.x, 0, pos.z);
-        dummy.scale.set(radiusX, t.height, radiusZ);
+        // Oak: raise canopy above trunk
+        const baseY = sp === 'oak' ? t.height * 0.4 : 0;
+        dummy.position.set(pos.x, baseY, pos.z);
+        dummy.scale.set(radiusX, t.height * (sp === 'oak' ? 0.6 : 1), radiusZ);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
       }
@@ -638,6 +694,38 @@ export class TreeLayer3D {
       mesh.frustumCulled = false;
       this.scene.add(mesh);
       this.meshes[sp] = mesh;
+
+      // Trunk mesh
+      const trunk = new THREE.InstancedMesh(trunkGeo, this.materials[sp], arr.length);
+      for (let i = 0; i < arr.length; i++) {
+        const t = arr[i];
+        const pos = this.lngLatToScene(t.lng, t.lat);
+        const trunkH = sp === 'oak' ? t.height * 0.5 : t.height * 0.3;
+        dummy.position.set(pos.x, 0, pos.z);
+        dummy.scale.set(t.canopyDiameter * 0.15, trunkH, t.canopyDiameter * 0.15);
+        dummy.updateMatrix();
+        trunk.setMatrixAt(i, dummy.matrix);
+      }
+      trunk.instanceMatrix.needsUpdate = true;
+      trunk.frustumCulled = false;
+      this.scene.add(trunk);
+      this.trunkMeshes[sp] = trunk;
+
+      // Shadow disc
+      const shadow = new THREE.InstancedMesh(shadowGeo, shadowMat, arr.length);
+      for (let i = 0; i < arr.length; i++) {
+        const t = arr[i];
+        const pos = this.lngLatToScene(t.lng, t.lat);
+        const r = t.canopyDiameter * 0.6;
+        dummy.position.set(pos.x, 0, pos.z);
+        dummy.scale.set(r, 1, r);
+        dummy.updateMatrix();
+        shadow.setMatrixAt(i, dummy.matrix);
+      }
+      shadow.instanceMatrix.needsUpdate = true;
+      shadow.frustumCulled = false;
+      this.scene.add(shadow);
+      this.shadowMeshes[sp] = shadow;
 
       // Dot mesh (for far zoom)
       const dot = new THREE.InstancedMesh(dotGeo, this.dotMaterials[sp], arr.length);
@@ -660,6 +748,9 @@ export class TreeLayer3D {
     oakGeo.dispose();
     mixedGeo.dispose();
     dotGeo.dispose();
+    trunkGeo.dispose();
+    shadowGeo.dispose();
+    shadowMat.dispose();
   }
 
   // ─── Internal: LOD switching ───
@@ -669,6 +760,8 @@ export class TreeLayer3D {
     for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
       const vis = this.speciesVisible[sp];
       if (this.meshes[sp]) this.meshes[sp]!.visible = vis && close;
+      if (this.trunkMeshes[sp]) this.trunkMeshes[sp]!.visible = vis && close;
+      if (this.shadowMeshes[sp]) this.shadowMeshes[sp]!.visible = vis && close;
       if (this.dotMeshes[sp]) this.dotMeshes[sp]!.visible = vis && !close;
     }
   }
@@ -774,7 +867,7 @@ export class TreeLayer3D {
 
     if (this.trees.length === 0) return;
 
-    const count = Math.min(this.trees.length * 2, 1200);
+    const count = Math.min(this.trees.length * 2, 2500);
     this.particlePositions = new Float32Array(count * 3);
     this.particleVelocities = new Float32Array(count * 3);
 
@@ -805,9 +898,9 @@ export class TreeLayer3D {
 
     this.particleMaterial = new THREE.PointsMaterial({
       color: HOLO.particle,
-      size: 3.5,
+      size: 1.8,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.5,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,

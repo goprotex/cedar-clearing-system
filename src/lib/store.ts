@@ -219,6 +219,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
     get().fetchSoilData(id, centroid[0], centroid[1]);
     // Auto-fetch elevation
     get().fetchElevation(id, centroid[0], centroid[1]);
+    // Auto-run cedar spectral analysis
+    get().analyzeCedar(id);
   },
 
   setDrawingMode: (active) => set({ drawingMode: active }),

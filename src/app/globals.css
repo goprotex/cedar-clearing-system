@@ -170,26 +170,26 @@
   100% { background-position: 0 200px; }
 }
 
-/* Hologram panel styling */
+/* Hologram panel styling — Matrix green */
 .holo-panel {
-  background: rgba(0, 20, 30, 0.85);
-  border: 1px solid rgba(0, 255, 200, 0.2);
+  background: rgba(0, 10, 2, 0.88);
+  border: 1px solid rgba(0, 255, 65, 0.2);
   box-shadow:
-    0 0 15px rgba(0, 255, 200, 0.1),
-    inset 0 1px 0 rgba(0, 255, 200, 0.1);
+    0 0 15px rgba(0, 255, 65, 0.1),
+    inset 0 1px 0 rgba(0, 255, 65, 0.08);
 }
 
-/* Hologram button */
+/* Hologram button — Matrix green */
 .holo-button {
-  background: rgba(0, 20, 30, 0.85);
-  border: 1px solid rgba(0, 255, 200, 0.25);
-  color: rgba(0, 255, 200, 0.8);
-  box-shadow: 0 0 12px rgba(0, 255, 200, 0.15);
+  background: rgba(0, 10, 2, 0.88);
+  border: 1px solid rgba(0, 255, 65, 0.25);
+  color: rgba(0, 255, 65, 0.8);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.15);
   transition: all 0.3s ease;
 }
 .holo-button:hover {
-  background: rgba(0, 40, 50, 0.9);
-  border-color: rgba(0, 255, 200, 0.5);
-  color: rgba(0, 255, 200, 1);
-  box-shadow: 0 0 20px rgba(0, 255, 200, 0.3);
+  background: rgba(0, 25, 5, 0.92);
+  border-color: rgba(0, 255, 65, 0.5);
+  color: rgba(0, 255, 65, 1);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
 }
