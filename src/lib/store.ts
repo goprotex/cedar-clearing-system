@@ -84,6 +84,9 @@ interface BidStore {
   selectedPastureId: string | null;
   drawingMode: boolean;
 
+  // Analysis progress
+  analysisProgress: { active: boolean; step: string; detail: string } | null;
+
   // All saved bids (local storage for Phase 1)
   savedBids: BidSummary[];
 
@@ -145,6 +148,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
   rateCard: DEFAULT_RATE_CARD,
   selectedPastureId: null,
   drawingMode: false,
+  analysisProgress: null,
   savedBids: [],
 
   setCurrentBid: (bid) => set({ currentBid: bid }),
@@ -217,8 +221,10 @@ export const useBidStore = create<BidStore>((set, get) => ({
     }));
     get().recalculate();
     // Auto-fetch soil data for the new polygon's centroid
+    set({ analysisProgress: { active: true, step: 'Fetching soil data...', detail: 'Querying USDA SSURGO database for soil composition' } });
     get().fetchSoilData(id, centroid[0], centroid[1]);
     // Auto-fetch elevation
+    set({ analysisProgress: { active: true, step: 'Fetching elevation...', detail: 'Querying USGS elevation data for terrain profile' } });
     get().fetchElevation(id, centroid[0], centroid[1]);
     // Auto-run cedar spectral analysis
     get().analyzeCedar(id);
@@ -387,6 +393,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
     try {
+      set({ analysisProgress: { active: true, step: 'Running spectral analysis...', detail: `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution` } });
       const res = await fetch('/api/cedar-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -395,11 +402,16 @@ export const useBidStore = create<BidStore>((set, get) => ({
           acreage: pasture.acreage,
         }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        set({ analysisProgress: null });
+        return;
+      }
+      set({ analysisProgress: { active: true, step: 'Processing results...', detail: 'Classifying vegetation: cedar, oak, grass, brush, bare ground' } });
       const data: CedarAnalysis = await res.json();
       get().updatePasture(pastureId, { cedarAnalysis: data });
 
       // Auto-mark all cedar trees as "remove" by default
+      set({ analysisProgress: { active: true, step: 'Generating tree positions...', detail: 'Placing 3D trees based on spectral classification results' } });
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
         const trees = extractTreesFromAnalysis([{
@@ -419,11 +431,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
             canopyDiameter: t.canopyDiameter,
           }));
         if (cedarTrees.length > 0) {
+          set({ analysisProgress: { active: true, step: 'Auto-marking cedars...', detail: `Marking ${cedarTrees.length} cedar trees for removal` } });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
       }
+      set({ analysisProgress: { active: true, step: 'Analysis complete!', detail: `Found ${data.summary.cedar.pct}% cedar across ${data.summary.totalSamples} sample points` } });
+      // Clear after a brief moment so user sees the completion
+      setTimeout(() => set({ analysisProgress: null }), 2000);
     } catch {
-      // Cedar analysis is best-effort
+      set({ analysisProgress: null });
     }
   },
 

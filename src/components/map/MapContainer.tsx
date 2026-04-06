@@ -61,6 +61,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     currentBid,
     selectedPastureId,
     drawingMode,
+    analysisProgress,
     setPasturePolygon,
     setDrawingMode,
     selectPasture,
@@ -849,6 +850,30 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {layers.hologram && !currentBid.pastures.some(p => p.cedarAnalysis?.gridCells?.features?.length) && (
         <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 holo-panel px-4 py-2 rounded-lg shadow-lg text-xs text-green-300 max-w-xs text-center">
           🔮 No tree data yet — run <span className="font-bold text-green-100">Spectral Analysis</span> on a pasture to generate 3D hologram trees
+        </div>
+      )}
+
+      {/* Analysis progress overlay */}
+      {analysisProgress?.active && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="bg-slate-900/90 backdrop-blur-sm border border-green-500/30 rounded-xl shadow-2xl px-8 py-6 max-w-sm text-center space-y-3 pointer-events-auto">
+            {/* Spinner */}
+            <div className="flex justify-center">
+              <div className="w-10 h-10 border-3 border-green-500/30 border-t-green-400 rounded-full animate-spin" />
+            </div>
+            {/* Step */}
+            <div className="text-green-300 font-semibold text-sm">
+              {analysisProgress.step}
+            </div>
+            {/* Detail */}
+            <div className="text-slate-400 text-xs leading-relaxed">
+              {analysisProgress.detail}
+            </div>
+            {/* Pulse bar */}
+            <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full animate-pulse" style={{ width: '100%' }} />
+            </div>
+          </div>
         </div>
       )}
     </div>
