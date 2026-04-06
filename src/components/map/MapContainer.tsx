@@ -368,17 +368,25 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
     // ── Hologram mode: 3D tree layer ──
     if (layers.hologram) {
-      if (!treeLayerRef.current) {
-        const treeLayer = new TreeLayer3D(currentBid.propertyCenter);
-        treeLayerRef.current = treeLayer;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        map.addLayer(treeLayer as any);
+      if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
+        // Clean up stale ref if layer was somehow removed
+        if (treeLayerRef.current && !map.getLayer('3d-trees')) {
+          treeLayerRef.current = null;
+        }
+        if (!treeLayerRef.current) {
+          const treeLayer = new TreeLayer3D(currentBid.propertyCenter);
+          treeLayerRef.current = treeLayer;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          map.addLayer(treeLayer as any);
+        }
+      }
 
-        // Extract trees from all pastures' cedar analysis
+      // Always sync tree data when pastures change
+      const tl = treeLayerRef.current;
+      if (tl) {
         const trees = extractTreesFromAnalysis(currentBid.pastures);
-        if (trees.length > 0) treeLayer.updateTrees(trees);
+        if (trees.length > 0) tl.updateTrees(trees);
 
-        // Extract polygon walls
         const walls: PastureWall[] = currentBid.pastures
           .filter(p => p.polygon.geometry.coordinates.length > 0)
           .map(p => ({
@@ -386,12 +394,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
             color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
           }));
-        treeLayer.updatePolygonWalls(walls);
-      }
+        tl.updatePolygonWalls(walls);
 
-      // Sync species visibility
-      const tl = treeLayerRef.current;
-      if (tl) {
+        // Sync species visibility
         for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
           tl.setSpeciesVisible(sp, speciesVisible[sp]);
         }
@@ -508,22 +513,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
 
     source.setData({ type: 'FeatureCollection', features: allFeatures });
-
-    // Update 3D tree layer if hologram is active
-    if (treeLayerRef.current && layers.hologram) {
-      const trees = extractTreesFromAnalysis(currentBid.pastures);
-      treeLayerRef.current.updateTrees(trees);
-
-      const walls: PastureWall[] = currentBid.pastures
-        .filter(p => p.polygon.geometry.coordinates.length > 0)
-        .map(p => ({
-          id: p.id,
-          coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
-          color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
-        }));
-      treeLayerRef.current.updatePolygonWalls(walls);
-    }
-  }, [currentBid.pastures, layers.hologram]);
+  }, [currentBid.pastures]);
 
   // ── Tree marking click handler ──
   useEffect(() => {

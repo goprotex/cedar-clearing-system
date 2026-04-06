@@ -484,7 +484,13 @@ export class TreeLayer3D {
 
     this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(l);
 
+    // Restore Three.js state after Mapbox modified WebGL context
     this.renderer.resetState();
+
+    // Ensure viewport matches canvas size (Mapbox may have changed it)
+    const canvas = this.map.getCanvas();
+    this.renderer.setViewport(0, 0, canvas.width, canvas.height);
+
     this.renderer.render(this.scene, this.camera);
     this.map.triggerRepaint();
   }
