@@ -901,9 +901,9 @@ export class TreeLayer3D {
 
     this.particleMaterial = new THREE.PointsMaterial({
       color: HOLO.particle,
-      size: 1.8,
+      size: 0.15, // ~6 inches in world units
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.18,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
