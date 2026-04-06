@@ -116,10 +116,10 @@ const WALL_FRAGMENT = /* glsl */ `
   void main() {
     float scan = sin(vHeight * 0.8 + uTime * 2.0) * 0.5 + 0.5;
     float edge = pow(vFresnel, 3.0);
-    float alpha = (0.08 + edge * 0.25 + scan * 0.07);
+    float alpha = (0.02 + edge * 0.06 + scan * 0.02);
 
     // Horizontal grid lines
-    float gridLine = abs(sin(vHeight * 3.0)) < 0.05 ? 0.3 : 0.0;
+    float gridLine = abs(sin(vHeight * 3.0)) < 0.05 ? 0.08 : 0.0;
     alpha += gridLine;
 
     gl_FragColor = vec4(uColor * 1.5, alpha);
@@ -519,10 +519,20 @@ export class TreeLayer3D {
     this.updateParticles();
 
     // Build the camera matrix: projection = mapboxMatrix * modelMatrix
-    const { x, y, z, scale } = this.originMerc;
+    // Query terrain elevation so trees render on top of DEM surface
+    let elevation = 0;
+    if (this.map.getTerrain()) {
+      const el = this.map.queryTerrainElevation({
+        lng: this.originLngLat[0],
+        lat: this.originLngLat[1],
+      } as mapboxgl.LngLat);
+      if (el != null) elevation = el;
+    }
+    const merc = mapboxgl.MercatorCoordinate.fromLngLat(this.originLngLat, elevation);
+    const scale = merc.meterInMercatorCoordinateUnits();
 
     const l = new THREE.Matrix4()
-      .makeTranslation(x, y, z)
+      .makeTranslation(merc.x, merc.y, merc.z ?? 0)
       .scale(new THREE.Vector3(scale, -scale, scale))
       .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
 

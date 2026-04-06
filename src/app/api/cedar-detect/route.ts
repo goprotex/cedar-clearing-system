@@ -200,16 +200,15 @@ export async function POST(req: NextRequest) {
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
 
-    // 60m cells with 40% overlap — sample points every 36m, cell polygons 60m wide
-    const cellSizeKm = 0.06;  // 60m cell
-    const spacingKm = 0.036;  // 36m between points (60m * 0.6 = 40% overlap)
+    // 15m uniform grid — dense wall-to-wall coverage, no gaps
+    const spacingKm = 0.015; // 15m between sample points
 
     const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
 
-    // Use all points — 60m/40% overlap keeps count manageable even for large properties
+    // Use all points — 15m grid is dense but manageable within 300s timeout
     const samplePoints = pointsInPoly;
 
     if (samplePoints.length === 0) {
@@ -280,10 +279,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build cell polygons for map overlay (60m cells = 30m half-size)
+    // Build cell polygons for map overlay (15m cells = 7.5m half-size)
     const centerLat = (bbox[1] + bbox[3]) / 2;
-    const halfLngDeg = cellSizeKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
-    const halfLatDeg = cellSizeKm / 2 / 111.32;
+    const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
+    const halfLatDeg = spacingKm / 2 / 111.32;
 
     const gridCells: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
@@ -346,8 +345,6 @@ export async function POST(req: NextRequest) {
       avgBandVotes: Math.round(avgBandVotes * 10) / 10,
       highConfidenceCedarCells: highConfCedar,
       gridSpacingM: Math.round(spacingKm * 1000),
-      cellSizeM: Math.round(cellSizeKm * 1000),
-      overlapPct: 40,
     };
 
     return NextResponse.json(

@@ -8,6 +8,7 @@ import {
   calculateSoilDifficulty,
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
+import { extractTreesFromAnalysis } from '@/lib/tree-layer';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -397,6 +398,30 @@ export const useBidStore = create<BidStore>((set, get) => ({
       if (!res.ok) return;
       const data: CedarAnalysis = await res.json();
       get().updatePasture(pastureId, { cedarAnalysis: data });
+
+      // Auto-mark all cedar trees as "remove" by default
+      const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
+      if (updatedPasture) {
+        const trees = extractTreesFromAnalysis([{
+          cedarAnalysis: data,
+          density: updatedPasture.density,
+        }]);
+        const cedarTrees: MarkedTree[] = trees
+          .filter((t) => t.species === 'cedar')
+          .map((t) => ({
+            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            lng: t.lng,
+            lat: t.lat,
+            species: t.species,
+            action: 'remove' as const,
+            label: `Remove cedar`,
+            height: t.height,
+            canopyDiameter: t.canopyDiameter,
+          }));
+        if (cedarTrees.length > 0) {
+          get().updatePasture(pastureId, { savedTrees: cedarTrees });
+        }
+      }
     } catch {
       // Cedar analysis is best-effort
     }
