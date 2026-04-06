@@ -9,6 +9,7 @@ import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
 import { TreeLayer3D, extractTreesFromAnalysis } from '@/lib/tree-layer';
 import type { PastureWall } from '@/lib/tree-layer';
+import type { MarkedTree } from '@/types';
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -52,6 +53,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const [speciesVisible, setSpeciesVisible] = useState<Record<Species, boolean>>({
     cedar: true, oak: true, mixed: true,
   });
+  const [markMode, setMarkMode] = useState<'save' | 'remove' | null>(null);
 
   const {
     currentBid,
@@ -60,6 +62,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     setPasturePolygon,
     setDrawingMode,
     selectPasture,
+    markTree,
+    unmarkTree,
   } = useBidStore();
 
   // Handle polygon creation from draw
@@ -519,6 +523,76 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
   }, [currentBid.pastures, layers.hologram]);
 
+  // ── Tree marking click handler ──
+  useEffect(() => {
+    const map = mapRef.current;
+    const tl = treeLayerRef.current;
+    if (!map || !tl || !markMode || !layers.hologram || !selectedPastureId) return;
+
+    const onClick = (e: mapboxgl.MapMouseEvent) => {
+      const nearest = tl.findNearestTree(e.lngLat.lng, e.lngLat.lat, 25);
+      if (!nearest) return;
+
+      const pasture = currentBid.pastures.find((p) => p.id === selectedPastureId);
+      if (!pasture) return;
+
+      // Check if tree is already marked at this location
+      const existing = (pasture.savedTrees ?? []).find(
+        (t) => Math.abs(t.lng - nearest.lng) < 0.00001 && Math.abs(t.lat - nearest.lat) < 0.00001
+      );
+
+      if (existing) {
+        // Toggle or remove
+        if (existing.action === markMode) {
+          unmarkTree(selectedPastureId, existing.id);
+        } else {
+          // Switch from save⇄remove — remove then re-add
+          unmarkTree(selectedPastureId, existing.id);
+          const tree: MarkedTree = {
+            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            lng: nearest.lng,
+            lat: nearest.lat,
+            species: nearest.species,
+            action: markMode,
+            label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
+            height: nearest.height,
+            canopyDiameter: nearest.canopyDiameter,
+          };
+          markTree(selectedPastureId, tree);
+        }
+      } else {
+        const tree: MarkedTree = {
+          id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          lng: nearest.lng,
+          lat: nearest.lat,
+          species: nearest.species,
+          action: markMode,
+          label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
+          height: nearest.height,
+          canopyDiameter: nearest.canopyDiameter,
+        };
+        markTree(selectedPastureId, tree);
+      }
+    };
+
+    map.on('click', onClick);
+    map.getCanvas().style.cursor = markMode === 'save' ? 'cell' : 'crosshair';
+
+    return () => {
+      map.off('click', onClick);
+      map.getCanvas().style.cursor = '';
+    };
+  }, [markMode, layers.hologram, selectedPastureId, currentBid.pastures, markTree, unmarkTree]);
+
+  // ── Sync marked trees to 3D layer ──
+  useEffect(() => {
+    const tl = treeLayerRef.current;
+    if (!tl || !layers.hologram) return;
+
+    const allMarked = currentBid.pastures.flatMap((p) => p.savedTrees ?? []);
+    tl.updateMarkedTrees(allMarked);
+  }, [currentBid.pastures, layers.hologram]);
+
   // ── Fly to selected pasture when it changes ──
   useEffect(() => {
     const map = mapRef.current;
@@ -693,13 +767,55 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       {/* Screenshot button (hologram mode) */}
       {layers.hologram && (
-        <button
-          onClick={captureScreenshot}
-          className="absolute bottom-4 right-4 z-10 holo-button px-3 py-2 rounded-lg text-xs font-medium"
-          title="Capture hologram screenshot"
-        >
-          📸 Capture
-        </button>
+        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
+          {/* Tree marking mode buttons */}
+          <button
+            onClick={() => setMarkMode(markMode === 'save' ? null : 'save')}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              markMode === 'save'
+                ? 'bg-green-500/80 text-white shadow-[0_0_12px_rgba(0,255,68,0.5)]'
+                : 'holo-button'
+            }`}
+            title="Mark trees to SAVE (click on trees)"
+          >
+            🛡️ Save
+          </button>
+          <button
+            onClick={() => setMarkMode(markMode === 'remove' ? null : 'remove')}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              markMode === 'remove'
+                ? 'bg-red-500/80 text-white shadow-[0_0_12px_rgba(255,34,68,0.5)]'
+                : 'holo-button'
+            }`}
+            title="Mark trees to REMOVE (click on trees)"
+          >
+            ✂️ Remove
+          </button>
+          <button
+            onClick={captureScreenshot}
+            className="holo-button px-3 py-2 rounded-lg text-xs font-medium"
+            title="Capture hologram screenshot"
+          >
+            📸 Capture
+          </button>
+        </div>
+      )}
+
+      {/* Mark mode banner */}
+      {markMode && layers.hologram && (
+        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
+          markMode === 'save'
+            ? 'bg-green-600/90 text-white shadow-[0_0_20px_rgba(0,255,68,0.3)]'
+            : 'bg-red-600/90 text-white shadow-[0_0_20px_rgba(255,34,68,0.3)]'
+        }`}>
+          {markMode === 'save' ? '🛡️ Click trees to SAVE' : '✂️ Click trees to REMOVE'}
+          <button
+            onClick={() => setMarkMode(null)}
+            className="ml-3 underline hover:no-underline"
+          >
+            Done
+          </button>
+        </div>
       )}
     </div>
   );

@@ -87,6 +87,8 @@ export interface Pasture {
   seasonalAnalysis: SeasonalAnalysis | null;
   // Method-specific adders
   adders: PastureAdder[];
+  // Marked trees (save/remove)
+  savedTrees: MarkedTree[];
   // Calculated
   subtotal: number;
   methodMultiplier: number;
@@ -169,6 +171,33 @@ export interface PastureAdder {
   adderId: string;
   quantity: number;
   costPerUnit: number;
+}
+
+// ──── Marked Trees (save/skip) ────
+
+export interface MarkedTree {
+  id: string;
+  lng: number;
+  lat: number;
+  species: 'cedar' | 'oak' | 'mixed';
+  action: 'save' | 'remove';
+  label: string; // e.g. "Heritage Oak #1", "Customer requested"
+  height: number;
+  canopyDiameter: number;
+}
+
+// ──── AI Recommendation ────
+
+export interface AIRecommendation {
+  vegetationType: VegetationType;
+  density: DensityClass;
+  terrain: TerrainClass;
+  clearingMethod: ClearingMethod;
+  disposalMethod: DisposalMethod;
+  notes: string;
+  reasoning: string;
+  estimatedDifficulty: number; // 1-10
+  suggestedAdders: string[]; // adder IDs
 }
 
 // ──── Bid ────

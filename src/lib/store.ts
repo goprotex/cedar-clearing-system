@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard, SeasonalAnalysis } from '@/types';
+import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard, SeasonalAnalysis, MarkedTree, AIRecommendation } from '@/types';
 import {
   calculatePastureCost,
   calculateBidTotal,
@@ -37,6 +37,7 @@ function createDefaultPasture(sortOrder: number): Pasture {
     cedarAnalysis: null,
     seasonalAnalysis: null,
     adders: [],
+    savedTrees: [],
     subtotal: 0,
     methodMultiplier: 1.0,
     estimatedHrsPerAcre: 1.0,
@@ -119,6 +120,14 @@ interface BidStore {
 
   // Seasonal analysis
   analyzeSeasonal: (pastureId: string) => Promise<void>;
+
+  // Tree marking
+  markTree: (pastureId: string, tree: MarkedTree) => void;
+  unmarkTree: (pastureId: string, treeId: string) => void;
+  updateMarkedTree: (pastureId: string, treeId: string, updates: Partial<MarkedTree>) => void;
+
+  // AI auto-populate
+  aiPopulate: (pastureId: string) => Promise<AIRecommendation | null>;
 
   // Rate card
   updateRateCard: (updates: Partial<RateCard>) => void;
@@ -417,5 +426,104 @@ export const useBidStore = create<BidStore>((set, get) => ({
       rateCard: { ...state.rateCard, ...updates },
     }));
     get().recalculate();
+  },
+
+  markTree: (pastureId, tree) => {
+    set((state) => ({
+      currentBid: {
+        ...state.currentBid,
+        pastures: state.currentBid.pastures.map((p) =>
+          p.id === pastureId
+            ? { ...p, savedTrees: [...(p.savedTrees ?? []), tree] }
+            : p
+        ),
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+  },
+
+  unmarkTree: (pastureId, treeId) => {
+    set((state) => ({
+      currentBid: {
+        ...state.currentBid,
+        pastures: state.currentBid.pastures.map((p) =>
+          p.id === pastureId
+            ? { ...p, savedTrees: (p.savedTrees ?? []).filter((t) => t.id !== treeId) }
+            : p
+        ),
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+  },
+
+  updateMarkedTree: (pastureId, treeId, updates) => {
+    set((state) => ({
+      currentBid: {
+        ...state.currentBid,
+        pastures: state.currentBid.pastures.map((p) =>
+          p.id === pastureId
+            ? {
+                ...p,
+                savedTrees: (p.savedTrees ?? []).map((t) =>
+                  t.id === treeId ? { ...t, ...updates } : t
+                ),
+              }
+            : p
+        ),
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+  },
+
+  aiPopulate: async (pastureId) => {
+    const pasture = get().currentBid.pastures.find((p) => p.id === pastureId);
+    if (!pasture || pasture.acreage === 0) return null;
+
+    try {
+      const res = await fetch('/api/ai-populate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          acreage: pasture.acreage,
+          centroid: pasture.centroid,
+          elevationFt: pasture.elevationFt,
+          soilData: pasture.soilData,
+          soilMultiplier: pasture.soilMultiplier,
+          cedarAnalysis: pasture.cedarAnalysis
+            ? {
+                summary: pasture.cedarAnalysis.summary,
+                claudeVision: pasture.cedarAnalysis.claudeVision,
+              }
+            : null,
+          seasonalAnalysis: pasture.seasonalAnalysis,
+        }),
+      });
+      if (!res.ok) return null;
+      const rec: AIRecommendation = await res.json();
+
+      // Apply AI recommendations to pasture
+      const adders = rec.suggestedAdders
+        .map((id) => {
+          const def = get().rateCard.methodAdders.find((d) => d.id === id);
+          if (!def) return null;
+          const qty = def.unit === 'acre' ? pasture.acreage : 1;
+          return { adderId: id, quantity: qty, costPerUnit: def.defaultCost };
+        })
+        .filter((a): a is NonNullable<typeof a> => a !== null);
+
+      get().updatePasture(pastureId, {
+        vegetationType: rec.vegetationType,
+        density: rec.density,
+        terrain: rec.terrain,
+        clearingMethod: rec.clearingMethod,
+        disposalMethod: rec.disposalMethod,
+        notes: rec.notes,
+        adders: adders.length > 0 ? adders : pasture.adders,
+      });
+
+      return rec;
+    } catch {
+      return null;
+    }
   },
 }));

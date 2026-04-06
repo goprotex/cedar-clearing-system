@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Pasture, ClearingMethod, DensityClass, DisposalMethod, TerrainClass, VegetationType } from '@/types';
+import type { Pasture, ClearingMethod, DensityClass, DisposalMethod, TerrainClass, VegetationType, AIRecommendation } from '@/types';
 import { useBidStore } from '@/lib/store';
 import {
   formatCurrency,
@@ -24,9 +24,11 @@ interface PastureCardProps {
 }
 
 export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
-  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar, analyzeSeasonal } = useBidStore();
+  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar, analyzeSeasonal, aiPopulate, unmarkTree } = useBidStore();
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzingSeasonal, setAnalyzingSeasonal] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AIRecommendation | null>(null);
 
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
 
@@ -490,6 +492,82 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
             <div>
               Est. {Math.round(pasture.acreage * pasture.estimatedHrsPerAcre)} total hrs
               ({Math.ceil(pasture.acreage * pasture.estimatedHrsPerAcre / 8)} work days)
+            </div>
+          </div>
+        )}
+
+        {/* AI Auto-Populate */}
+        {pasture.acreage > 0 && (
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-cyan-600 text-cyan-700 hover:bg-cyan-50"
+              disabled={aiLoading}
+              onClick={async () => {
+                setAiLoading(true);
+                setAiResult(null);
+                const rec = await aiPopulate(pasture.id);
+                setAiResult(rec);
+                setAiLoading(false);
+              }}
+            >
+              {aiLoading ? (
+                <>
+                  <span className="animate-spin mr-1">⚙️</span> AI Analyzing...
+                </>
+              ) : (
+                '🤖 AI Auto-Fill Fields'
+              )}
+            </Button>
+            {aiResult && (
+              <div className="text-xs bg-cyan-50 border border-cyan-200 rounded p-2 space-y-1">
+                <div className="font-semibold text-cyan-800">AI Recommendation Applied</div>
+                <div className="text-cyan-700">{aiResult.reasoning}</div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px]">
+                    Difficulty: {aiResult.estimatedDifficulty}/10
+                  </Badge>
+                  {aiResult.suggestedAdders.length > 0 && (
+                    <Badge variant="outline" className="text-[10px]">
+                      +{aiResult.suggestedAdders.length} adders
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Saved Trees */}
+        {(pasture.savedTrees?.length ?? 0) > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold">Marked Trees ({pasture.savedTrees.length})</Label>
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {pasture.savedTrees.map((t) => (
+                <div
+                  key={t.id}
+                  className={`flex items-center justify-between text-[11px] px-2 py-1 rounded ${
+                    t.action === 'save'
+                      ? 'bg-green-50 border border-green-200 text-green-800'
+                      : 'bg-red-50 border border-red-200 text-red-800'
+                  }`}
+                >
+                  <span>
+                    {t.action === 'save' ? '🛡️' : '✂️'} {t.label}
+                    <span className="text-muted-foreground ml-1">
+                      ({t.height}m, ⌀{t.canopyDiameter}m)
+                    </span>
+                  </span>
+                  <button
+                    className="text-muted-foreground hover:text-destructive ml-1"
+                    onClick={() => unmarkTree(pasture.id, t.id)}
+                    title="Remove marking"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import mapboxgl from 'mapbox-gl';
+import type { MarkedTree } from '@/types';
 
 // ─── Types ───
 
@@ -34,6 +35,8 @@ const HOLO = {
   grid:   new THREE.Color(0x00ff88),
   wall:   new THREE.Color(0x00eeff),
   particle: new THREE.Color(0x44ffcc),
+  save:   new THREE.Color(0x00ff44), // bright green shield
+  remove: new THREE.Color(0xff2244), // red target
 };
 
 // ─── Hologram Shader (Fresnel glow + scan lines) ───
@@ -169,6 +172,52 @@ const GRID_FRAGMENT = /* glsl */ `
     alpha += sweep * 0.03 * edgeFade;
 
     gl_FragColor = vec4(uColor, alpha);
+  }
+`;
+
+// ─── Marker Ring Shader (pulsing ring around marked trees) ───
+
+const MARKER_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    #ifdef USE_INSTANCING
+      vec4 mvPos = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+    #else
+      vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    #endif
+    vUv = uv;
+    gl_Position = projectionMatrix * mvPos;
+  }
+`;
+
+const MARKER_FRAGMENT = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColor;
+
+  varying vec2 vUv;
+
+  void main() {
+    vec2 center = vUv - 0.5;
+    float dist = length(center) * 2.0;
+
+    // Ring
+    float ring = smoothstep(0.7, 0.75, dist) - smoothstep(0.85, 0.9, dist);
+
+    // Inner glow
+    float innerGlow = (1.0 - smoothstep(0.0, 0.7, dist)) * 0.15;
+
+    // Pulsing
+    float pulse = 0.7 + 0.3 * sin(uTime * 2.5);
+
+    // Rotating dash pattern
+    float angle = atan(center.y, center.x);
+    float dash = sin(angle * 4.0 - uTime * 3.0) * 0.5 + 0.5;
+    ring *= 0.6 + dash * 0.4;
+
+    float alpha = (ring * 0.8 + innerGlow) * pulse;
+    if (alpha < 0.01) discard;
+
+    gl_FragColor = vec4(uColor * 1.5, alpha);
   }
 `;
 
@@ -314,6 +363,13 @@ export class TreeLayer3D {
   private particlePositions: Float32Array | null = null;
   private particleVelocities: Float32Array | null = null;
 
+  // Marked tree rings
+  private saveRings: THREE.InstancedMesh | null = null;
+  private removeRings: THREE.InstancedMesh | null = null;
+  private saveRingMaterial: THREE.ShaderMaterial;
+  private removeRingMaterial: THREE.ShaderMaterial;
+  private markedTrees: MarkedTree[] = [];
+
   // State
   private trees: TreePosition[] = [];
   private speciesVisible: Record<Species, boolean> = { cedar: true, oak: true, mixed: true };
@@ -333,6 +389,26 @@ export class TreeLayer3D {
       },
       vertexShader: WALL_VERTEX,
       fragmentShader: WALL_FRAGMENT,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+
+    // Marker ring materials
+    this.saveRingMaterial = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uColor: { value: HOLO.save } },
+      vertexShader: MARKER_VERTEX,
+      fragmentShader: MARKER_FRAGMENT,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    this.removeRingMaterial = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uColor: { value: HOLO.remove } },
+      vertexShader: MARKER_VERTEX,
+      fragmentShader: MARKER_FRAGMENT,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -381,6 +457,8 @@ export class TreeLayer3D {
       ...Object.values(this.dotMaterials),
       this.gridMaterial,
       this.wallMaterial,
+      this.saveRingMaterial,
+      this.removeRingMaterial,
     ];
     for (const mat of allMaterials) {
       if (mat?.uniforms?.uTime) mat.uniforms.uTime.value = this.animTime;
@@ -419,6 +497,8 @@ export class TreeLayer3D {
     for (const mat of Object.values(this.dotMaterials)) mat.dispose();
     this.gridMaterial?.dispose();
     this.wallMaterial.dispose();
+    this.saveRingMaterial.dispose();
+    this.removeRingMaterial.dispose();
     this.particleMaterial?.dispose();
   }
 
@@ -451,6 +531,33 @@ export class TreeLayer3D {
       const wallMesh = this.createWallGeometry(wall.coordinates);
       if (wallMesh) this.wallGroup.add(wallMesh);
     }
+  }
+
+  updateMarkedTrees(marked: MarkedTree[]) {
+    this.markedTrees = marked;
+    this.rebuildMarkerRings();
+  }
+
+  /** Find the nearest tree within `radiusM` meters of a given lng/lat. Returns tree info or null. */
+  findNearestTree(lng: number, lat: number, radiusM = 20): TreePosition | null {
+    if (this.trees.length === 0) return null;
+
+    const clickScene = this.lngLatToScene(lng, lat);
+    let best: TreePosition | null = null;
+    let bestDist = Infinity;
+
+    for (const t of this.trees) {
+      const p = this.lngLatToScene(t.lng, t.lat);
+      const dx = p.x - clickScene.x;
+      const dz = p.z - clickScene.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = t;
+      }
+    }
+
+    return bestDist <= radiusM ? best : null;
   }
 
   // ─── Internal: Build instanced meshes ───
@@ -540,6 +647,52 @@ export class TreeLayer3D {
       if (this.meshes[sp]) this.meshes[sp]!.visible = vis && close;
       if (this.dotMeshes[sp]) this.dotMeshes[sp]!.visible = vis && !close;
     }
+  }
+
+  // ─── Internal: Marker rings for saved/removed trees ───
+
+  private rebuildMarkerRings() {
+    // Remove old ring meshes
+    if (this.saveRings) { this.scene.remove(this.saveRings); this.saveRings.dispose(); this.saveRings = null; }
+    if (this.removeRings) { this.scene.remove(this.removeRings); this.removeRings.dispose(); this.removeRings = null; }
+
+    if (this.markedTrees.length === 0) return;
+
+    const saves = this.markedTrees.filter((t) => t.action === 'save');
+    const removes = this.markedTrees.filter((t) => t.action === 'remove');
+
+    const ringGeo = new THREE.PlaneGeometry(1, 1);
+    ringGeo.rotateX(-Math.PI / 2);
+    ringGeo.translate(0, 0.3, 0);
+
+    const dummy = new THREE.Object3D();
+
+    const buildRings = (trees: MarkedTree[], material: THREE.ShaderMaterial): THREE.InstancedMesh => {
+      const mesh = new THREE.InstancedMesh(ringGeo, material, trees.length);
+      for (let i = 0; i < trees.length; i++) {
+        const t = trees[i];
+        const p = this.lngLatToScene(t.lng, t.lat);
+        const ringSize = Math.max(t.canopyDiameter * 1.5, 8);
+        dummy.position.set(p.x, 0, p.z);
+        dummy.scale.set(ringSize, 1, ringSize);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.frustumCulled = false;
+      return mesh;
+    };
+
+    if (saves.length > 0) {
+      this.saveRings = buildRings(saves, this.saveRingMaterial);
+      this.scene.add(this.saveRings);
+    }
+    if (removes.length > 0) {
+      this.removeRings = buildRings(removes, this.removeRingMaterial);
+      this.scene.add(this.removeRings);
+    }
+
+    ringGeo.dispose();
   }
 
   // ─── Internal: Holographic ground grid ───
