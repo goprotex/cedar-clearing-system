@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
 
-export const maxDuration = 55; // Vercel function timeout
+export const maxDuration = 300; // 5 min — thorough spectral analysis
 
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
@@ -200,21 +200,26 @@ export async function POST(req: NextRequest) {
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
 
-    // Auto-scale grid spacing based on acreage (keep total points manageable)
-    let spacingKm: number;
-    if (ac < 10) spacingKm = 0.015; // 15m
-    else if (ac < 30) spacingKm = 0.02; // 20m
-    else if (ac < 80) spacingKm = 0.03; // 30m
-    else if (ac < 200) spacingKm = 0.04; // 40m
-    else spacingKm = 0.06; // 60m
+    // Fixed 5m grid spacing — high-resolution regardless of property size
+    const spacingKm = 0.005; // 5m
 
     const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
 
-    // Cap at 300 to prevent excessive API calls
-    const samplePoints = pointsInPoly.slice(0, 300);
+    // Cap at 5000 sample points — randomly sample for even spatial coverage on huge properties
+    const MAX_SAMPLES = 5000;
+    let samplePoints = pointsInPoly;
+    if (pointsInPoly.length > MAX_SAMPLES) {
+      // Fisher-Yates shuffle then take first MAX_SAMPLES
+      const arr = [...pointsInPoly];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      samplePoints = arr.slice(0, MAX_SAMPLES);
+    }
 
     if (samplePoints.length === 0) {
       return NextResponse.json(
@@ -224,7 +229,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Batch identify requests against NAIP ImageServer
-    const batchSize = 15;
+    const batchSize = 50;
     const results: SampleResult[] = [];
 
     for (let i = 0; i < samplePoints.length; i += batchSize) {
