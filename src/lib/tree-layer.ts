@@ -280,17 +280,20 @@ export function extractTreesFromAnalysis(
       const confidence = (props.confidence as number) ?? 0.5;
 
       // Higher NDVI = denser vegetation = more trees
-      // Base: 12 trees, scale up by NDVI and band agreement
-      let treeCount = 12;
-      if (ndvi > 0.5) treeCount += 14;       // very dense → 26 base
-      else if (ndvi > 0.35) treeCount += 10; // dense → 22 base
-      else if (ndvi > 0.2) treeCount += 6;   // moderate → 18 base
-      else if (ndvi > 0.1) treeCount += 3;   // light → 15 base
+      // Dense cedar stands can have 200-400+ stems/acre — we need LOTS of trees per cell
+      let treeCount = 30;
+      if (ndvi > 0.6) treeCount += 50;       // very dense canopy → 80+
+      else if (ndvi > 0.5) treeCount += 40;  // dense → 70+
+      else if (ndvi > 0.4) treeCount += 30;  // moderate-dense → 60+
+      else if (ndvi > 0.3) treeCount += 20;  // moderate → 50+
+      else if (ndvi > 0.2) treeCount += 10;  // light-moderate → 40+
+      else if (ndvi > 0.1) treeCount += 5;   // light → 35+
 
       // High confidence cells get more trees (bandVotes 3-5 out of 5)
-      if (bandVotes >= 4) treeCount += 6;
-      else if (bandVotes >= 3) treeCount += 3;
-      else if (bandVotes >= 2) treeCount += 1;
+      if (bandVotes >= 5) treeCount += 20;
+      else if (bandVotes >= 4) treeCount += 15;
+      else if (bandVotes >= 3) treeCount += 8;
+      else if (bandVotes >= 2) treeCount += 3;
 
       // Get cell centroid from polygon
       const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
@@ -309,14 +312,14 @@ export function extractTreesFromAnalysis(
 
         let height: number, canopy: number;
         if (species === 'cedar') {
-          height = (3 + rand() * 5) * ndviScale;    // ~2-9m
-          canopy = (2 + rand() * 3) * ndviScale;    // ~1.2-5.8m
+          height = (2 + rand() * 4) * ndviScale;    // ~1.5-7m
+          canopy = (1.2 + rand() * 2) * ndviScale;  // ~0.7-3.7m
         } else if (species === 'oak') {
-          height = (3 + rand() * 4) * ndviScale;    // ~2-8m
-          canopy = (3 + rand() * 4) * ndviScale;    // ~2-8m
+          height = (2.5 + rand() * 3.5) * ndviScale; // ~1.5-7m
+          canopy = (2 + rand() * 3) * ndviScale;     // ~1.2-5.8m
         } else {
-          height = (2 + rand() * 3) * ndviScale;    // ~1.2-5.8m
-          canopy = (2 + rand() * 3) * ndviScale;    // ~1.2-5.8m
+          height = (1.5 + rand() * 2.5) * ndviScale; // ~1-4.6m
+          canopy = (1 + rand() * 2) * ndviScale;     // ~0.6-3.5m
         }
 
         trees.push({
@@ -867,7 +870,7 @@ export class TreeLayer3D {
 
     if (this.trees.length === 0) return;
 
-    const count = Math.min(this.trees.length * 2, 2500);
+    const count = Math.min(this.trees.length * 2, 8000);
     this.particlePositions = new Float32Array(count * 3);
     this.particleVelocities = new Float32Array(count * 3);
 
