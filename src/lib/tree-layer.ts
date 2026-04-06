@@ -261,22 +261,34 @@ export function extractTreesFromAnalysis(
   const trees: TreePosition[] = [];
   const rand = seededRandom(42);
 
-  const densityTreeCount: Record<string, number> = {
-    light: 2, moderate: 3, heavy: 5, extreme: 7,
-  };
-
   for (const pasture of pastures) {
     if (!pasture.cedarAnalysis?.gridCells?.features) continue;
 
     const spacing = pasture.cedarAnalysis.summary.gridSpacingM || 30;
     const halfSpacingDeg = (spacing / 2) / 111320; // rough meters to degrees
-    const treeCount = densityTreeCount[pasture.density] || 2;
 
     for (const feature of pasture.cedarAnalysis.gridCells.features) {
-      const cls = feature.properties?.classification as string;
+      const props = feature.properties ?? {};
+      const cls = props.classification as string;
       if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') continue;
 
       const species: Species = cls === 'mixed_brush' ? 'mixed' : cls as Species;
+
+      // Derive per-cell tree count from spectral data
+      const ndvi = (props.ndvi as number) ?? 0.2;
+      const bandVotes = (props.bandVotes as number) ?? 2;
+      const confidence = (props.confidence as number) ?? 0.5;
+
+      // Higher NDVI = denser vegetation = more trees
+      // Base: 4 trees, scale up by NDVI (range ~0.1-0.8) and band agreement
+      let treeCount = 4;
+      if (ndvi > 0.5) treeCount += 6;        // very dense → 10 base
+      else if (ndvi > 0.35) treeCount += 4;  // dense → 8 base
+      else if (ndvi > 0.2) treeCount += 2;   // moderate → 6 base
+
+      // High confidence cells get more trees (bandVotes 3-5 out of 5)
+      if (bandVotes >= 4) treeCount += 3;
+      else if (bandVotes >= 3) treeCount += 1;
 
       // Get cell centroid from polygon
       const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
@@ -284,19 +296,25 @@ export function extractTreesFromAnalysis(
       const cLat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
 
       for (let t = 0; t < treeCount; t++) {
-        const offsetLng = (rand() - 0.5) * halfSpacingDeg * 1.4;
-        const offsetLat = (rand() - 0.5) * halfSpacingDeg * 1.4;
+        // Cluster trees toward cell center with gaussian-like jitter
+        const jitter1 = (rand() - 0.5 + rand() - 0.5) * 0.5; // triangular distribution
+        const jitter2 = (rand() - 0.5 + rand() - 0.5) * 0.5;
+        const offsetLng = jitter1 * halfSpacingDeg * 1.6;
+        const offsetLat = jitter2 * halfSpacingDeg * 1.6;
+
+        // Scale tree size by NDVI — higher NDVI = taller, wider canopy
+        const ndviScale = 0.6 + Math.min(ndvi, 0.7) * 0.8; // 0.6–1.16
 
         let height: number, canopy: number;
         if (species === 'cedar') {
-          height = 8 + rand() * 14;    // 8-22m
-          canopy = 4 + rand() * 6;     // 4-10m
+          height = (3 + rand() * 5) * ndviScale;    // ~2-9m
+          canopy = (2 + rand() * 3) * ndviScale;    // ~1.2-5.8m
         } else if (species === 'oak') {
-          height = 6 + rand() * 10;    // 6-16m
-          canopy = 6 + rand() * 10;    // 6-16m
+          height = (3 + rand() * 4) * ndviScale;    // ~2-8m
+          canopy = (3 + rand() * 4) * ndviScale;    // ~2-8m
         } else {
-          height = 3 + rand() * 6;     // 3-9m
-          canopy = 3 + rand() * 6;     // 3-9m
+          height = (2 + rand() * 3) * ndviScale;    // ~1.2-5.8m
+          canopy = (2 + rand() * 3) * ndviScale;    // ~1.2-5.8m
         }
 
         trees.push({
@@ -756,7 +774,7 @@ export class TreeLayer3D {
 
     if (this.trees.length === 0) return;
 
-    const count = Math.min(this.trees.length * 3, 600);
+    const count = Math.min(this.trees.length * 2, 1200);
     this.particlePositions = new Float32Array(count * 3);
     this.particleVelocities = new Float32Array(count * 3);
 

@@ -426,6 +426,18 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       if (key === 'hologram' && !prev.hologram) {
         next.terrain3d = false;
         next.cedarAI = false; // hide flat squares, 3D trees replace them
+        // Pitch the camera to see 3D trees from an angle
+        const map = mapRef.current;
+        if (map) {
+          map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
+        }
+      }
+      // Reset camera when hologram turns off
+      if (key === 'hologram' && prev.hologram) {
+        const map = mapRef.current;
+        if (map) {
+          map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+        }
       }
       next[key] = !prev[key];
       return next;
