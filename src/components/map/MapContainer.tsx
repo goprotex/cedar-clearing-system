@@ -331,11 +331,12 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // Toggle cedar AI overlay (fill + border)
+    // Toggle cedar AI overlay (fill + border) — auto-hide when hologram is active
+    const cedarVisible = layers.cedarAI && !layers.hologram;
     for (const cedarLayerId of ['cedar-fill', 'cedar-border']) {
       const layer = map.getLayer(cedarLayerId);
       if (layer) {
-        map.setLayoutProperty(cedarLayerId, 'visibility', layers.cedarAI ? 'visible' : 'none');
+        map.setLayoutProperty(cedarLayerId, 'visibility', cedarVisible ? 'visible' : 'none');
       }
     }
     if (map.getLayer('cedar-fill')) {
@@ -415,9 +416,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram auto-enables terrain
+      // Hologram auto-enables terrain, auto-hides cedar AI squares
       if (key === 'hologram' && !prev.hologram) {
         next.terrain3d = true;
+        next.cedarAI = false; // hide flat squares, 3D trees replace them
       }
       next[key] = !prev[key];
       return next;

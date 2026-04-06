@@ -83,10 +83,10 @@ const HOLO_FRAGMENT = /* glsl */ `
     float pulse = 0.85 + 0.15 * sin(uTime * 1.2);
 
     vec3 color = mix(uColor, uGlow, fresnel * 0.6 + scan * 0.2);
-    float alpha = (uOpacity + fresnel * 0.35) * pulse;
-    alpha *= (0.8 + scan * 0.2);
+    float alpha = (uOpacity + fresnel * 0.45) * pulse;
+    alpha *= (0.85 + scan * 0.15);
 
-    gl_FragColor = vec4(color * 1.3, alpha);
+    gl_FragColor = vec4(color * 1.6, alpha);
   }
 `;
 
@@ -229,7 +229,7 @@ function createHoloMaterial(base: THREE.Color, glow: THREE.Color): THREE.ShaderM
       uTime: { value: 0 },
       uColor: { value: base },
       uGlow: { value: glow },
-      uOpacity: { value: 0.55 },
+      uOpacity: { value: 0.75 },
     },
     vertexShader: HOLO_VERTEX,
     fragmentShader: HOLO_FRAGMENT,
@@ -262,7 +262,7 @@ export function extractTreesFromAnalysis(
   const rand = seededRandom(42);
 
   const densityTreeCount: Record<string, number> = {
-    light: 1, moderate: 2, heavy: 3, extreme: 4,
+    light: 2, moderate: 3, heavy: 5, extreme: 7,
   };
 
   for (const pasture of pastures) {
@@ -289,14 +289,14 @@ export function extractTreesFromAnalysis(
 
         let height: number, canopy: number;
         if (species === 'cedar') {
-          height = 6 + rand() * 10;    // 6-16m
-          canopy = 3 + rand() * 5;     // 3-8m
+          height = 8 + rand() * 14;    // 8-22m
+          canopy = 4 + rand() * 6;     // 4-10m
         } else if (species === 'oak') {
-          height = 5 + rand() * 8;     // 5-13m
-          canopy = 5 + rand() * 8;     // 5-13m
+          height = 6 + rand() * 10;    // 6-16m
+          canopy = 6 + rand() * 10;    // 6-16m
         } else {
-          height = 2 + rand() * 5;     // 2-7m
-          canopy = 2 + rand() * 5;     // 2-7m
+          height = 3 + rand() * 6;     // 3-9m
+          canopy = 3 + rand() * 6;     // 3-9m
         }
 
         trees.push({
@@ -515,8 +515,8 @@ export class TreeLayer3D {
 
   setSpeciesVisible(species: Species, visible: boolean) {
     this.speciesVisible[species] = visible;
-    if (this.meshes[species]) this.meshes[species]!.visible = visible && this.lastZoom > 14.5;
-    if (this.dotMeshes[species]) this.dotMeshes[species]!.visible = visible && this.lastZoom <= 14.5;
+    if (this.meshes[species]) this.meshes[species]!.visible = visible && this.lastZoom > 13;
+    if (this.dotMeshes[species]) this.dotMeshes[species]!.visible = visible && this.lastZoom <= 13;
   }
 
   getSpeciesVisible(): Record<Species, boolean> {
@@ -641,7 +641,7 @@ export class TreeLayer3D {
   // ─── Internal: LOD switching ───
 
   private updateLOD(zoom: number) {
-    const close = zoom > 14.5;
+    const close = zoom > 13;
     for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
       const vis = this.speciesVisible[sp];
       if (this.meshes[sp]) this.meshes[sp]!.visible = vis && close;
@@ -781,9 +781,9 @@ export class TreeLayer3D {
 
     this.particleMaterial = new THREE.PointsMaterial({
       color: HOLO.particle,
-      size: 2.5,
+      size: 3.5,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.7,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,

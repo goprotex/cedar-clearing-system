@@ -240,18 +240,19 @@ export async function POST(req: NextRequest) {
 
     // Auto-scale grid spacing based on acreage (keep total points manageable)
     let spacingKm: number;
-    if (ac < 10) spacingKm = 0.02; // 20m
-    else if (ac < 50) spacingKm = 0.035; // 35m
-    else if (ac < 200) spacingKm = 0.055; // 55m
-    else spacingKm = 0.08; // 80m
+    if (ac < 10) spacingKm = 0.015; // 15m
+    else if (ac < 30) spacingKm = 0.02; // 20m
+    else if (ac < 80) spacingKm = 0.03; // 30m
+    else if (ac < 200) spacingKm = 0.04; // 40m
+    else spacingKm = 0.06; // 60m
 
     const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
 
-    // Cap at 150 to prevent excessive API calls
-    const samplePoints = pointsInPoly.slice(0, 150);
+    // Cap at 300 to prevent excessive API calls
+    const samplePoints = pointsInPoly.slice(0, 300);
 
     if (samplePoints.length === 0) {
       return NextResponse.json(
