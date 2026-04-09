@@ -84,12 +84,13 @@ interface BidStore {
   selectedPastureId: string | null;
   drawingMode: boolean;
 
-  // Analysis progress
+  // Analysis progress (`pct` is canonical; `percent` optional alias for UI that reads `percent`)
   analysisProgress: {
     active: boolean;
     step: string;
     detail: string;
     pct: number;
+    percent?: number;
     phase: string;
     cedarCount?: number;
     oakCount?: number;
@@ -242,9 +243,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
     }));
     get().recalculate();
     // Auto-fetch soil data for the new polygon's centroid
-    set({ analysisProgress: { active: true, phase: 'soil', step: 'Fetching soil data...', detail: 'Querying USDA SSURGO database', pct: 0 } });
+    set({ analysisProgress: { active: true, phase: 'soil', step: 'Fetching soil data...', detail: 'Querying USDA SSURGO database', pct: 0, percent: 0 } });
     get().fetchSoilData(id, centroid[0], centroid[1]);
-    set({ analysisProgress: { active: true, phase: 'elevation', step: 'Fetching elevation...', detail: 'Querying USGS elevation data', pct: 0 } });
+    set({ analysisProgress: { active: true, phase: 'elevation', step: 'Fetching elevation...', detail: 'Querying USGS elevation data', pct: 0, percent: 0 } });
     get().fetchElevation(id, centroid[0], centroid[1]);
     // Auto-run cedar spectral analysis
     get().analyzeCedar(id);
@@ -413,7 +414,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
     try {
-      set({ analysisProgress: { active: true, phase: 'init', step: 'Initializing spectral analysis...', detail: `Scanning ${Math.round(pasture.acreage)} acres at 15m resolution`, pct: 0 } });
+      set({ analysisProgress: { active: true, phase: 'init', step: 'Initializing spectral analysis...', detail: `Scanning ${Math.round(pasture.acreage)} acres at 15m resolution`, pct: 0, percent: 0 } });
 
       const res = await fetch('/api/cedar-detect', {
         method: 'POST',
@@ -455,13 +456,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
             try {
               const payload = JSON.parse(line.slice(6));
               if (eventType === 'progress') {
+                const p = Number(payload.pct ?? payload.percent ?? 0);
                 set({
                   analysisProgress: {
                     active: true,
                     phase: payload.phase || 'sampling',
                     step: payload.message || 'Processing...',
                     detail: payload.detail || '',
-                    pct: payload.pct || 0,
+                    pct: p,
+                    percent: p,
                     cedarCount: payload.cedarCount,
                     oakCount: payload.oakCount,
                     totalPoints: payload.totalPoints,
@@ -482,10 +485,10 @@ export const useBidStore = create<BidStore>((set, get) => ({
         return;
       }
 
-      set({ analysisProgress: { active: true, phase: 'applying', step: 'Applying results to map...', detail: '', pct: 99, totalPoints: resultData.summary?.totalSamples } });
+      set({ analysisProgress: { active: true, phase: 'applying', step: 'Applying results to map...', detail: '', pct: 99, percent: 99, totalPoints: resultData.summary?.totalSamples } });
       get().updatePasture(pastureId, { cedarAnalysis: resultData });
 
-      set({ analysisProgress: { active: true, phase: 'trees', step: 'Generating 3D tree positions...', detail: 'Placing trees from spectral data', pct: 99 } });
+      set({ analysisProgress: { active: true, phase: 'trees', step: 'Generating 3D tree positions...', detail: 'Placing trees from spectral data', pct: 99, percent: 99 } });
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
         const trees = extractTreesFromAnalysis([{
@@ -507,7 +510,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       }
 
       const s = resultData.summary;
-      set({ analysisProgress: { active: true, phase: 'done', step: 'Analysis complete', detail: `${s.cedar.pct}% cedar · ${s.oak?.pct || 0}% oak · ${s.totalSamples} samples`, pct: 100, totalPoints: s.totalSamples } });
+      set({ analysisProgress: { active: true, phase: 'done', step: 'Analysis complete', detail: `${s.cedar.pct}% cedar · ${s.oak?.pct || 0}% oak · ${s.totalSamples} samples`, pct: 100, percent: 100, totalPoints: s.totalSamples } });
       setTimeout(() => set({ analysisProgress: null }), 3000);
     } catch {
       set({ analysisProgress: null });

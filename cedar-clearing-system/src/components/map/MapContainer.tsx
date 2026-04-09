@@ -908,22 +908,22 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             <div className="text-slate-400 text-xs leading-relaxed">
               {analysisProgress.detail}
             </div>
-            {/* Progress — real width when `percent` is set (spectral analysis); indeterminate otherwise */}
+            {/* Progress — real width when `percent` or `pct` is set; indeterminate otherwise */}
             <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-              {analysisProgress.percent != null ? (
+              {(analysisProgress.percent ?? analysisProgress.pct) != null ? (
                 <div
                   className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-[width] duration-300 ease-out"
                   style={{
-                    width: `${Math.min(100, Math.max(0, analysisProgress.percent))}%`,
+                    width: `${Math.min(100, Math.max(0, analysisProgress.percent ?? analysisProgress.pct ?? 0))}%`,
                   }}
                 />
               ) : (
                 <div className="h-full w-full bg-gradient-to-r from-green-500/90 to-emerald-400/90 rounded-full animate-pulse" />
               )}
             </div>
-            {analysisProgress.percent != null && (
+            {(analysisProgress.percent ?? analysisProgress.pct) != null && (
               <div className="text-[10px] text-slate-500 tabular-nums">
-                {Math.round(analysisProgress.percent)}%
+                {Math.round(analysisProgress.percent ?? analysisProgress.pct ?? 0)}%
               </div>
             )}
           </div>

@@ -1093,7 +1093,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       )}
 
       {/* Apple Glass–style analysis progress overlay */}
-      {analysisProgress?.active && (
+      {analysisProgress?.active && (() => {
+        const progressPct = analysisProgress.percent ?? analysisProgress.pct;
+        return (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="w-[340px] backdrop-blur-xl bg-black/60 border border-white/10 rounded-3xl shadow-[0_8px_60px_rgba(0,255,65,0.15)] px-7 py-6 space-y-4 pointer-events-auto">
             {/* Phase icon + title */}
@@ -1102,13 +1104,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(0,255,65,0.1)" strokeWidth="2.5" />
                   <circle cx="18" cy="18" r="16" fill="none" stroke="#00ff41" strokeWidth="2.5"
-                    strokeDasharray={`${(analysisProgress.pct || 0)} 100`}
+                    strokeDasharray={`${progressPct} 100`}
                     strokeLinecap="round"
                     className="transition-all duration-500"
                   />
                 </svg>
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-green-400">
-                  {analysisProgress.pct || 0}%
+                  {progressPct}%
                 </span>
               </div>
               <div className="min-w-0">
@@ -1128,7 +1130,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               <div
                 className="h-full rounded-full transition-all duration-500 ease-out"
                 style={{
-                  width: `${analysisProgress.pct || 0}%`,
+                  width: `${progressPct}%`,
                   background: analysisProgress.phase === 'done'
                     ? 'linear-gradient(90deg, #00ff41, #33ff66)'
                     : 'linear-gradient(90deg, #00ff41, #00cc33)',
@@ -1164,7 +1166,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

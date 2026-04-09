@@ -133,8 +133,8 @@ interface BidStore {
   selectedPastureId: string | null;
   drawingMode: boolean;
 
-  // Analysis progress (`percent` 0–100 when known; omit for indeterminate steps like soil fetch)
-  analysisProgress: { active: boolean; step: string; detail: string; percent?: number } | null;
+  // Analysis progress (`percent` / `pct` 0–100 when known; omit for indeterminate steps like soil fetch)
+  analysisProgress: { active: boolean; step: string; detail: string; pct?: number; percent?: number } | null;
 
   // All saved bids (local storage for Phase 1)
   savedBids: BidSummary[];
