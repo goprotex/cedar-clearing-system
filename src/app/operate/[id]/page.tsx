@@ -1,4 +1,4 @@
-import OperatorClient from './OperatorClient';
+import OperatorWrapper from './OperatorWrapper';
 
 export const metadata = {
   title: 'Operator Mode — Cedar Hack',
@@ -6,5 +6,5 @@ export const metadata = {
 
 export default async function OperatorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <OperatorClient bidId={id} />;
+  return <OperatorWrapper bidId={id} />;
 }
