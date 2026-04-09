@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
 
+export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 min — thorough spectral analysis
+
+/** Cap grid points so large pastures stay within serverless time limits (stride-subsample). */
+const MAX_SAMPLE_POINTS = 2800;
 
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
+
+/** Throttle NAIP `identify` calls to reduce burst traffic and rate-limit / HTTP 429 risk. */
+const NAIP_WAVE_CONCURRENCY = 9;
+/** Pause after each wave completes (before starting the next wave). */
+const NAIP_WAVE_COOLDOWN_MS = 320;
+/** Random extra delay so concurrent users don’t retry in lockstep. */
+const NAIP_COOLDOWN_JITTER_MS = 120;
+/** Stagger start times within a wave so connections don’t open in one tick. */
+const NAIP_STAGGER_MS = 48;
+const NAIP_IDENTIFY_TIMEOUT_MS = 18_000;
 
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
 
@@ -372,7 +386,13 @@ export async function POST(req: NextRequest) {
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
-    const samplePoints = pointsInPoly;
+    let samplePoints = pointsInPoly;
+    let subsampleNote = '';
+    if (samplePoints.length > MAX_SAMPLE_POINTS) {
+      const stride = Math.ceil(samplePoints.length / MAX_SAMPLE_POINTS);
+      samplePoints = samplePoints.filter((_, i) => i % stride === 0);
+      subsampleNote = ` (subsampled ${samplePoints.length} of ${pointsInPoly.length} grid points for speed)`;
+    }
 
     if (samplePoints.length === 0) {
       return NextResponse.json(
@@ -381,15 +401,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch a single NAIP pixel with retry
-    async function fetchPixel(lng: number, lat: number, retries = 2): Promise<SampleResult> {
+    function naipWaveCooldown(): Promise<void> {
+      const ms =
+        NAIP_WAVE_COOLDOWN_MS + Math.floor(Math.random() * (NAIP_COOLDOWN_JITTER_MS + 1));
+      return new Promise((r) => setTimeout(r, ms));
+    }
+
+    // Fetch a single NAIP pixel with retry; backs off on HTTP 429 / 503 (rate limits / overload).
+    async function fetchPixel(lng: number, lat: number): Promise<SampleResult> {
       const geom = JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } });
       const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
 
-      for (let attempt = 0; attempt <= retries; attempt++) {
+      const maxAttempts = 6;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-          if (!res.ok) continue;
+          const res = await fetch(url, { signal: AbortSignal.timeout(NAIP_IDENTIFY_TIMEOUT_MS) });
+
+          if (res.status === 429 || res.status === 503) {
+            const ra = res.headers.get('retry-after');
+            const sec =
+              ra && /^\d+$/.test(ra.trim())
+                ? Math.min(60, parseInt(ra.trim(), 10))
+                : Math.min(45, 4 + attempt * 3);
+            await new Promise((r) => setTimeout(r, sec * 1000 + Math.random() * 600));
+            continue;
+          }
+
+          if (!res.ok) {
+            if (attempt < maxAttempts - 1) {
+              await new Promise((r) => setTimeout(r, 450 * (attempt + 1) + Math.random() * 200));
+            }
+            continue;
+          }
 
           const data = await res.json();
           const pixelStr: string = data?.value || '';
@@ -409,16 +452,16 @@ export async function POST(req: NextRequest) {
           const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
           return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
         } catch {
-          if (attempt < retries) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+          if (attempt < maxAttempts - 1) {
+            await new Promise((r) => setTimeout(r, 550 * (attempt + 1) + Math.random() * 250));
+          }
         }
       }
       return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.1, bandVotes: 0 };
     }
 
     const totalPoints = samplePoints.length;
-    const batchSize = 15;
-    const batchDelayMs = 150;
-    const totalBatches = Math.ceil(totalPoints / batchSize);
+    const totalWaves = Math.ceil(totalPoints / NAIP_WAVE_CONCURRENCY);
 
     // Stream progress via SSE
     const encoder = new TextEncoder();
@@ -431,34 +474,43 @@ export async function POST(req: NextRequest) {
         send('progress', {
           phase: 'grid',
           message: `Generated ${totalPoints} sample points at 15m resolution`,
+          detail: subsampleNote || undefined,
           totalPoints,
           completed: 0,
-          pct: 0,
+          pct: 3,
         });
 
         const results: SampleResult[] = [];
         let cedarSoFar = 0;
         let oakSoFar = 0;
 
-        for (let b = 0; b < totalBatches; b++) {
-          const start = b * batchSize;
-          const batch = samplePoints.slice(start, start + batchSize);
-          const batchResults = await Promise.all(
-            batch.map((pt) => fetchPixel(pt.geometry.coordinates[0], pt.geometry.coordinates[1]))
+        for (let w = 0; w < totalWaves; w++) {
+          const start = w * NAIP_WAVE_CONCURRENCY;
+          const wave = samplePoints.slice(start, start + NAIP_WAVE_CONCURRENCY);
+          const waveResults = await Promise.all(
+            wave.map((pt, i) =>
+              (async () => {
+                if (NAIP_STAGGER_MS > 0 && i > 0) {
+                  await new Promise((r) => setTimeout(r, i * NAIP_STAGGER_MS));
+                }
+                return fetchPixel(pt.geometry.coordinates[0], pt.geometry.coordinates[1]);
+              })()
+            )
           );
-          results.push(...batchResults);
+          results.push(...waveResults);
 
-          for (const r of batchResults) {
+          for (const r of waveResults) {
             if (r.classification === 'cedar') cedarSoFar++;
             if (r.classification === 'oak') oakSoFar++;
           }
 
           const completed = results.length;
-          const pct = Math.round((completed / totalPoints) * 100);
+          // Map sampling to ~4–88% so later phases can advance smoothly (avoids 88→95 jumps).
+          const pct = Math.min(88, 4 + Math.round((completed / totalPoints) * 84));
           send('progress', {
             phase: 'sampling',
             message: `Sampling NAIP imagery — ${completed}/${totalPoints} points`,
-            detail: `Cedar: ${cedarSoFar} | Oak: ${oakSoFar} | Batch ${b + 1}/${totalBatches}`,
+            detail: `Cedar: ${cedarSoFar} | Oak: ${oakSoFar} | Wave ${w + 1}/${totalWaves} (${NAIP_WAVE_CONCURRENCY}/wave, throttled)`,
             totalPoints,
             completed,
             pct,
@@ -466,8 +518,8 @@ export async function POST(req: NextRequest) {
             oakCount: oakSoFar,
           });
 
-          if (b < totalBatches - 1) {
-            await new Promise(r => setTimeout(r, batchDelayMs));
+          if (w < totalWaves - 1) {
+            await naipWaveCooldown();
           }
         }
 
@@ -476,7 +528,7 @@ export async function POST(req: NextRequest) {
           message: 'Running tile consensus refinement...',
           totalPoints,
           completed: totalPoints,
-          pct: 95,
+          pct: 90,
         });
 
 
@@ -488,7 +540,7 @@ export async function POST(req: NextRequest) {
           message: 'Building classification grid...',
           totalPoints,
           completed: totalPoints,
-          pct: 98,
+          pct: 94,
         });
 
         const centerLat = (bbox[1] + bbox[3]) / 2;
@@ -572,9 +624,10 @@ export async function POST(req: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
       },
     });
   } catch (err) {

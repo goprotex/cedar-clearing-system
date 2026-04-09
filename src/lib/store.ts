@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard, SeasonalAnalysis, MarkedTree, AIRecommendation } from '@/types';
 import {
@@ -426,13 +427,22 @@ export const useBidStore = create<BidStore>((set, get) => ({
       });
 
       if (!res.ok) {
+        let msg = `Spectral analysis failed (${res.status})`;
+        try {
+          const errBody = (await res.json()) as { error?: string; detail?: string };
+          if (errBody.error) msg = errBody.detail ? `${errBody.error}: ${errBody.detail}` : errBody.error;
+        } catch {
+          /* ignore */
+        }
         set({ analysisProgress: null });
+        toast.error(msg);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
         set({ analysisProgress: null });
+        toast.error('Spectral analysis: no response body from server.');
         return;
       }
 
@@ -449,32 +459,35 @@ export const useBidStore = create<BidStore>((set, get) => ({
         buffer = lines.pop() || '';
 
         let eventType = '';
-        for (const line of lines) {
+        for (const rawLine of lines) {
+          const line = rawLine.replace(/\r$/, '');
           if (line.startsWith('event: ')) {
             eventType = line.slice(7).trim();
           } else if (line.startsWith('data: ') && eventType) {
             try {
-              const payload = JSON.parse(line.slice(6));
+              const payload = JSON.parse(line.slice(6).trim()) as Record<string, unknown>;
               if (eventType === 'progress') {
                 const p = Number(payload.pct ?? payload.percent ?? 0);
                 set({
                   analysisProgress: {
                     active: true,
-                    phase: payload.phase || 'sampling',
-                    step: payload.message || 'Processing...',
-                    detail: payload.detail || '',
+                    phase: (payload.phase as string) || 'sampling',
+                    step: (payload.message as string) || 'Processing...',
+                    detail: (payload.detail as string) || '',
                     pct: p,
                     percent: p,
-                    cedarCount: payload.cedarCount,
-                    oakCount: payload.oakCount,
-                    totalPoints: payload.totalPoints,
-                    completed: payload.completed,
+                    cedarCount: payload.cedarCount as number | undefined,
+                    oakCount: payload.oakCount as number | undefined,
+                    totalPoints: payload.totalPoints as number | undefined,
+                    completed: payload.completed as number | undefined,
                   },
                 });
               } else if (eventType === 'result') {
                 resultData = payload as CedarAnalysis;
               }
-            } catch { /* skip malformed */ }
+            } catch {
+              /* skip malformed line */
+            }
             eventType = '';
           }
         }
@@ -482,13 +495,16 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       if (!resultData) {
         set({ analysisProgress: null });
+        toast.error(
+          'No spectral result was received. Try a smaller pasture, check your connection, or retry — the analysis stream may have been cut off.'
+        );
         return;
       }
 
-      set({ analysisProgress: { active: true, phase: 'applying', step: 'Applying results to map...', detail: '', pct: 99, percent: 99, totalPoints: resultData.summary?.totalSamples } });
+      set({ analysisProgress: { active: true, phase: 'applying', step: 'Applying results to map...', detail: '', pct: 96, percent: 96, totalPoints: resultData.summary?.totalSamples } });
       get().updatePasture(pastureId, { cedarAnalysis: resultData });
 
-      set({ analysisProgress: { active: true, phase: 'trees', step: 'Generating 3D tree positions...', detail: 'Placing trees from spectral data', pct: 99, percent: 99 } });
+      set({ analysisProgress: { active: true, phase: 'trees', step: 'Generating 3D tree positions...', detail: 'Placing trees from spectral data', pct: 98, percent: 98 } });
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
         const trees = extractTreesFromAnalysis([{
@@ -512,8 +528,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
       const s = resultData.summary;
       set({ analysisProgress: { active: true, phase: 'done', step: 'Analysis complete', detail: `${s.cedar.pct}% cedar · ${s.oak?.pct || 0}% oak · ${s.totalSamples} samples`, pct: 100, percent: 100, totalPoints: s.totalSamples } });
       setTimeout(() => set({ analysisProgress: null }), 3000);
-    } catch {
+    } catch (e) {
       set({ analysisProgress: null });
+      toast.error(e instanceof Error ? e.message : 'Spectral analysis failed.');
     }
   },
 

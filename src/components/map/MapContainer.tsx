@@ -1102,9 +1102,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             <div className="flex items-center gap-3">
               <div className="relative w-10 h-10 shrink-0">
                 <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(0,255,65,0.1)" strokeWidth="2.5" />
-                  <circle cx="18" cy="18" r="16" fill="none" stroke="#00ff41" strokeWidth="2.5"
-                    strokeDasharray={`${progressPct} 100`}
+                  <circle cx="18" cy="18" r="16" pathLength={100} fill="none" stroke="rgba(0,255,65,0.1)" strokeWidth="2.5" />
+                  <circle cx="18" cy="18" r="16" pathLength={100} fill="none" stroke="#00ff41" strokeWidth="2.5"
+                    strokeDasharray={`${Math.min(100, Math.max(0, progressPct))} ${100 - Math.min(100, Math.max(0, progressPct))}`}
                     strokeLinecap="round"
                     className="transition-all duration-500"
                   />
@@ -1118,8 +1118,12 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                   {analysisProgress.step}
                 </div>
                 <div className="text-white/40 text-[11px] font-medium">
-                  {analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
+                  {analysisProgress.phase === 'grid' ? 'GRID' :
+                   analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
                    analysisProgress.phase === 'consensus' ? 'TILE_CONSENSUS' :
+                   analysisProgress.phase === 'building' ? 'BUILD_GRID' :
+                   analysisProgress.phase === 'applying' ? 'APPLY_MAP' :
+                   analysisProgress.phase === 'trees' ? 'TREES_3D' :
                    analysisProgress.phase === 'done' ? 'COMPLETE' : 'INITIALIZING'}
                 </div>
               </div>
