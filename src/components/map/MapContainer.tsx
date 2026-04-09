@@ -7,6 +7,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
+import { TreeLayer3D, extractTreesFromAnalysis } from '@/lib/tree-layer';
+import type { PastureWall } from '@/lib/tree-layer';
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -29,6 +31,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const lastFlyToPastureRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
+  const treeLayerRef = useRef<TreeLayer3D | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -504,6 +507,34 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         map.setPaintProperty('pastures-labels', 'text-color', '#00ff41');
       }
 
+      // ── 3D tree layer ──
+      if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
+        if (treeLayerRef.current && !map.getLayer('3d-trees')) {
+          treeLayerRef.current = null;
+        }
+        if (!treeLayerRef.current) {
+          const treeLayer = new TreeLayer3D(currentBid.propertyCenter);
+          treeLayerRef.current = treeLayer;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          map.addLayer(treeLayer as any);
+        }
+      }
+
+      const tl = treeLayerRef.current;
+      if (tl) {
+        const trees = extractTreesFromAnalysis(currentBid.pastures);
+        if (trees.length > 0) tl.updateTrees(trees);
+
+        const walls: PastureWall[] = currentBid.pastures
+          .filter(p => p.polygon.geometry.coordinates.length > 0)
+          .map(p => ({
+            id: p.id,
+            coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
+            color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
+          }));
+        tl.updatePolygonWalls(walls);
+      }
+
       // Start slow auto-rotation
       if (!rotationFrameRef.current) {
         const rotate = () => {
@@ -519,6 +550,12 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       if (rotationFrameRef.current) {
         cancelAnimationFrame(rotationFrameRef.current);
         rotationFrameRef.current = null;
+      }
+
+      // Remove 3D tree layer
+      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+        map.removeLayer('3d-trees');
+        treeLayerRef.current = null;
       }
 
       // Hide mask
