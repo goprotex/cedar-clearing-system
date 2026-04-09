@@ -213,23 +213,6 @@ function classifyVegetation(
   return { classification: 'mixed_brush', confidence: 0.45, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
 }
 
-function getClassColor(classification: VegClass, ndvi: number): string {
-  switch (classification) {
-    case 'cedar':
-      if (ndvi > 0.5) return '#dc2626'; // dense
-      if (ndvi > 0.4) return '#ea580c'; // moderate
-      return '#f97316'; // light
-    case 'oak':
-      return '#92400e';
-    case 'mixed_brush':
-      return '#d97706';
-    case 'grass':
-      return '#65a30d';
-    case 'bare':
-      return '#9ca3af';
-  }
-}
-
 // ── Overlapping tile consensus ──
 // Overlays a grid of 5×5-pixel tiles (75m) at 2-pixel stride (30m) = 60% overlap.
 // Each pixel is covered by up to 9 tiles. Tiles vote on classification via
@@ -471,6 +454,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
         }
 
+        try {
         send('progress', {
           phase: 'grid',
           message: `Generated ${totalPoints} sample points at 15m resolution`,
@@ -547,35 +531,13 @@ export async function POST(req: NextRequest) {
         const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
         const halfLatDeg = spacingKm / 2 / 111.32;
 
-        const gridCells: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: refined.map((s) => ({
-            type: 'Feature' as const,
-            geometry: {
-              type: 'Polygon' as const,
-              coordinates: [
-                [
-                  [s.lng - halfLngDeg, s.lat - halfLatDeg],
-                  [s.lng + halfLngDeg, s.lat - halfLatDeg],
-                  [s.lng + halfLngDeg, s.lat + halfLatDeg],
-                  [s.lng - halfLngDeg, s.lat + halfLatDeg],
-                  [s.lng - halfLngDeg, s.lat - halfLatDeg],
-                ],
-              ],
-            },
-            properties: {
-              classification: s.classification,
-              ndvi: Math.round(s.ndvi * 1000) / 1000,
-              gndvi: Math.round(s.gndvi * 1000) / 1000,
-              savi: Math.round(s.savi * 1000) / 1000,
-              confidence: Math.round(s.confidence * 100) / 100,
-              bandVotes: s.bandVotes,
-              color: getClassColor(s.classification, s.ndvi),
-            },
-          })),
-        };
-
         const total = refined.length;
+        if (total === 0) {
+          send('error', { message: 'No spectral samples after processing.' });
+          controller.close();
+          return;
+        }
+
         const cedarCount = refined.filter((r) => r.classification === 'cedar').length;
         const oakCount = refined.filter((r) => r.classification === 'oak').length;
         const mixedCount = refined.filter((r) => r.classification === 'mixed_brush').length;
@@ -605,6 +567,8 @@ export async function POST(req: NextRequest) {
           avgBandVotes: Math.round(avgBandVotes * 10) / 10,
           highConfidenceCedarCells: highConfCedar,
           gridSpacingM: Math.round(spacingKm * 1000),
+          cellHalfLngDeg: halfLngDeg,
+          cellHalfLatDeg: halfLatDeg,
           tileConsensus: {
             tileCount,
             tileOverlapPct: 60,
@@ -617,8 +581,31 @@ export async function POST(req: NextRequest) {
           },
         };
 
-        send('result', { gridCells, summary });
+        // Compact `samples` keeps the final SSE line small (full GeoJSON grid was exceeding serverless limits).
+        const samples = refined.map((s) => ({
+          lng: s.lng,
+          lat: s.lat,
+          ndvi: s.ndvi,
+          gndvi: s.gndvi,
+          savi: s.savi,
+          classification: s.classification,
+          confidence: s.confidence,
+          bandVotes: s.bandVotes,
+        }));
+
+        send('result', { summary, samples });
         controller.close();
+        } catch (streamErr) {
+          const message = streamErr instanceof Error ? streamErr.message : 'Spectral stream failed';
+          try {
+            controller.enqueue(
+              encoder.encode(`event: error\ndata: ${JSON.stringify({ message })}\n\n`)
+            );
+          } catch {
+            /* ignore */
+          }
+          controller.close();
+        }
       },
     });
 

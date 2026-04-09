@@ -10,6 +10,7 @@ import {
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
 import { extractTreesFromAnalysis } from '@/lib/tree-layer';
+import { normalizeCedarAnalysisPayload } from '@/lib/cedar-analysis-grid';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -449,6 +450,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       const decoder = new TextDecoder();
       let buffer = '';
       let resultData: CedarAnalysis | null = null;
+      let streamError: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -482,8 +484,13 @@ export const useBidStore = create<BidStore>((set, get) => ({
                     completed: payload.completed as number | undefined,
                   },
                 });
+              } else if (eventType === 'error') {
+                streamError =
+                  typeof payload.message === 'string'
+                    ? payload.message
+                    : 'Spectral analysis failed on the server.';
               } else if (eventType === 'result') {
-                resultData = payload as unknown as CedarAnalysis;
+                resultData = normalizeCedarAnalysisPayload(payload);
               }
             } catch {
               /* skip malformed line */
@@ -491,6 +498,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
             eventType = '';
           }
         }
+      }
+
+      if (streamError) {
+        set({ analysisProgress: null });
+        toast.error(streamError);
+        return;
       }
 
       if (!resultData) {

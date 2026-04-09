@@ -131,6 +131,9 @@ export interface CedarAnalysisSummary {
   avgBandVotes: number;
   highConfidenceCedarCells: number;
   gridSpacingM: number;
+  /** Half cell width in degrees (from spectral API) — used to rebuild grid from compact `samples`. */
+  cellHalfLngDeg?: number;
+  cellHalfLatDeg?: number;
   tileConsensus?: TileConsensusStats;
 }
 
