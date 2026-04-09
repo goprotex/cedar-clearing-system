@@ -348,7 +348,7 @@ export class TreeLayer3D {
   private map!: mapboxgl.Map;
   private renderer!: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.Camera();
+  private camera: THREE.Camera;
 
   // Model transform from origin
   private originMerc!: { x: number; y: number; z: number; scale: number };
@@ -415,6 +415,9 @@ export class TreeLayer3D {
   constructor(originLngLat: [number, number]) {
     this.originLngLat = originLngLat;
 
+    this.camera = new THREE.Camera();
+    this.camera.matrixAutoUpdate = false;
+
     // Wall material
     this.wallMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -461,6 +464,7 @@ export class TreeLayer3D {
       antialias: true,
     });
     this.renderer.autoClear = false;
+    this.renderer.shadowMap.enabled = false;
 
     // Compute Mercator origin
     const merc = mapboxgl.MercatorCoordinate.fromLngLat(this.originLngLat, 0);
@@ -509,7 +513,6 @@ export class TreeLayer3D {
     if (this.growthProgress < 1) {
       this.growthProgress = Math.min(1, this.growthProgress + 0.008); // ~2s at 60fps
       const t = this.growthProgress;
-      // Ease-out elastic-like curve
       const scale = t < 1 ? 1 - Math.pow(1 - t, 3) : 1;
       for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
         if (this.meshes[sp]) this.meshes[sp]!.scale.setY(scale);
@@ -541,13 +544,15 @@ export class TreeLayer3D {
       .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
 
     this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(l);
+    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
 
     // Restore Three.js state after Mapbox modified WebGL context
     this.renderer.resetState();
 
     // Ensure viewport matches canvas size (Mapbox may have changed it)
     const canvas = this.map.getCanvas();
-    this.renderer.setViewport(0, 0, canvas.width, canvas.height);
+    const { drawingBufferWidth: w, drawingBufferHeight: h } = gl;
+    this.renderer.setViewport(0, 0, w || canvas.width, h || canvas.height);
 
     this.renderer.render(this.scene, this.camera);
     this.map.triggerRepaint();

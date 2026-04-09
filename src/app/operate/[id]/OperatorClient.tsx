@@ -167,19 +167,35 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
       map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
 
-      // Pasture polygon outlines
+      // NAIP NDVI overlay at 100% opacity for holographic base
+      map.addSource('naip-ndvi', {
+        type: 'raster',
+        tiles: [
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+        ],
+        tileSize: 256,
+      });
+      map.addLayer({
+        id: 'naip-ndvi-overlay',
+        type: 'raster',
+        source: 'naip-ndvi',
+        paint: { 'raster-opacity': 1.0 },
+      });
+
+      // Pasture polygon outlines with holographic green glow
       const pastureFeatures: GeoJSON.Feature[] = bid.pastures
         .filter(p => p.polygon.geometry.coordinates.length > 0)
         .map(p => ({
           type: 'Feature', geometry: p.polygon.geometry,
-          properties: { name: p.name, color: '#FF6B00' },
+          properties: { name: p.name, color: '#00ff41' },
         }));
 
       map.addSource('pastures', { type: 'geojson', data: { type: 'FeatureCollection', features: pastureFeatures } });
-      map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#FF6B00', 'line-width': 2, 'line-dasharray': [2, 1] } });
-      map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#FF6B00', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
+      map.addLayer({ id: 'pastures-fill', type: 'fill', source: 'pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.05 } });
+      map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
+      map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
 
-      // Cedar grid cells — fill-extrusion so visible on 3D terrain
+      // Cedar grid cells — fill-extrusion with holographic coloring
       const allCedarFeatures: GeoJSON.Feature[] = [];
       for (const p of bid.pastures) {
         if (!p.cedarAnalysis?.gridCells?.features) continue;
@@ -187,9 +203,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           const cls = f.properties?.classification;
           if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
           const cellId = `${p.id}:${idx}`;
+          const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
           allCedarFeatures.push({
             ...f,
-            properties: { ...f.properties, cellId, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
+            properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
           });
         });
       }
@@ -199,10 +216,19 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.addLayer({
         id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
         paint: {
-          'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'color']],
-          'fill-extrusion-opacity': 0.6,
+          'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
+          'fill-extrusion-opacity': 0.55,
           'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
           'fill-extrusion-base': 0,
+        },
+      });
+
+      map.addLayer({
+        id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
+        paint: {
+          'line-color': ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']],
+          'line-width': 0.5,
+          'line-opacity': 0.4,
         },
       });
 
@@ -232,9 +258,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         const cls = f.properties?.classification;
         if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
         const cellId = `${p.id}:${idx}`;
+        const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
         features.push({
           ...f,
-          properties: { ...f.properties, cellId, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
+          properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
         });
       });
     }
@@ -397,14 +424,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const elapsedMs = Date.now() - state.sessionStart;
 
   return (
-    <div className="h-screen w-screen bg-[#131313] relative overflow-hidden">
+    <div className="h-screen w-screen bg-[#131313] relative overflow-hidden hologram-mode">
       {/* Full-screen map */}
       <div ref={mapContainerRef} className="absolute inset-0" />
+      {/* Holographic scan-line overlay */}
+      <div className="holo-scanlines" />
 
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#131313]/80 backdrop-blur-sm border-b border-[#353534]">
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#000a02]/80 backdrop-blur-sm border-b border-green-900/40">
         <div className="flex items-center gap-3">
-          <Link href={`/bid/${bidId}`} className="text-[#FF6B00] font-black text-sm tracking-widest hover:text-white transition-colors">
+          <Link href={`/bid/${bidId}`} className="text-[#00ff41] font-black text-sm tracking-widest hover:text-white transition-colors">
             ← CEDAR_HACK
           </Link>
           <span className="text-[10px] text-[#a98a7d] font-mono hidden sm:inline">
@@ -421,9 +450,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* HUD panel */}
       {hudOpen && (
-        <div className="absolute top-14 left-3 z-10 bg-[#131313]/90 backdrop-blur-sm border border-[#353534] rounded-lg p-3 min-w-[220px] space-y-3">
+        <div className="absolute top-14 left-3 z-10 holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-[#FF6B00] font-bold uppercase tracking-widest">Field HUD</span>
+            <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Field HUD</span>
             <button onClick={() => setHudOpen(false)} className="text-[#a98a7d] hover:text-white text-xs">✕</button>
           </div>
 
@@ -500,7 +529,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       {!hudOpen && (
         <button
           onClick={() => setHudOpen(true)}
-          className="absolute top-14 left-3 z-10 bg-[#131313]/90 backdrop-blur-sm border border-[#353534] rounded-lg px-3 py-2 text-[10px] text-[#FF6B00] font-bold uppercase tracking-widest hover:text-white transition-colors"
+          className="absolute top-14 left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
         >
           HUD ({stats.pct}%)
         </button>
