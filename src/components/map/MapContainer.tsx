@@ -342,21 +342,35 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
 
     // Toggle cedar AI overlay (fill + border)
+    const cedarVisible = layers.cedarAI || layers.hologram;
     for (const cedarLayerId of ['cedar-fill', 'cedar-border']) {
       const layer = map.getLayer(cedarLayerId);
       if (layer) {
-        map.setLayoutProperty(cedarLayerId, 'visibility', layers.cedarAI ? 'visible' : 'none');
+        map.setLayoutProperty(cedarLayerId, 'visibility', cedarVisible ? 'visible' : 'none');
       }
     }
     if (map.getLayer('cedar-fill')) {
-      const cedarOpacity = layers.hologram ? Math.min(opacities.cedarAI, 0.45) : opacities.cedarAI;
-      map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', cedarOpacity);
+      if (layers.hologram) {
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', 0.85);
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 6);
+      } else {
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', opacities.cedarAI);
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 2);
+      }
+    }
+    if (map.getLayer('cedar-border')) {
+      if (layers.hologram) {
+        map.setPaintProperty('cedar-border', 'line-opacity', 0.8);
+        map.setPaintProperty('cedar-border', 'line-width', 1);
+      } else {
+        map.setPaintProperty('cedar-border', 'line-opacity', 0.5);
+        map.setPaintProperty('cedar-border', 'line-width', 0.5);
+      }
     }
 
-    // Toggle 3D terrain
-    if (layers.terrain3d) {
+    // Toggle 3D terrain (disabled when hologram is on)
+    if (layers.terrain3d && !layers.hologram) {
       map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
-      // Add sky layer for atmosphere if not present
       if (!map.getLayer('sky')) {
         map.addLayer({
           id: 'sky',
@@ -375,9 +389,63 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // Force NDVI to 100% when hologram is active
-    if (layers.hologram && layers.naipNDVI && map.getLayer('naip-ndvi-overlay')) {
-      map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
+    // ── Hologram mode: desaturate base map, force NDVI + cedar visible ──
+    if (layers.hologram) {
+      // Desaturate the satellite base map to make overlays pop
+      const baseLayers = map.getStyle().layers ?? [];
+      for (const bl of baseLayers) {
+        if (bl.id.startsWith('satellite') || bl.id.includes('mapbox-satellite')) {
+          try {
+            map.setPaintProperty(bl.id, 'raster-saturation', -0.7);
+            map.setPaintProperty(bl.id, 'raster-brightness-max', 0.4);
+          } catch { /* not a raster layer */ }
+        }
+      }
+
+      // Force NDVI visible at 100%
+      if (map.getLayer('naip-ndvi-overlay')) {
+        map.setLayoutProperty('naip-ndvi-overlay', 'visibility', 'visible');
+        map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
+      }
+
+      // Green pasture borders in hologram mode
+      if (map.getLayer('pastures-border')) {
+        map.setPaintProperty('pastures-border', 'line-color', '#00ff41');
+        map.setPaintProperty('pastures-border', 'line-width', 3);
+      }
+      if (map.getLayer('pastures-fill')) {
+        map.setPaintProperty('pastures-fill', 'fill-color', '#00ff41');
+        map.setPaintProperty('pastures-fill', 'fill-opacity', 0.08);
+      }
+      if (map.getLayer('pastures-labels')) {
+        map.setPaintProperty('pastures-labels', 'text-color', '#00ff41');
+      }
+    } else {
+      // Restore satellite base map
+      const baseLayers = map.getStyle().layers ?? [];
+      for (const bl of baseLayers) {
+        if (bl.id.startsWith('satellite') || bl.id.includes('mapbox-satellite')) {
+          try {
+            map.setPaintProperty(bl.id, 'raster-saturation', 0);
+            map.setPaintProperty(bl.id, 'raster-brightness-max', 1);
+          } catch { /* not a raster layer */ }
+        }
+      }
+
+      // Restore pasture colors
+      if (map.getLayer('pastures-border')) {
+        map.setPaintProperty('pastures-border', 'line-color', ['get', 'color']);
+        map.setPaintProperty('pastures-border', 'line-width', [
+          'case', ['boolean', ['get', 'selected'], false], 3, 2,
+        ]);
+      }
+      if (map.getLayer('pastures-fill')) {
+        map.setPaintProperty('pastures-fill', 'fill-color', ['get', 'color']);
+        map.setPaintProperty('pastures-fill', 'fill-opacity', 0.25);
+      }
+      if (map.getLayer('pastures-labels')) {
+        map.setPaintProperty('pastures-labels', 'text-color', '#ffffff');
+      }
     }
 
   }, [layers, opacities, currentBid.pastures, currentBid.propertyCenter]);
