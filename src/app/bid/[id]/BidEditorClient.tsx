@@ -9,7 +9,6 @@ import BidDetails from '@/components/bid/BidDetails';
 import BidOptions from '@/components/bid/BidOptions';
 import RateCardSettings from '@/components/bid/RateCardSettings';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
@@ -60,8 +59,15 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUpdatedAt = useRef(currentBid.updatedAt);
 
-  // Load bid from localStorage on mount
+  // Mark mounted without using an effect body setState (eslint rule)
+  if (!mounted && typeof window !== 'undefined') {
+    // This is only evaluated client-side; it prevents server/client ID mismatch.
+    setMounted(true);
+  }
+
+  // Load bid from localStorage after mount
   useEffect(() => {
+    if (!mounted) return;
     loadBid(bidId);
     // If no saved data was found for this ID, the store still holds
     // the previous (stale) bid. Reset to a fresh bid keyed to this ID.
@@ -69,8 +75,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     if (state.currentBid.id !== bidId) {
       state.newBid();
     }
-    setMounted(true);
-  }, [bidId, loadBid]);
+  }, [bidId, loadBid, mounted]);
 
   useEffect(() => {
     if (currentBid.updatedAt !== lastUpdatedAt.current && currentBid.pastures.length > 0) {
@@ -127,7 +132,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
             </SelectContent>
           </Select>
           <span className="text-[10px] text-[#5a4136] font-mono hidden lg:inline truncate">
-            // {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
+            {'//'} {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">

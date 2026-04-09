@@ -71,6 +71,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const trailCoordsRef = useRef<[number, number][]>([]);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [ndviEnabled, setNdviEnabled] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -149,6 +151,11 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
+    if (!mapboxgl.supported({ failIfMajorPerformanceCaveat: false })) {
+      setMapError('WebGL is not supported on this device/browser.');
+      return;
+    }
+
     const map = new mapboxgl.Map({
       container,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
@@ -158,6 +165,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       antialias: true,
       preserveDrawingBuffer: true,
       failIfMajorPerformanceCaveat: false,
+    });
+
+    map.on('error', (e) => {
+      const msg =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (e as any)?.error?.message ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (e as any)?.error?.toString?.() ||
+        'Mapbox failed to load.';
+      setMapError(String(msg));
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -174,7 +191,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
       map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
 
-      // NAIP NDVI overlay at 100% opacity for holographic base
+      // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
       map.addSource('naip-ndvi', {
         type: 'raster',
         tiles: [
@@ -186,7 +203,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         id: 'naip-ndvi-overlay',
         type: 'raster',
         source: 'naip-ndvi',
-        paint: { 'raster-opacity': 1.0 },
+        paint: { 'raster-opacity': 0.85 },
+        layout: { visibility: 'none' },
       });
 
       // Pasture polygon outlines with holographic green glow
@@ -248,6 +266,15 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     return () => { map.remove(); mapRef.current = null; };
   }, [state.bid]);
+
+  // Toggle NDVI overlay visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const layerId = 'naip-ndvi-overlay';
+    if (!map.getLayer(layerId)) return;
+    map.setLayoutProperty(layerId, 'visibility', ndviEnabled ? 'visible' : 'none');
+  }, [ndviEnabled]);
 
   // Process GPS position — check cedar cells for clearing
   const updateCedarSource = useCallback(() => {
@@ -437,6 +464,19 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       {/* Holographic scan-line overlay */}
       {bid && <div className="holo-scanlines" />}
 
+      {/* Map error overlay */}
+      {bid && mapError && (
+        <div className="absolute inset-0 z-40 bg-[#131313]/90 backdrop-blur-sm flex items-center justify-center text-[#e5e2e1]">
+          <div className="max-w-md w-[92vw] border border-[#353534] bg-[#0e0e0e]/90 p-6 space-y-3">
+            <div className="text-[#FF6B00] text-xl font-black uppercase tracking-widest">MAP_OFFLINE</div>
+            <div className="text-xs font-mono text-[#a98a7d] break-words">{mapError}</div>
+            <div className="text-[11px] text-[#a98a7d]">
+              If this is a token/style error, verify <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> and refresh.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar */}
       {bid && (
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#000a02]/80 backdrop-blur-sm border-b border-green-900/40">
@@ -449,6 +489,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setNdviEnabled((v) => !v)}
+              className="text-[10px] font-mono text-[#a98a7d] hover:text-white border border-green-900/40 px-2 py-1 rounded"
+              title="Toggle NDVI overlay"
+            >
+              {ndviEnabled ? 'NDVI_ON' : 'NDVI_OFF'}
+            </button>
             <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[10px] font-mono text-[#a98a7d]">
               {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
