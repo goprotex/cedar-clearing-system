@@ -209,6 +209,19 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         data: { type: 'FeatureCollection', features: [] },
       });
 
+      // 2D flat fill — works on all devices including mobile
+      map.addLayer({
+        id: 'cedar-flat',
+        type: 'fill',
+        source: 'cedar-analysis',
+        paint: {
+          'fill-color': ['get', 'color'],
+          'fill-opacity': 0.6,
+        },
+        layout: { visibility: 'none' },
+      });
+
+      // 3D extrusion — bonus layer for desktop
       map.addLayer({
         id: 'cedar-fill',
         type: 'fill-extrusion',
@@ -341,43 +354,50 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // Toggle cedar AI overlay (fill + border)
+    // Toggle cedar AI overlay (flat fill + extrusion + border)
     const cedarVisible = layers.cedarAI || layers.hologram;
-    for (const cedarLayerId of ['cedar-fill', 'cedar-border']) {
+    for (const cedarLayerId of ['cedar-flat', 'cedar-fill', 'cedar-border']) {
       const layer = map.getLayer(cedarLayerId);
       if (layer) {
         map.setLayoutProperty(cedarLayerId, 'visibility', cedarVisible ? 'visible' : 'none');
       }
     }
-    if (map.getLayer('cedar-fill')) {
-      if (layers.hologram) {
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-color', [
-          'match', ['get', 'classification'],
-          'cedar', '#00ff41',
-          'oak', '#ffaa00',
-          'mixed_brush', '#22dd44',
-          '#00ff41',
-        ]);
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', 0.85);
+
+    // Hologram: bright green flat fill + optional extrusion + thick borders
+    if (layers.hologram) {
+      const holoColorExpr = [
+        'match', ['get', 'classification'],
+        'cedar', '#00ff41',
+        'oak', '#ffaa00',
+        'mixed_brush', '#22dd44',
+        '#00ff41',
+      ] as mapboxgl.Expression;
+
+      if (map.getLayer('cedar-flat')) {
+        map.setPaintProperty('cedar-flat', 'fill-color', holoColorExpr);
+        map.setPaintProperty('cedar-flat', 'fill-opacity', 0.7);
+      }
+      if (map.getLayer('cedar-fill')) {
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-color', holoColorExpr);
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', 0.6);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 6);
-      } else {
+      }
+      if (map.getLayer('cedar-border')) {
+        map.setPaintProperty('cedar-border', 'line-color', holoColorExpr);
+        map.setPaintProperty('cedar-border', 'line-opacity', 0.9);
+        map.setPaintProperty('cedar-border', 'line-width', 1.5);
+      }
+    } else {
+      if (map.getLayer('cedar-flat')) {
+        map.setPaintProperty('cedar-flat', 'fill-color', ['get', 'color']);
+        map.setPaintProperty('cedar-flat', 'fill-opacity', opacities.cedarAI * 0.8);
+      }
+      if (map.getLayer('cedar-fill')) {
         map.setPaintProperty('cedar-fill', 'fill-extrusion-color', ['get', 'color']);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', opacities.cedarAI);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 2);
       }
-    }
-    if (map.getLayer('cedar-border')) {
-      if (layers.hologram) {
-        map.setPaintProperty('cedar-border', 'line-color', [
-          'match', ['get', 'classification'],
-          'cedar', '#00ff41',
-          'oak', '#ffaa00',
-          'mixed_brush', '#22dd44',
-          '#00ff41',
-        ]);
-        map.setPaintProperty('cedar-border', 'line-opacity', 0.8);
-        map.setPaintProperty('cedar-border', 'line-width', 1);
-      } else {
+      if (map.getLayer('cedar-border')) {
         map.setPaintProperty('cedar-border', 'line-color', ['get', 'color']);
         map.setPaintProperty('cedar-border', 'line-opacity', 0.5);
         map.setPaintProperty('cedar-border', 'line-width', 0.5);
