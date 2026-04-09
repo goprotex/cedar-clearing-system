@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cactus Creek Clearing | Customer Progress Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-variant": "#353534",
+                    "on-primary": "#561f00",
+                    "surface-dim": "#131313",
+                    "secondary": "#ecffe3",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-container-low": "#1c1b1b",
+                    "surface-bright": "#3a3939",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "error-container": "#93000a",
+                    "primary-fixed-dim": "#ffb693",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "on-tertiary": "#2f3131",
+                    "on-secondary-container": "#007117",
+                    "on-secondary-fixed": "#002203",
+                    "error": "#ffb4ab",
+                    "on-surface": "#e5e2e1",
+                    "primary-container": "#ff6b00",
+                    "inverse-primary": "#a04100",
+                    "secondary-fixed": "#72ff70",
+                    "primary": "#ffb693",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-error": "#690005",
+                    "on-secondary": "#003907",
+                    "on-primary-container": "#572000",
+                    "primary-fixed": "#ffdbcc",
+                    "inverse-on-surface": "#313030",
+                    "on-background": "#e5e2e1",
+                    "surface": "#131313",
+                    "tertiary-container": "#989999",
+                    "secondary-container": "#13ff43",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "background": "#131313",
+                    "inverse-surface": "#e5e2e1",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-surface-variant": "#e2bfb0",
+                    "on-primary-fixed": "#351000",
+                    "tertiary": "#c6c6c7",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "surface-container-highest": "#353534",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "secondary-fixed-dim": "#00e639",
+                    "outline-variant": "#5a4136",
+                    "outline": "#a98a7d",
+                    "surface-tint": "#ffb693",
+                    "surface-container": "#201f1f",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-container": "#2f3132"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+        .pixel-scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(255, 107, 0, 0.05) 50%);
+            background-size: 100% 4px;
+        }
+        .status-glow {
+            box-shadow: 0 0 15px rgba(19, 255, 67, 0.3);
+        }
+    </style>
+</head>
+<body class="pixel-scanline min-h-screen">
+<!-- Top Navigation Anchor -->
+<nav class="bg-[#131313] text-[#FFB693] font-['Space_Grotesk'] uppercase tracking-tighter text-sm docked full-width top-0 border-b-2 border-[#A98A7D] flex justify-between items-center w-full px-6 h-16 sticky z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#FF6B00] tracking-widest">CACTUS_CREEK</span>
+<div class="hidden md:flex gap-6">
+<span class="text-[#13FF43] border-b-2 border-[#13FF43] transition-colors duration-75 ease-linear">SYS_READY</span>
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-[#131313] transition-colors duration-75 ease-linear px-2">LAT: 30.2</span>
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-[#131313] transition-colors duration-75 ease-linear px-2">LONG: -97.7</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined hover:bg-[#FF6B00] hover:text-[#131313] p-1 cursor-pointer transition-colors duration-75">settings_input_component</span>
+<span class="material-symbols-outlined hover:bg-[#FF6B00] hover:text-[#131313] p-1 cursor-pointer transition-colors duration-75">terminal</span>
+<span class="material-symbols-outlined hover:bg-[#FF6B00] hover:text-[#131313] p-1 cursor-pointer transition-colors duration-75">sensors</span>
+</div>
+</nav>
+<!-- Side Navigation Anchor -->
+<aside class="bg-[#131313] text-[#FFB693] font-['Space_Grotesk'] uppercase font-medium docked left-0 h-screen w-64 border-r-2 border-[#A98A7D] fixed left-0 top-0 hidden lg:flex flex-col py-4 z-40">
+<div class="px-6 mb-8 mt-16">
+<div class="text-lg font-black text-[#FF6B00] mb-1">OP_CENTER</div>
+<div class="text-[10px] text-[#A98A7D]">SECTOR_7G // CUSTOMER_PORTAL</div>
+</div>
+<div class="flex-1 space-y-1">
+<div class="bg-[#FF6B00] text-[#131313] font-bold px-6 py-3 flex items-center gap-3">
+<span class="material-symbols-outlined">conveyor_belt</span>
+<span>Fleet Status</span>
+</div>
+<div class="text-[#E5E2E1] hover:bg-[#353534] hover:text-[#FFB693] px-6 py-3 flex items-center gap-3 cursor-pointer active:scale-95 transition-all">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Telemetry</span>
+</div>
+<div class="text-[#E5E2E1] hover:bg-[#353534] hover:text-[#FFB693] px-6 py-3 flex items-center gap-3 cursor-pointer active:scale-95 transition-all">
+<span class="material-symbols-outlined">build</span>
+<span>Maintenance</span>
+</div>
+<div class="text-[#E5E2E1] hover:bg-[#353534] hover:text-[#FFB693] px-6 py-3 flex items-center gap-3 cursor-pointer active:scale-95 transition-all">
+<span class="material-symbols-outlined">event_note</span>
+<span>Scheduling</span>
+</div>
+</div>
+<div class="px-4 mt-auto space-y-4">
+<button class="w-full bg-[#FF6B00] text-[#131313] py-3 font-bold text-sm tracking-widest active:scale-95 transition-all">
+                INITIATE_CLEAR
+            </button>
+<div class="pt-4 border-t border-[#A98A7D]/30">
+<div class="flex items-center gap-3 px-2 py-2 text-[#E5E2E1] hover:text-[#FFB693] cursor-pointer text-xs">
+<span class="material-symbols-outlined text-sm">memory</span>
+<span>DIAGNOSTICS</span>
+</div>
+<div class="flex items-center gap-3 px-2 py-2 text-[#E5E2E1] hover:text-[#FFB693] cursor-pointer text-xs">
+<span class="material-symbols-outlined text-sm">power_settings_new</span>
+<span>LOGOUT</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="lg:ml-64 p-6 lg:p-10 space-y-8">
+<!-- Header Branding Module -->
+<header class="flex flex-col md:flex-row justify-between items-end border-b-2 border-[#A98A7D] pb-6 gap-6">
+<div>
+<h1 class="text-5xl font-extrabold tracking-tighter uppercase leading-none">CACTUS CREEK<br/><span class="text-[#FF6B00]">CLEARING PORTAL</span></h1>
+<p class="mt-4 font-mono text-sm tracking-widest text-[#A98A7D]">ASSET: L-60822_AUSTIN_TX // STATUS: OPERATIONAL</p>
+</div>
+<div class="text-right flex flex-col items-end">
+<div class="bg-primary-container text-black px-4 py-2 font-bold mb-2">OPERATOR: 01</div>
+<div class="text-xs text-[#E5E2E1] font-mono">CONNECTION_SECURE // AES-256</div>
+</div>
+</header>
+<!-- Main Dashboard Grid -->
+<div class="bento-grid">
+<!-- Comparison Engine (Satellite Imagery) -->
+<section class="col-span-12 lg:col-span-8 bg-surface-container border-2 border-outline p-1 relative overflow-hidden">
+<div class="absolute top-4 right-4 z-10 flex gap-2">
+<span class="bg-[#131313] border border-outline px-3 py-1 text-[10px] tracking-widest uppercase">Live_Feed</span>
+<span class="bg-secondary-container text-black px-3 py-1 text-[10px] font-bold tracking-widest uppercase status-glow">Active</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-1 h-[400px]">
+<div class="relative group">
+<div class="absolute inset-0 bg-[#FF6B00]/10 mix-blend-overlay pointer-events-none"></div>
+<img alt="satellite-before" class="w-full h-full object-cover grayscale brightness-50" data-alt="high-altitude satellite view of dense untamed Texas scrubland and thick brush before land clearing operations" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqjwKELM4PNYU5DThYN6BIydGx-2XjVH_E-BEZUwkowdZ38DH0YBavOs2eK8rHoW5QBVc_zi8ViwhFVF09XLlCdtBr_wtQntN9SlEsfyBmNIFOpt0cl2b4teokTGmnUGrudO08buHtlqffQFQbWHRdYxYFwjbOLghjhC0aZvYnwFBtkSWC10JcND9q3vOcDRLU1WGFczn6UWmrFB9lHVbSi5PGBbtUSlxk17RMFO-yx0_44fggtTbZptBI-D20faKHuYlqYF2QtSU"/>
+<div class="absolute bottom-4 left-4 bg-black/80 border border-outline px-4 py-2">
+<span class="text-[#FF6B00] font-bold text-xs uppercase tracking-widest">T-MINUS 45 DAYS</span>
+<div class="text-[10px] text-white opacity-60">INITIAL_SURVEY_STATE</div>
+</div>
+</div>
+<div class="relative group">
+<div class="absolute inset-0 bg-[#13FF43]/5 mix-blend-overlay pointer-events-none"></div>
+<img alt="satellite-after" class="w-full h-full object-cover" data-alt="high-altitude drone imagery showing neat rows of cleared agricultural land with visible machinery tracks and central construction pad" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzsoT5ODx1vpeSxQMgaZLUxflobAcxRYjK7CAnK6DANBRVW9bZqvomIjSzYve0siPAmsKbsV4XpddZ80nRP772W-Tbf8M8A5tmRFHfbGVLLrB9Hkvic1USKLnA-WCt7cklsJuuDPWg9A6r_5o8GyNoPFi3asCOILsp9RohVNGLan0jPBo_DfMd52LKkWrkJ7nx--aMNYRQwbhA3_gE-HAxibsJwyhMLM3n_cRHy6KRcc1sFjEu270IOnkFyvqXXGowd4CtwnuLcbU"/>
+<div class="absolute bottom-4 left-4 bg-black/80 border border-secondary-container px-4 py-2">
+<span class="text-[#13FF43] font-bold text-xs uppercase tracking-widest">CURRENT_PHASE</span>
+<div class="text-[10px] text-white opacity-60">VEGETATION_REMOVAL_68%</div>
+</div>
+<!-- Real-time Machine Dot -->
+<div class="absolute top-1/2 left-1/3 w-4 h-4 bg-[#13FF43] rounded-full status-glow animate-pulse">
+<div class="absolute -top-8 -left-12 bg-black border border-secondary-container px-2 py-1 text-[8px] whitespace-nowrap">
+                                ASSET_ID: CC-X7 // MULTICHER
+                            </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Progress Telemetry -->
+<section class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<div class="bg-surface-container-high border-2 border-outline p-6 flex flex-col justify-between h-1/2">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-mono uppercase tracking-[0.3em] text-[#A98A7D]">Job_Completion</span>
+<span class="text-4xl font-black text-[#13FF43]">68%</span>
+</div>
+<div class="space-y-4">
+<div class="w-full h-8 bg-surface-dim border border-outline-variant flex gap-1 p-1">
+<div class="h-full bg-secondary-container w-1/6"></div>
+<div class="h-full bg-secondary-container w-1/6"></div>
+<div class="h-full bg-secondary-container w-1/6"></div>
+<div class="h-full bg-secondary-container w-1/6"></div>
+<div class="h-full bg-secondary-container/50 w-1/6"></div>
+<div class="h-full bg-surface-variant w-1/6"></div>
+</div>
+<div class="flex justify-between text-[10px] font-mono text-[#A98A7D]">
+<span>TOTAL: 140 ACRES</span>
+<span>CLEARED: 95.2 ACRES</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high border-2 border-outline p-6 h-1/2">
+<div class="text-xs font-mono uppercase tracking-[0.3em] text-[#A98A7D] mb-6">ENVIRONMENTAL_METRICS</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="border-l-2 border-[#FF6B00] pl-4">
+<div class="text-[10px] uppercase text-[#A98A7D]">Fuel_Burn</div>
+<div class="text-xl font-bold">412 GAL</div>
+</div>
+<div class="border-l-2 border-[#13FF43] pl-4">
+<div class="text-[10px] uppercase text-[#A98A7D]">Hours_Op</div>
+<div class="text-xl font-bold">156 HR</div>
+</div>
+<div class="border-l-2 border-primary pl-4">
+<div class="text-[10px] uppercase text-[#A98A7D]">Mulch_Vol</div>
+<div class="text-xl font-bold">12k T</div>
+</div>
+<div class="border-l-2 border-secondary-fixed pl-4">
+<div class="text-[10px] uppercase text-[#A98A7D]">Soil_Temp</div>
+<div class="text-xl font-bold">84°F</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Milestone Log -->
+<section class="col-span-12 bg-surface-container border-2 border-outline">
+<div class="flex items-center justify-between border-b border-outline px-6 py-4">
+<h3 class="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-[#FF6B00]">list_alt</span>
+                        MILESTONE_LOG_DATA_STREAM
+                    </h3>
+<span class="text-[10px] font-mono text-[#A98A7D]">RECORDS: 12 // LATEST: 10-24-23</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high text-[10px] font-mono uppercase tracking-widest text-[#A98A7D]">
+<th class="px-6 py-3 font-normal border-b border-outline-variant">Date</th>
+<th class="px-6 py-3 font-normal border-b border-outline-variant">Milestone_ID</th>
+<th class="px-6 py-3 font-normal border-b border-outline-variant">Crew_Commander</th>
+<th class="px-6 py-3 font-normal border-b border-outline-variant">Execution_Notes</th>
+<th class="px-6 py-3 font-normal border-b border-outline-variant">Status</th>
+</tr>
+</thead>
+<tbody class="font-mono text-xs">
+<tr class="border-b border-outline-variant/30 hover:bg-[#353534] transition-colors">
+<td class="px-6 py-4">OCT 24, 2023</td>
+<td class="px-6 py-4 text-[#FFB693]">MS_PHASE_03_C</td>
+<td class="px-6 py-4">SGT. MILLER</td>
+<td class="px-6 py-4">Perimeter mulching complete. Moving to Sector 4. Soil stability optimal.</td>
+<td class="px-6 py-4">
+<span class="text-secondary-fixed-dim bg-[#13FF43]/10 px-2 py-0.5 border border-[#13FF43]/30">SYNCED</span>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/30 hover:bg-[#353534] transition-colors">
+<td class="px-6 py-4">OCT 21, 2023</td>
+<td class="px-6 py-4 text-[#FFB693]">MS_DRAINAGE_A</td>
+<td class="px-6 py-4">SGT. MILLER</td>
+<td class="px-6 py-4">Culvert installation near creek bed finalized. Heavy rocky terrain encountered.</td>
+<td class="px-6 py-4">
+<span class="text-secondary-fixed-dim bg-[#13FF43]/10 px-2 py-0.5 border border-[#13FF43]/30">SYNCED</span>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/30 hover:bg-[#353534] transition-colors opacity-50">
+<td class="px-6 py-4">OCT 18, 2023</td>
+<td class="px-6 py-4 text-[#FFB693]">MS_SITE_PREP</td>
+<td class="px-6 py-4">CAPT. HENDRIX</td>
+<td class="px-6 py-4">Equipment mobilization successful. GPS base station established.</td>
+<td class="px-6 py-4">
+<span class="text-secondary-fixed-dim bg-[#13FF43]/10 px-2 py-0.5 border border-[#13FF43]/30">SYNCED</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Weather HUD & Contact -->
+<section class="col-span-12 md:col-span-6 lg:col-span-4 bg-surface-container border-2 border-outline p-6 relative">
+<div class="absolute top-0 right-0 p-2 opacity-10">
+<span class="material-symbols-outlined text-8xl">cloud</span>
+</div>
+<div class="text-xs font-mono uppercase tracking-[0.3em] text-[#A98A7D] mb-6">SITE_ATMOSPHERICS</div>
+<div class="flex items-center gap-6">
+<div class="text-5xl font-bold">72°F</div>
+<div class="flex flex-col text-[10px] font-mono">
+<span class="text-secondary-container">WINDS: 12MPH NW</span>
+<span class="text-primary">HUMIDITY: 42%</span>
+<span class="text-tertiary">VISIBILITY: 10MI</span>
+</div>
+</div>
+</section>
+<section class="col-span-12 md:col-span-6 lg:col-span-8 bg-[#FF6B00] text-black p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+<div>
+<h4 class="text-2xl font-black uppercase tracking-tighter">Emergency Extraction or Site Changes?</h4>
+<p class="text-sm font-medium">Contact your designated Sector Commander for immediate tactical adjustments.</p>
+</div>
+<button class="bg-black text-[#FF6B00] px-8 py-4 font-bold uppercase tracking-widest hover:bg-white transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined">support_agent</span>
+                    Signal_Commander
+                </button>
+</section>
+</div>
+<!-- Footer Coordinates -->
+<footer class="pt-10 pb-6 border-t border-outline-variant flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-[#A98A7D] tracking-[0.4em] uppercase gap-4">
+<div>©2024_CACTUS_CREEK_CLEARING_CORP // TX_LIC_99210</div>
+<div class="flex gap-8">
+<span>COORD_LOCK: 30°16'02"N 97°44'35"W</span>
+<span class="text-secondary-container">CONNECTION: STABLE</span>
+</div>
+</footer>
+</main>
+<!-- Map Indicator Fragment (Decorative) -->
+<div class="fixed bottom-6 right-6 w-32 h-32 border border-outline-variant bg-[#131313]/80 backdrop-blur-sm z-50 pointer-events-none hidden xl:block overflow-hidden">
+<div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&amp;fit=crop&amp;q=80&amp;w=300')] bg-cover opacity-30 grayscale" data-location="Austin, Texas" style=""></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-1 h-20 bg-secondary-container/20 absolute"></div>
+<div class="h-1 w-20 bg-secondary-container/20 absolute"></div>
+<div class="w-2 h-2 bg-secondary-container animate-ping"></div>
+</div>
+<div class="absolute bottom-1 left-1 text-[8px] text-[#A98A7D]">RADAR_ACTIVE</div>
+</div>
+</body></html>

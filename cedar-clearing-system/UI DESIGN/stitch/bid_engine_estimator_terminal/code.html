@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TERMINAL_FRONTIER_V1 | CEDAR_HACK_BID_ENGINE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#131313",
+                        "on-surface": "#e5e2e1",
+                        "surface-bright": "#3a3939",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary": "#2f3131",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "primary": "#ffb693",
+                        "primary-container": "#ff6b00",
+                        "surface": "#131313",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-fixed": "#ffdbcc",
+                        "on-secondary-container": "#007117",
+                        "outline": "#a98a7d",
+                        "secondary": "#ecffe3",
+                        "on-secondary": "#003907",
+                        "secondary-fixed": "#72ff70",
+                        "tertiary-container": "#989999",
+                        "on-tertiary-container": "#2f3132",
+                        "on-surface-variant": "#e2bfb0",
+                        "surface-container-highest": "#353534",
+                        "on-primary": "#561f00",
+                        "inverse-on-surface": "#313030",
+                        "tertiary": "#c6c6c7",
+                        "tertiary-fixed": "#e2e2e2",
+                        "inverse-primary": "#a04100",
+                        "on-secondary-fixed": "#002203",
+                        "primary-fixed-dim": "#ffb693",
+                        "on-primary-fixed": "#351000",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#00e639",
+                        "error": "#ffb4ab",
+                        "on-background": "#e5e2e1",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "surface-variant": "#353534",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "surface-tint": "#ffb693",
+                        "outline-variant": "#5a4136",
+                        "background": "#131313",
+                        "surface-container": "#201f1f",
+                        "inverse-surface": "#e5e2e1",
+                        "secondary-container": "#13ff43",
+                        "on-primary-container": "#572000",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-container-high": "#2a2a2a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #353534; }
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #131313; color: #e5e2e1; }
+    </style>
+</head>
+<body class="bg-surface select-none">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full border-b-2 border-[#353534] bg-[#131313] text-[#FFB693] font-['Space_Grotesk'] uppercase tracking-tighter flex justify-between items-center h-16 px-6 z-50">
+<div class="text-2xl font-bold text-[#FF6B00] tracking-widest">TERMINAL_FRONTIER_V1</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-8 text-xs font-bold">
+<span class="text-[#FFB693] border-b-2 border-[#FF6B00] cursor-pointer">ESTIMATOR</span>
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-75 cursor-pointer">FLEET_SYNC</span>
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-75 cursor-pointer">ARCHIVE</span>
+</div>
+<div class="flex gap-4 items-center border-l border-[#353534] pl-6">
+<span class="material-symbols-outlined text-xl cursor-pointer" data-icon="satellite_alt">satellite_alt</span>
+<span class="material-symbols-outlined text-xl cursor-pointer" data-icon="sensors">sensors</span>
+<span class="material-symbols-outlined text-xl cursor-pointer" data-icon="settings_input_component">settings_input_component</span>
+<div class="w-8 h-8 bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<img alt="OPERATOR_AVATAR" class="w-full h-full object-cover" data-alt="close up headshot portrait of a technician wearing futuristic tactical visor in a dark high tech environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJw1lzdSxAmf0o8BJWZmPBaAA05mb6JXlD5UJz46j5gxw1L_zIRPS3zPtFIHGOZ7fs16pXE-b_uR6ZAQ_oObzUxoKV1iTsrXrRGr4-DE9suoJva9vwxEsGNBjSA66h52w4QRTr-K2lmFyteTL3QnHNaeshxDW0cVo_pNKXXP2MJWa5jyRpr8Y-TfCCGXOuQVSQUuQuzEyeLMk7KsrCzkOcGcnrPugR0F-avv3XPdy0_O2XXiQ_sHSREPt-t4Yczuv0SGQsygAhTow"/>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] text-[#FFB693] flex flex-col pt-20 pb-4 px-2 z-40 hidden md:flex">
+<div class="px-4 mb-8">
+<div class="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
+<div class="text-[10px] text-[#E5E2E1] opacity-50 tracking-widest">GRID_REF: 44.02/12.9</div>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-3 p-3 text-[#E5E2E1] opacity-70 hover:opacity-100 hover:bg-[#353534] hover:text-[#13FF43] transition-all cursor-pointer font-['Space_Grotesk'] text-xs font-bold uppercase tracking-tight">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span>ACTIVE_BIDS</span>
+</div>
+<div class="flex items-center gap-3 p-3 bg-[#FF6B00] text-black font-black scale-100 skew-x-2 transition-transform cursor-pointer font-['Space_Grotesk'] text-xs uppercase tracking-tight">
+<span class="material-symbols-outlined" data-icon="calculate">calculate</span>
+<span>ESTIMATOR</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-[#E5E2E1] opacity-70 hover:opacity-100 hover:bg-[#353534] hover:text-[#13FF43] transition-all cursor-pointer font-['Space_Grotesk'] text-xs font-bold uppercase tracking-tight">
+<span class="material-symbols-outlined" data-icon="satellite">satellite</span>
+<span>MAP_RADAR</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-[#E5E2E1] opacity-70 hover:opacity-100 hover:bg-[#353534] hover:text-[#13FF43] transition-all cursor-pointer font-['Space_Grotesk'] text-xs font-bold uppercase tracking-tight">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span>FLEET_SYNC</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-[#E5E2E1] opacity-70 hover:opacity-100 hover:bg-[#353534] hover:text-[#13FF43] transition-all cursor-pointer font-['Space_Grotesk'] text-xs font-bold uppercase tracking-tight">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span>ARCHIVE</span>
+</div>
+</nav>
+<div class="mt-auto pt-4 border-t border-[#353534] px-2 space-y-2">
+<button class="w-full bg-[#FF6B00] text-black font-black py-3 mb-4 text-xs uppercase tracking-widest hover:bg-white transition-colors">
+                NEW_ESTIMATE
+            </button>
+<div class="flex items-center gap-3 p-2 text-[#E5E2E1] opacity-50 text-[10px] uppercase font-bold cursor-pointer">
+<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
+<span>SYS_HEALTH</span>
+</div>
+<div class="flex items-center gap-3 p-2 text-[#E5E2E1] opacity-50 text-[10px] uppercase font-bold cursor-pointer">
+<span class="material-symbols-outlined text-sm" data-icon="logout">logout</span>
+<span>LOGOUT</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 pt-20 p-6 min-h-screen grid grid-cols-12 gap-6">
+<!-- TOP ROW: TITLE & OVERVIEW -->
+<div class="col-span-12 flex justify-between items-end border-l-4 border-primary-container pl-4 mb-4">
+<div>
+<h1 class="text-4xl font-black uppercase tracking-tighter text-on-surface">CEDAR_HACK_BID_ENGINE</h1>
+<p class="text-primary text-xs font-mono">PROJECT_ID: CH-2024-X9 // LOCATION: CENTRAL_TEXAS_VALLEY</p>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2 border-2 border-outline text-secondary-fixed font-bold text-xs uppercase hover:bg-white hover:text-black transition-all">SAVE AS DRAFT</button>
+<button class="px-6 py-2 bg-primary-container text-black font-black text-xs uppercase hover:bg-white transition-all">GENERATE PDF PROPOSAL</button>
+</div>
+</div>
+<!-- LEFT COLUMN: MAP PANEL -->
+<div class="col-span-12 lg:col-span-7 space-y-6">
+<!-- Map Container -->
+<div class="relative bg-surface-container-lowest border-2 border-[#353534] aspect-video w-full overflow-hidden">
+<div class="absolute inset-0 z-0 opacity-60">
+<img alt="Satellite Pasture" class="w-full h-full object-cover grayscale brightness-50" data-alt="Satellite top-down view of a vast ranch pasture with scattered cedar trees and dusty trails under bright sunlight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_nmRdO6OwaHttBKHYK-vPG9kSEpolRahTUPS4X1z2H_M8l2cLJ1yaQJRqpiPpiEckaJZHAvr1JTwgxa-0ppqqmHT2zVc0DtsZhFV3VwuPSqzexvmsdBT6wNf-UT8JcD_p7f3ABxhzldf8WpRFsUF9WMN_Nq9Qia5QQZqeNtBDe0mCeWiwzNW2-cL8zN7cL6wWE87XF6VXl88ibF-pl97tE0fZWTGrSPKBWYnmXP5zQU1p3MQyX7OjFNgMpHrR9eVGSYy8CpEGnEw"/>
+<!-- Fake Heatmap Overlay -->
+<div class="absolute inset-0 bg-gradient-to-br from-red-600/40 via-transparent to-red-900/40 mix-blend-overlay"></div>
+</div>
+<!-- HUD Overlays -->
+<div class="absolute inset-0 pointer-events-none border-[20px] border-black/20"></div>
+<div class="absolute top-4 left-4 bg-black/80 border border-primary-container p-3 backdrop-blur-sm">
+<div class="text-[10px] text-primary uppercase font-bold mb-1">SATELLITE_FEED</div>
+<div class="text-white text-xs font-mono">COORD: 30.2672° N, 97.7431° W</div>
+<div class="mt-2 flex items-center gap-2">
+<span class="w-2 h-2 bg-secondary-container animate-pulse"></span>
+<span class="text-[10px] text-secondary-container font-black uppercase">SIGNAL_STABLE</span>
+</div>
+</div>
+<div class="absolute bottom-4 right-4 bg-black/80 border border-[#353534] p-3 text-right">
+<div class="text-[10px] text-tertiary uppercase font-bold">LEGEND</div>
+<div class="flex items-center gap-2 justify-end">
+<span class="text-[9px] text-on-surface">CEDAR DENSITY (HIGH)</span>
+<span class="w-3 h-3 bg-red-600"></span>
+</div>
+<div class="flex items-center gap-2 justify-end">
+<span class="text-[9px] text-on-surface">POLYGON BOUNDARY</span>
+<span class="w-3 h-3 border border-secondary-fixed"></span>
+</div>
+</div>
+<!-- SVG Polygon Boundary -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<path d="M 100,100 L 400,150 L 500,400 L 200,450 Z" fill="rgba(114, 255, 112, 0.1)" stroke="#72ff70" stroke-dasharray="8 4" stroke-width="2"></path>
+</svg>
+</div>
+<!-- Soil Analytics Bento -->
+<div class="grid grid-cols-3 gap-4">
+<div class="bg-surface-container border border-[#353534] p-4 relative overflow-hidden group">
+<div class="text-[10px] text-primary-fixed uppercase font-black mb-2 flex items-center justify-between">
+<span>SOIL_SLOPE</span>
+<span class="material-symbols-outlined text-xs" data-icon="terrain">terrain</span>
+</div>
+<div class="text-3xl font-black text-on-surface">12%</div>
+<div class="text-[9px] text-outline uppercase mt-1">MODERATE_GRADIENT</div>
+<div class="absolute bottom-0 right-0 w-12 h-12 bg-white/5 skew-x-12 translate-x-4"></div>
+</div>
+<div class="bg-surface-container border border-[#353534] p-4 relative overflow-hidden">
+<div class="text-[10px] text-primary-fixed uppercase font-black mb-2 flex items-center justify-between">
+<span>ROCK_FRAG</span>
+<span class="material-symbols-outlined text-xs" data-icon="layers">layers</span>
+</div>
+<div class="text-3xl font-black text-on-surface">45%</div>
+<div class="text-[9px] text-error uppercase mt-1">HIGH_ABRASION_RISK</div>
+</div>
+<div class="bg-surface-container border border-[#353534] p-4 relative overflow-hidden">
+<div class="text-[10px] text-primary-fixed uppercase font-black mb-2 flex items-center justify-between">
+<span>BEDROCK_DEPTH</span>
+<span class="material-symbols-outlined text-xs" data-icon="vertical_align_bottom">vertical_align_bottom</span>
+</div>
+<div class="text-3xl font-black text-on-surface">14<span class="text-sm">in</span></div>
+<div class="text-[9px] text-outline uppercase mt-1">SHALLOW_SUBSTRATE</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: ESTIMATOR & SUMMARY -->
+<div class="col-span-12 lg:col-span-5 space-y-6">
+<!-- AI Breakdown Card -->
+<div class="bg-surface-container-high border-2 border-primary-container p-6 relative">
+<div class="absolute -top-3 -right-3 bg-primary-container text-black px-2 py-1 text-[10px] font-black uppercase">AI_ANALYSIS_LIVE</div>
+<div class="grid grid-cols-2 gap-y-6">
+<div>
+<div class="text-[10px] text-primary uppercase font-bold">TOTAL_ACREAGE</div>
+<div class="text-2xl font-black">12.42 <span class="text-xs text-outline">AC</span></div>
+</div>
+<div>
+<div class="text-[10px] text-primary uppercase font-bold">CEDAR_COUNT</div>
+<div class="text-2xl font-black">1,248 <span class="text-xs text-outline">UNITS</span></div>
+</div>
+<div class="col-span-2 pt-4 border-t border-outline-variant">
+<div class="text-[10px] text-primary uppercase font-bold">DENSITY_RATING</div>
+<div class="flex items-center gap-2 mt-1">
+<div class="h-4 flex-1 bg-surface-container-lowest border border-outline-variant flex">
+<div class="w-full h-full bg-primary-container"></div>
+</div>
+<div class="text-xl font-black text-primary-container">HEAVY</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Clearing Method Selector -->
+<div class="bg-surface-container border border-[#353534] p-6">
+<label class="block text-[10px] text-primary uppercase font-black mb-4 tracking-widest">SELECT_CLEARING_METHOD</label>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-4 bg-surface-container-highest border border-primary text-primary cursor-pointer">
+<span class="text-sm font-bold uppercase">Fine Mulch (Standard)</span>
+<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span>
+</div>
+<div class="flex items-center justify-between p-4 border border-outline-variant text-on-surface-variant hover:border-primary transition-colors cursor-pointer">
+<span class="text-sm font-bold uppercase">Rough Mulch</span>
+<span class="material-symbols-outlined text-sm" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+<div class="flex items-center justify-between p-4 border border-outline-variant text-on-surface-variant hover:border-primary transition-colors cursor-pointer">
+<span class="text-sm font-bold uppercase">Chainsaw + Grapple</span>
+<span class="material-symbols-outlined text-sm" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+</div>
+</div>
+<!-- Financial Summary -->
+<div class="bg-surface-container-highest border border-secondary-container p-6 flex flex-col gap-4">
+<div class="flex justify-between items-center text-secondary-container">
+<span class="text-[10px] font-black uppercase tracking-widest">DIFFICULTY_MULTIPLIER</span>
+<span class="text-xl font-black">1.25x</span>
+</div>
+<div class="h-px bg-secondary-container/20 w-full"></div>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="text-xs text-on-surface-variant font-bold uppercase">Base Rate</span>
+<span class="text-lg font-black font-mono text-on-surface">$1,200/ac</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-xs text-on-surface-variant font-bold uppercase">Est. Duration</span>
+<span class="text-lg font-black font-mono text-on-surface">5-7 DAYS</span>
+</div>
+<div class="pt-4 border-t border-outline-variant mt-2">
+<div class="text-[10px] text-primary uppercase font-bold mb-1">TOTAL_ESTIMATE</div>
+<div class="text-5xl font-black text-primary-container tracking-tighter">
+                            $24,450.00
+                        </div>
+</div>
+</div>
+</div>
+<div class="pt-4 space-y-4">
+<button class="w-full bg-primary-container text-black font-black py-5 text-lg uppercase tracking-widest hover:bg-white transition-all transform active:scale-95 flex items-center justify-center gap-3">
+<span class="material-symbols-outlined" data-icon="picture_as_pdf">picture_as_pdf</span>
+                    GENERATE PDF PROPOSAL
+                </button>
+<div class="text-center text-[10px] text-outline font-mono opacity-50">
+                    TERMINAL_AUTH: 0x882_VALIDATED // TIMESTAMP: 2024.05.21.14.02.55
+                </div>
+</div>
+</div>
+</main>
+<!-- Mobile Navigation (BottomNavBar substitute) -->
+<div class="md:hidden fixed bottom-0 left-0 w-full bg-[#131313] border-t-2 border-[#353534] grid grid-cols-5 h-16 z-50">
+<div class="flex flex-col items-center justify-center text-[#FF6B00] bg-primary-container/10">
+<span class="material-symbols-outlined" data-icon="calculate">calculate</span>
+<span class="text-[8px] font-bold uppercase mt-1">EST</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface opacity-70">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-[8px] font-bold uppercase mt-1">MAP</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface opacity-70">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span class="text-[8px] font-bold uppercase mt-1">SYNC</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface opacity-70">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="text-[8px] font-bold uppercase mt-1">ARCH</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface opacity-70">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[8px] font-bold uppercase mt-1">SYS</span>
+</div>
+</div>
+</body></html>

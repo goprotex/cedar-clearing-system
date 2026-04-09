@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#003907",
+                    "on-surface": "#e5e2e1",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "primary-fixed-dim": "#ffb693",
+                    "secondary": "#ecffe3",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "inverse-surface": "#e5e2e1",
+                    "tertiary-container": "#989999",
+                    "on-error-container": "#ffdad6",
+                    "on-surface-variant": "#e2bfb0",
+                    "on-background": "#e5e2e1",
+                    "tertiary-fixed": "#e2e2e2",
+                    "inverse-primary": "#a04100",
+                    "surface-variant": "#353534",
+                    "error": "#ffb4ab",
+                    "tertiary": "#c6c6c7",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "surface-container-low": "#1c1b1b",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-secondary-fixed": "#002203",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "secondary-fixed-dim": "#00e639",
+                    "surface-tint": "#ffb693",
+                    "on-tertiary": "#2f3131",
+                    "on-error": "#690005",
+                    "surface-container-high": "#2a2a2a",
+                    "background": "#131313",
+                    "on-primary": "#561f00",
+                    "outline-variant": "#5a4136",
+                    "primary-fixed": "#ffdbcc",
+                    "on-tertiary-container": "#2f3132",
+                    "surface-bright": "#3a3939",
+                    "error-container": "#93000a",
+                    "secondary-container": "#13ff43",
+                    "inverse-on-surface": "#313030",
+                    "outline": "#a98a7d",
+                    "on-secondary-container": "#007117",
+                    "primary": "#ffb693",
+                    "surface-container-highest": "#353534",
+                    "on-primary-container": "#572000",
+                    "primary-container": "#ff6b00",
+                    "surface-dim": "#131313",
+                    "secondary-fixed": "#72ff70",
+                    "surface": "#131313",
+                    "on-primary-fixed": "#351000",
+                    "surface-container": "#201f1f"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "0px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #ff6b00; }
+        .glitch-subtle:hover { text-shadow: 2px 0 #13ff43, -2px 0 #ff6b00; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b-2 border-[#A98A7D] border-solid shadow-[0_0_40px_rgba(255,107,0,0.1)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-[#FF6B00] tracking-widest font-['Space_Grotesk'] uppercase">WASTELAND_CRM_V1.0</span>
+<div class="h-6 w-[2px] bg-outline-variant"></div>
+<span class="text-[#FFB693] font-['Space_Grotesk'] uppercase tracking-tighter font-bold">CEDAR_HACK_REGISTRY</span>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-[#13FF43] border-b-2 border-[#13FF43] font-['Space_Grotesk'] uppercase tracking-tighter font-bold h-full flex items-center px-2" href="#">FREQ_88.1</a>
+<a class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 font-['Space_Grotesk'] uppercase tracking-tighter font-bold px-2" href="#">SIG_STRENGTH_MAX</a>
+<a class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 font-['Space_Grotesk'] uppercase tracking-tighter font-bold px-2" href="#">BATT_98%</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#FFB693] hover:bg-[#FF6B00] hover:text-black p-2 transition-colors">settings_input_antenna</button>
+<button class="material-symbols-outlined text-[#FFB693] hover:bg-[#FF6B00] hover:text-black p-2 transition-colors">bolt</button>
+<button class="material-symbols-outlined text-[#FFB693] hover:bg-[#FF6B00] hover:text-black p-2 transition-colors">security</button>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col z-40 bg-[#131313] w-64 border-r-2 border-[#A98A7D] border-solid">
+<div class="p-6 border-b border-outline-variant bg-surface-container-low">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-black">person</span>
+</div>
+<div>
+<h3 class="text-[#FF6B00] font-black font-['Space_Grotesk'] text-xs uppercase">SECTOR_7_OPS</h3>
+<p class="text-[#E5E2E1] opacity-70 font-['Space_Grotesk'] text-[10px] uppercase">STATUS: STABLE</p>
+</div>
+</div>
+<button class="w-full bg-primary-container text-black font-black py-2 text-xs uppercase tracking-widest hover:bg-on-surface hover:text-black transition-all">INITIATE_SWEEP</button>
+</div>
+<nav class="flex-1 py-4 overflow-y-auto">
+<a class="flex items-center gap-4 px-6 py-4 bg-[#FF6B00] text-black font-black font-['Space_Grotesk'] text-xs uppercase transition-all translate-x-1" href="#">
+<span class="material-symbols-outlined">radar</span>
+                SIGNAL_TOWER
+            </a>
+<a class="flex items-center gap-4 px-6 py-4 text-[#E5E2E1] opacity-70 hover:bg-[#353534] hover:text-[#13FF43] font-['Space_Grotesk'] text-xs uppercase transition-all" href="#">
+<span class="material-symbols-outlined">map</span>
+                DEAD_ZONE_MAP
+            </a>
+<a class="flex items-center gap-4 px-6 py-4 text-[#E5E2E1] opacity-70 hover:bg-[#353534] hover:text-[#13FF43] font-['Space_Grotesk'] text-xs uppercase transition-all" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+                RESOURCE_SCAVENGE
+            </a>
+<a class="flex items-center gap-4 px-6 py-4 text-[#E5E2E1] opacity-70 hover:bg-[#353534] hover:text-[#13FF43] font-['Space_Grotesk'] text-xs uppercase transition-all" href="#">
+<span class="material-symbols-outlined">history_edu</span>
+                INCIDENT_LOG
+            </a>
+</nav>
+<div class="border-t border-outline-variant p-4">
+<a class="flex items-center gap-4 px-2 py-2 text-[#E5E2E1] opacity-70 hover:text-primary transition-all font-['Space_Grotesk'] text-xs uppercase" href="#">
+<span class="material-symbols-outlined">terminal</span> TERMINAL
+            </a>
+<a class="flex items-center gap-4 px-2 py-2 text-[#E5E2E1] opacity-70 hover:text-error transition-all font-['Space_Grotesk'] text-xs uppercase" href="#">
+<span class="material-symbols-outlined">power_settings_new</span> LOGOUT
+            </a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 mt-16 h-[calc(100vh-64px)] grid grid-cols-12 overflow-hidden bg-background">
+<!-- Left Panel: Client Registry List -->
+<section class="col-span-4 border-r-2 border-outline flex flex-col h-full bg-surface-container-lowest">
+<div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container">
+<h2 class="text-primary font-black uppercase tracking-tighter">CLIENT_REGISTRY</h2>
+<span class="text-label-sm text-outline px-2 border border-outline font-mono">COUNT: 142</span>
+</div>
+<div class="flex-1 overflow-y-auto divide-y divide-outline-variant">
+<!-- Active Client -->
+<div class="p-4 bg-surface-container-high border-l-4 border-primary-container cursor-pointer transition-all">
+<div class="flex justify-between items-start mb-2">
+<span class="text-on-surface font-bold text-lg leading-tight">RAVEN_INDUSTRIAL</span>
+<span class="bg-secondary-container text-on-secondary-container text-[10px] px-2 py-0.5 font-black uppercase">ACTIVE</span>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono text-outline">
+<span>ID: 0x9928-F</span>
+<span>LAT: 45.23 / LON: -12.44</span>
+</div>
+</div>
+<!-- Lead Client -->
+<div class="p-4 hover:bg-surface-container cursor-pointer transition-all group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-on-surface group-hover:text-primary font-bold text-lg leading-tight">CYBER_DYNE_LOGISTICS</span>
+<span class="bg-primary text-on-primary-container text-[10px] px-2 py-0.5 font-black uppercase">LEAD</span>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono text-outline">
+<span>ID: 0x4412-B</span>
+<span>LAT: 44.91 / LON: -13.01</span>
+</div>
+</div>
+<!-- Completed Client -->
+<div class="p-4 hover:bg-surface-container cursor-pointer transition-all group opacity-60">
+<div class="flex justify-between items-start mb-2">
+<span class="text-on-surface group-hover:text-primary font-bold text-lg leading-tight">SCRAP_KING_NOMADS</span>
+<span class="border border-outline text-outline text-[10px] px-2 py-0.5 font-black uppercase">COMPLETED</span>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono text-outline">
+<span>ID: 0x8877-X</span>
+<span>LAT: 46.12 / LON: -11.88</span>
+</div>
+</div>
+<!-- Another Active Client -->
+<div class="p-4 hover:bg-surface-container cursor-pointer transition-all group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-on-surface group-hover:text-primary font-bold text-lg leading-tight">VODKA_DISTILLERY_5</span>
+<span class="bg-secondary-container text-on-secondary-container text-[10px] px-2 py-0.5 font-black uppercase">ACTIVE</span>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono text-outline">
+<span>ID: 0x1102-M</span>
+<span>LAT: 45.55 / LON: -12.99</span>
+</div>
+</div>
+<!-- Placeholder data for density -->
+<div class="p-4 hover:bg-surface-container cursor-pointer transition-all group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-on-surface group-hover:text-primary font-bold text-lg leading-tight">ORBITAL_RECLAIM_CO</span>
+<span class="bg-primary text-on-primary-container text-[10px] px-2 py-0.5 font-black uppercase">LEAD</span>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono text-outline">
+<span>ID: 0x9021-P</span>
+<span>LAT: 45.01 / LON: -12.11</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Panel: Profile View -->
+<section class="col-span-8 flex flex-col h-full bg-background overflow-y-auto">
+<!-- Profile Header -->
+<div class="p-8 border-b-2 border-outline-variant bg-surface-container-low">
+<div class="flex justify-between items-start">
+<div>
+<h1 class="text-4xl font-black text-primary-container tracking-tighter mb-2 uppercase">RAVEN_INDUSTRIAL</h1>
+<p class="text-on-surface-variant font-mono text-sm mb-6">ESTABLISHED: 2144.09.12 // PRIMARY_SECTOR: FUEL_DISTRIBUTION</p>
+<div class="flex gap-4">
+<div class="bg-surface p-4 border border-outline w-40">
+<p class="text-[10px] text-outline uppercase font-black">CONTRACT_VAL</p>
+<p class="text-xl font-bold text-on-surface">34,000 SC</p>
+</div>
+<div class="bg-surface p-4 border border-outline w-40">
+<p class="text-[10px] text-outline uppercase font-black">RISK_LEVEL</p>
+<p class="text-xl font-bold text-error">CRITICAL</p>
+</div>
+<div class="bg-surface p-4 border border-outline w-40">
+<p class="text-[10px] text-outline uppercase font-black">LAST_CONTACT</p>
+<p class="text-xl font-bold text-secondary-fixed-dim">0.4h AGO</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<button class="bg-primary-container text-black font-black px-6 py-2 uppercase text-xs hover:bg-white transition-all">TERMINATE_AGREEMENT</button>
+<button class="border border-outline text-on-surface font-black px-6 py-2 uppercase text-xs hover:bg-surface-variant transition-all">EXPORT_TELEMETRY</button>
+</div>
+</div>
+</div>
+<!-- Detailed Data Bento Grid -->
+<div class="p-8 grid grid-cols-2 gap-6">
+<!-- Property Map -->
+<div class="bg-surface-container-high border border-outline relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-full p-2 bg-background/80 backdrop-blur-sm z-10 flex justify-between items-center border-b border-outline">
+<span class="text-[10px] font-black uppercase text-primary tracking-widest">PROPERTY_MAP_HISTORY [SAT_SCAN_009]</span>
+<span class="material-symbols-outlined text-sm text-primary">gps_fixed</span>
+</div>
+<img class="w-full h-64 object-cover grayscale brightness-50 contrast-125 group-hover:scale-105 transition-transform duration-700" data-alt="Top-down satellite view of a gritty industrial complex in a desert wasteland, showing silos and rusty pipes with thermal imaging overlays." data-location="Waste Sector 7" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUhhOlExJsgRCIaoCZRMsrNlxBrGIFTynn_AyA23zgr-S_IttNUjFFGy4Lo4tPwzU0HzOrNZ3GvtN5I0dXp4t9rqZyKp58OAAiG4lCiEXeJ3m7JbAoUFNOkxuolUS-webWGsG29Iz6LYr1X-K3jlEI7GugUx8qT6-UTFJyJdPkgQLhVyM5qSvz0c1zACMSEOryos-qc08i3xYx1B2_8GVD12GCL6o8HBN10_1cZ0IMo0yvlfa9UNEqD99bYLVB9dpLAEBmrc2Zi0M"/>
+<div class="absolute inset-0 pointer-events-none border-[16px] border-transparent group-hover:border-primary/10 transition-all"></div>
+<div class="absolute bottom-2 right-2 bg-black/60 px-2 py-1 text-[8px] font-mono text-secondary-fixed-dim">LIVE_FEED: 98% SYNC</div>
+</div>
+<!-- Invoices -->
+<div class="bg-surface-container-high border border-outline flex flex-col">
+<div class="p-3 bg-background border-b border-outline flex justify-between">
+<span class="text-[10px] font-black uppercase text-primary tracking-widest">INVOICES_SENT</span>
+<span class="material-symbols-outlined text-sm text-primary">receipt_long</span>
+</div>
+<div class="p-4 flex-1 font-mono text-[11px] space-y-3">
+<div class="flex justify-between items-center border-b border-outline-variant pb-2">
+<span class="text-on-surface">#INV-88219</span>
+<span class="text-outline">12,000 SC</span>
+<span class="text-secondary-fixed-dim font-bold">PAID</span>
+</div>
+<div class="flex justify-between items-center border-b border-outline-variant pb-2">
+<span class="text-on-surface">#INV-88302</span>
+<span class="text-outline">15,000 SC</span>
+<span class="text-primary-container font-bold">PENDING</span>
+</div>
+<div class="flex justify-between items-center border-b border-outline-variant pb-2">
+<span class="text-on-surface">#INV-88411</span>
+<span class="text-outline">7,000 SC</span>
+<span class="text-error font-bold">OVERDUE</span>
+</div>
+<div class="pt-2 text-right">
+<span class="text-xs text-outline italic">TOTAL_OUTSTANDING: 22,000 SC</span>
+</div>
+</div>
+</div>
+<!-- Operator Notes / System Logs -->
+<div class="col-span-2 bg-[#0e0e0e] border-2 border-outline-variant p-4 font-mono text-[12px] text-secondary">
+<div class="flex justify-between items-center mb-4 pb-2 border-b border-outline-variant">
+<span class="text-primary-container font-bold uppercase tracking-widest">OPERATOR_LOG_ENTRIES</span>
+<span class="text-outline text-[10px]">AUTH_LVL: 4_OVERRIDE</span>
+</div>
+<div class="space-y-2 max-h-64 overflow-y-auto">
+<div class="flex gap-4">
+<span class="text-outline-variant shrink-0">[2145.02.10_12:44]</span>
+<span class="text-secondary-container">LOG:</span>
+<span class="text-on-surface">Physical courier intercepted near sector gates. Document package 0x99 delivered securely. Raven Industrial confirms reception.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline-variant shrink-0">[2145.02.11_09:12]</span>
+<span class="text-error">WARN:</span>
+<span class="text-on-surface">Payment for #INV-88411 missed. Automated ping sent to RAVEN_FINANCE_NODE. Response timed out. Escalating to Level 2 recovery.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline-variant shrink-0">[2145.02.11_14:20]</span>
+<span class="text-primary-container">NOTE:</span>
+<span class="text-on-surface">Agent 'STALKER_ONE' reports unusual activity in the northern fuel silos. Raven Industrial increased turret presence. Monitor closely.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline-variant shrink-0">[2145.02.12_02:00]</span>
+<span class="text-secondary-container">LOG:</span>
+<span class="text-on-surface">Registry entry updated. Stability rating adjusted to 0.76. Security tokens refreshed for another cycle.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline-variant shrink-0">[2145.02.12_04:30]</span>
+<span class="text-primary">SYNC:</span>
+<span class="text-on-surface-variant italic">...Waiting for telemetry stream...</span>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant flex items-center gap-2">
+<span class="text-primary animate-pulse">&gt;</span>
+<input class="bg-transparent border-none focus:ring-0 text-primary-container w-full uppercase placeholder:text-outline-variant placeholder:opacity-50" placeholder="APPEND_NOTE..." type="text"/>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Contextual HUD Element (Floating Label) -->
+<div class="fixed bottom-6 right-6 z-50 bg-primary-container text-black px-4 py-2 font-black uppercase text-sm shadow-[0_0_20px_rgba(255,107,0,0.4)] flex items-center gap-2">
+<span class="material-symbols-outlined animate-spin" style="font-size: 16px;">autorenew</span>
+        UPLINK_STABLE
+    </div>
+</body></html>

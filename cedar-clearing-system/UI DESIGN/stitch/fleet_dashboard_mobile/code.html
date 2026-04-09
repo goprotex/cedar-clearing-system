@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&amp;family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#c2b496",
+                        "on-primary": "#243429",
+                        "surface-bright": "#373a36",
+                        "on-primary-fixed-variant": "#3a4b3e",
+                        "tertiary": "#e7bcbf",
+                        "on-error": "#690005",
+                        "outline": "#8a938a",
+                        "surface-variant": "#323632",
+                        "on-surface-variant": "#c0c9bf",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0c0f0c",
+                        "surface": "#111411",
+                        "primary-container": "#304135",
+                        "primary-fixed": "#d4e7d7",
+                        "on-secondary": "#382f1a",
+                        "inverse-on-surface": "#2e312e",
+                        "surface-container-high": "#272b27",
+                        "secondary": "#d4c5a7",
+                        "primary-fixed-dim": "#b8cbbb",
+                        "on-primary-container": "#9aad9d",
+                        "inverse-surface": "#e1e3de",
+                        "on-tertiary": "#45292c",
+                        "on-tertiary-container": "#c79ea1",
+                        "on-tertiary-fixed-variant": "#5e3e41",
+                        "surface-tint": "#b8cbbb",
+                        "surface-container-highest": "#323632",
+                        "inverse-primary": "#516355",
+                        "tertiary-fixed-dim": "#e7bcbf",
+                        "secondary-container": "#50462f",
+                        "on-tertiary-fixed": "#2d1417",
+                        "surface-container": "#1d201d",
+                        "background": "#111411",
+                        "primary": "#b8cbbb",
+                        "error-container": "#93000a",
+                        "tertiary-container": "#533538",
+                        "secondary-fixed": "#f1e1c2",
+                        "outline-variant": "#404941",
+                        "on-primary-fixed": "#0f1f15",
+                        "surface-dim": "#111411",
+                        "surface-container-low": "#191c19",
+                        "on-surface": "#e1e3de",
+                        "on-background": "#e1e3de",
+                        "tertiary-fixed": "#ffd9dc",
+                        "on-secondary-fixed-variant": "#50462f",
+                        "secondary-fixed-dim": "#d4c5a7",
+                        "on-secondary-fixed": "#221b07",
+                        "error": "#ffb4ab"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .glass-panel {
+            background: rgba(50, 54, 50, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .hud-corner-tl { border-top: 1px solid #b8cbbb; border-left: 1px solid #b8cbbb; }
+        .hud-corner-br { border-bottom: 1px solid #b8cbbb; border-right: 1px solid #b8cbbb; }
+        body { font-family: 'Inter', sans-serif; background-color: #111411; color: #e1e3de; }
+        h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased pb-24">
+<!-- TopAppBar -->
+<header class="bg-[#101415] dark:bg-slate-950 flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50 transition-all duration-300 ease-in-out">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full overflow-hidden border border-emerald-900/30">
+<img alt="User Profile" data-alt="close-up portrait of a professional male forest engineer with serious expression, rugged lighting, outdoor setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC86-xm9Ger4YFljXDSv7ICMwxMIjbZEbFPFBu3K94jixd_aRY6i2elz23da6VNtme96pR6bf6_eN0eXjHZzzw2BSzCoC7GO0rG1zIvulfOsLxN4Na2FAeIIp7hpbfbuPHoIhNkM4p6obCRUrqhyR3qx6FUXt9GbS0o_liLEyzKyMhBU3ApMuQKiqDuWPxOWJEK3n3U7QHKShZlTUWS80KQYFoqAM4bh7ZAoSzrRy8fvoV5yfTd0VOOmjSdChRjj7BuNw2tFbZB9hI"/>
+</div>
+<span class="text-xl font-light tracking-widest text-[#024725] dark:text-emerald-400 uppercase font-['Space_Grotesk'] tracking-tight">Cedar Hack</span>
+</div>
+<button class="text-emerald-400 p-2 rounded-full hover:bg-emerald-900/20 transition-all">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</header>
+<main class="pt-20 px-4 space-y-8">
+<!-- Hero Header: Fleet Intelligence -->
+<section class="space-y-2">
+<div class="flex justify-between items-end">
+<h1 class="text-4xl font-light tracking-tighter text-primary">Fleet Intelligence</h1>
+<div class="text-right">
+<p class="text-[10px] uppercase tracking-widest font-bold opacity-50 font-label">Active Zone</p>
+<p class="text-sm font-medium">Sector 7-G (Pacific NW)</p>
+</div>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+<div class="glass-panel flex-shrink-0 px-4 py-2 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary scale-75" data-icon="thermostat">thermostat</span>
+<span class="text-xs font-mono">18.4°C</span>
+</div>
+<div class="glass-panel flex-shrink-0 px-4 py-2 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary scale-75" data-icon="humidity_percentage">humidity_percentage</span>
+<span class="text-xs font-mono">62% RH</span>
+</div>
+<div class="glass-panel flex-shrink-0 px-4 py-2 rounded-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary scale-75" data-icon="air">air</span>
+<span class="text-xs font-mono">4.2 km/h NW</span>
+</div>
+</div>
+</section>
+<!-- Job Progress: Circular Gauge -->
+<section class="grid grid-cols-2 gap-6 items-center">
+<div class="relative w-32 h-32 mx-auto">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 100 100">
+<circle class="text-surface-container-highest" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="70.3" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-2xl font-bold font-headline">72%</span>
+<span class="text-[8px] uppercase tracking-tighter opacity-60">Completion</span>
+</div>
+</div>
+<div class="space-y-4">
+<div>
+<p class="text-[10px] uppercase tracking-widest text-secondary font-bold">Acres Cleared</p>
+<p class="text-lg font-mono leading-none">142.8 <span class="text-[10px] opacity-40">/ 200</span></p>
+</div>
+<div>
+<p class="text-[10px] uppercase tracking-widest text-secondary font-bold">Target Removal</p>
+<p class="text-lg font-mono leading-none">8.4k <span class="text-[10px] opacity-40">Tons</span></p>
+</div>
+</div>
+</section>
+<!-- Live Fleet Status -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="text-sm font-bold uppercase tracking-widest text-primary/80">Live Fleet Status</h2>
+<span class="flex items-center gap-1 text-[10px] text-primary">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    SYNCED
+                </span>
+</div>
+<div class="space-y-3">
+<!-- Mulcher Card -->
+<div class="surface-container-low p-4 rounded-xl flex items-center justify-between border-l-2 border-primary">
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-highest p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<div>
+<h3 class="text-sm font-bold">MULCHER ALPHA</h3>
+<p class="text-[10px] font-mono text-on-surface-variant">45.4332° N, 122.6362° W</p>
+</div>
+</div>
+<div class="text-right">
+<span class="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded border border-primary/20">ACTIVE</span>
+</div>
+</div>
+<!-- Hauler Card -->
+<div class="surface-container-low p-4 rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-highest p-2 rounded-lg">
+<span class="material-symbols-outlined text-secondary" data-icon="local_shipping">local_shipping</span>
+</div>
+<div>
+<h3 class="text-sm font-bold">HAULER BRAVO</h3>
+<p class="text-[10px] font-mono text-on-surface-variant">45.4335° N, 122.6370° W</p>
+</div>
+</div>
+<div class="text-right">
+<span class="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded border border-secondary/20 font-medium">STAGING</span>
+</div>
+</div>
+<!-- Drone Card -->
+<div class="surface-container-low p-4 rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-highest p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="helicopter">helicopter</span>
+</div>
+<div>
+<h3 class="text-sm font-bold">SCOUT-01</h3>
+<p class="text-[10px] font-mono text-on-surface-variant">ALT: 120m | BATT: 88%</p>
+</div>
+</div>
+<div class="text-right">
+<span class="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded border border-primary/20">PATROL</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Quick Stats (Mulcher Dynamics) -->
+<section class="space-y-4">
+<h2 class="text-sm font-bold uppercase tracking-widest text-primary/80">Mulcher Dynamics</h2>
+<div class="grid grid-cols-2 gap-3">
+<div class="surface-container-high p-4 rounded-lg flex flex-col gap-1 relative overflow-hidden">
+<div class="hud-corner-tl absolute top-0 left-0 w-2 h-2"></div>
+<span class="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider">RPM Output</span>
+<span class="text-xl font-mono text-primary">3,420</span>
+<div class="w-full h-1 bg-surface-container-highest rounded-full mt-2 overflow-hidden">
+<div class="bg-primary h-full w-[85%]"></div>
+</div>
+</div>
+<div class="surface-container-high p-4 rounded-lg flex flex-col gap-1 relative overflow-hidden">
+<div class="hud-corner-tl absolute top-0 left-0 w-2 h-2"></div>
+<span class="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider">Engine Load</span>
+<span class="text-xl font-mono text-on-surface">62%</span>
+<div class="w-full h-1 bg-surface-container-highest rounded-full mt-2 overflow-hidden">
+<div class="bg-on-surface h-full w-[62%]"></div>
+</div>
+</div>
+<div class="surface-container-high p-4 rounded-lg flex flex-col gap-1 relative overflow-hidden">
+<div class="hud-corner-tl absolute top-0 left-0 w-2 h-2"></div>
+<span class="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider">Fuel Level</span>
+<span class="text-xl font-mono text-on-surface">144 <small class="text-[10px]">L</small></span>
+<div class="w-full h-1 bg-surface-container-highest rounded-full mt-2 overflow-hidden">
+<div class="bg-secondary h-full w-[40%]"></div>
+</div>
+</div>
+<div class="surface-container-high p-4 rounded-lg flex flex-col gap-1 relative overflow-hidden">
+<div class="hud-corner-tl absolute top-0 left-0 w-2 h-2"></div>
+<span class="text-[9px] uppercase font-bold text-on-surface-variant tracking-wider">Oil Temp</span>
+<span class="text-xl font-mono text-on-surface">92<small class="text-[10px]">°C</small></span>
+<div class="w-full h-1 bg-surface-container-highest rounded-full mt-2 overflow-hidden">
+<div class="bg-primary h-full w-[92%]"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Activity -->
+<section class="space-y-4">
+<h2 class="text-sm font-bold uppercase tracking-widest text-primary/80">Activity Log</h2>
+<div class="space-y-0 relative before:absolute before:left-3 before:top-4 before:bottom-4 before:w-px before:bg-outline-variant/30">
+<div class="flex gap-4 items-start relative pb-6">
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center z-10 border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</div>
+<div>
+<p class="text-xs font-bold">Terrain Scan Uploaded</p>
+<p class="text-[10px] text-on-surface-variant font-mono">SCOUT-01 | Sector G4 Completed</p>
+<p class="text-[9px] text-outline mt-1 font-mono uppercase">14:02:11</p>
+</div>
+</div>
+<div class="flex gap-4 items-start relative pb-6">
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center z-10 border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+</div>
+<div>
+<p class="text-xs font-bold">Fuel Caution</p>
+<p class="text-[10px] text-on-surface-variant font-mono">HAULER BRAVO | Sub 25% Threshold</p>
+<p class="text-[9px] text-outline mt-1 font-mono uppercase">13:45:00</p>
+</div>
+</div>
+<div class="flex gap-4 items-start relative">
+<div class="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center z-10 border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</div>
+<div>
+<p class="text-xs font-bold">Shift Rotation Start</p>
+<p class="text-[10px] text-on-surface-variant font-mono">Operator ID: A401 Synchronized</p>
+<p class="text-[9px] text-outline mt-1 font-mono uppercase">13:30:00</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#101415]/60 backdrop-blur-xl dark:bg-slate-950/60 border-t border-emerald-900/15 shadow-[0_-4px_40px_rgba(2,71,37,0.06)]">
+<button class="flex flex-col items-center justify-center text-emerald-400 bg-emerald-900/30 rounded-xl px-4 py-1.5 ring-1 ring-emerald-500/30 transition-all Active:scale-95 duration-150">
+<span class="material-symbols-outlined mb-1" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05rem] font-bold">Fleet HUD</span>
+</button>
+<button class="flex flex-col items-center justify-center text-slate-500 opacity-70 hover:text-emerald-200 transition-colors">
+<span class="material-symbols-outlined mb-1" data-icon="map">map</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05rem] font-bold">Map</span>
+</button>
+<button class="flex flex-col items-center justify-center text-slate-500 opacity-70 hover:text-emerald-200 transition-colors">
+<span class="material-symbols-outlined mb-1" data-icon="leaderboard">leaderboard</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05rem] font-bold">Analytics</span>
+</button>
+<button class="flex flex-col items-center justify-center text-slate-500 opacity-70 hover:text-emerald-200 transition-colors">
+<span class="material-symbols-outlined mb-1" data-icon="history">history</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05rem] font-bold">Logs</span>
+</button>
+</nav>
+</body></html>

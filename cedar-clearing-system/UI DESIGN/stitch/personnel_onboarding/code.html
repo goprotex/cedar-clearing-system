@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Wasteland CRM - Personnel Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-variant": "#353534",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "on-secondary-container": "#007117",
+                    "secondary-fixed": "#72ff70",
+                    "on-primary": "#561f00",
+                    "surface-container-highest": "#353534",
+                    "surface-container-high": "#2a2a2a",
+                    "on-primary-container": "#572000",
+                    "tertiary": "#c6c6c7",
+                    "primary": "#ffb693",
+                    "inverse-on-surface": "#313030",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "tertiary-container": "#989999",
+                    "secondary-container": "#13ff43",
+                    "on-secondary": "#003907",
+                    "inverse-surface": "#e5e2e1",
+                    "background": "#131313",
+                    "inverse-primary": "#a04100",
+                    "surface-container-low": "#1c1b1b",
+                    "surface": "#131313",
+                    "outline": "#a98a7d",
+                    "on-error-container": "#ffdad6",
+                    "on-error": "#690005",
+                    "error-container": "#93000a",
+                    "surface-container-lowest": "#0e0e0e",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-secondary-fixed": "#002203",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "secondary": "#ecffe3",
+                    "outline-variant": "#5a4136",
+                    "surface-bright": "#3a3939",
+                    "error": "#ffb4ab",
+                    "secondary-fixed-dim": "#00e639",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "surface-container": "#201f1f",
+                    "on-primary-fixed": "#351000",
+                    "primary-fixed-dim": "#ffb693",
+                    "surface-tint": "#ffb693",
+                    "on-tertiary-container": "#2f3132",
+                    "on-surface": "#e5e2e1",
+                    "on-background": "#e5e2e1",
+                    "surface-dim": "#131313",
+                    "primary-fixed": "#ffdbcc",
+                    "on-tertiary": "#2f3131",
+                    "primary-container": "#ff6b00",
+                    "on-surface-variant": "#e2bfb0"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #131313;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ff6b00;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background selection:bg-primary selection:text-background">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b-2 border-[#353534] shadow-[0_4px_20px_rgba(255,107,0,0.05)]">
+<div class="flex items-center gap-4">
+<span class="text-lg font-black text-[#FF6B00] tracking-tighter">SYSTEM_STATUS:ONLINE</span>
+</div>
+<nav class="hidden md:flex gap-8">
+<span class="font-['Space_Grotesk'] uppercase tracking-widest text-xs text-[#E5E2E1] flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">terminal</span> TERMINAL_V4
+            </span>
+<span class="font-['Space_Grotesk'] uppercase tracking-widest text-xs text-[#E5E2E1] flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">sensors</span> UPLINK_STABLE
+            </span>
+</nav>
+<div class="flex items-center gap-4">
+<button class="active:invert transition-all duration-75 p-2 hover:bg-[#FFB693] hover:text-[#131313] text-[#FFB693]">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="font-['Space_Grotesk'] uppercase tracking-widest text-xs text-[#FFB693] border border-[#FFB693] px-3 py-1 hover:bg-[#FFB693] hover:text-[#131313] active:invert transition-all">
+                LOGOUT
+            </button>
+</div>
+</header>
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col pt-20 pb-8 z-40 bg-[#131313] w-64 border-r-2 border-[#353534]">
+<div class="px-6 mb-8">
+<h1 class="text-xl font-bold text-[#FF6B00] mb-2">WASTELAND_CRM</h1>
+<p class="font-['Space_Grotesk'] uppercase text-[10px] tracking-widest text-[#FFB693] opacity-60">CLEARANCE_OPS_V.4.2</p>
+</div>
+<nav class="flex-1 flex flex-col gap-1">
+<a class="text-[#E5E2E1] opacity-80 px-4 py-3 hover:bg-[#353534] font-['Space_Grotesk'] uppercase text-sm font-medium flex items-center gap-3 transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined">construction</span> Equipment
+            </a>
+<a class="bg-[#FF6B00] text-[#131313] font-bold px-4 py-3 border-none font-['Space_Grotesk'] uppercase text-sm flex items-center gap-3 transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined">groups</span> Employees
+            </a>
+<a class="text-[#E5E2E1] opacity-80 px-4 py-3 hover:bg-[#353534] font-['Space_Grotesk'] uppercase text-sm font-medium flex items-center gap-3 transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined">settings_suggest</span> Job Controls
+            </a>
+</nav>
+<div class="mt-auto flex flex-col gap-1 border-t border-[#353534] pt-4">
+<a class="text-[#E5E2E1] opacity-80 px-4 py-3 hover:bg-[#353534] font-['Space_Grotesk'] uppercase text-sm font-medium flex items-center gap-3 transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined">settings</span> Settings
+            </a>
+<a class="text-[#E5E2E1] opacity-80 px-4 py-3 hover:bg-[#353534] font-['Space_Grotesk'] uppercase text-sm font-medium flex items-center gap-3 transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined">help_center</span> Support
+            </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="pl-64 pt-16 min-h-screen bg-background">
+<div class="p-8 max-w-7xl mx-auto">
+<!-- Header Section -->
+<div class="mb-12 border-l-4 border-primary-container pl-6">
+<h2 class="text-4xl font-bold uppercase tracking-tighter text-on-background mb-2">Personnel Terminal</h2>
+<p class="text-primary text-sm tracking-[0.2em] font-medium">RECRUITMENT // DEPLOYMENT // MONITORING</p>
+</div>
+<div class="grid grid-cols-12 gap-8">
+<!-- Left Column: Recruitment Form -->
+<section class="col-span-12 lg:col-span-4 bg-surface-container-high p-8 border-2 border-surface-variant relative overflow-hidden">
+<div class="absolute top-0 right-0 p-2 text-[10px] text-surface-variant font-mono">FORM_SEC_772</div>
+<h3 class="text-xl font-bold uppercase mb-8 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container">person_add</span>
+                        RECRUIT_NEW_OPERATOR
+                    </h3>
+<form class="space-y-6">
+<div>
+<label class="block text-[10px] uppercase tracking-widest text-primary mb-2">FULL_NAME_ID</label>
+<input class="w-full bg-background border-outline-variant text-on-surface focus:border-secondary-container focus:ring-0 placeholder:opacity-30 uppercase font-mono text-sm" placeholder="E.G. KAX-092 / J. MILLER" type="text"/>
+</div>
+<div>
+<label class="block text-[10px] uppercase tracking-widest text-primary mb-2">DESIGNATED_ROLE</label>
+<select class="w-full bg-background border-outline-variant text-on-surface focus:border-secondary-container focus:ring-0 uppercase font-mono text-sm">
+<option>HEAVY_EXTRACTOR_PILOT</option>
+<option>MAINTENANCE_TECH_LEVEL_2</option>
+<option>SCAVENGER_COORDINATOR</option>
+<option>SECURITY_OVERWATCH</option>
+</select>
+</div>
+<div>
+<label class="block text-[10px] uppercase tracking-widest text-primary mb-2">CERTIFICATIONS</label>
+<div class="grid grid-cols-2 gap-2">
+<label class="flex items-center gap-2 p-3 bg-background border border-outline-variant cursor-pointer hover:bg-surface-variant transition-colors group">
+<input class="rounded-none border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+<span class="text-[10px] font-bold group-hover:text-primary">BIO_HAZ_L3</span>
+</label>
+<label class="flex items-center gap-2 p-3 bg-background border border-outline-variant cursor-pointer hover:bg-surface-variant transition-colors group">
+<input class="rounded-none border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+<span class="text-[10px] font-bold group-hover:text-primary">MECH_PILOT</span>
+</label>
+<label class="flex items-center gap-2 p-3 bg-background border border-outline-variant cursor-pointer hover:bg-surface-variant transition-colors group">
+<input class="rounded-none border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+<span class="text-[10px] font-bold group-hover:text-primary">HIGH_VOLT</span>
+</label>
+<label class="flex items-center gap-2 p-3 bg-background border border-outline-variant cursor-pointer hover:bg-surface-variant transition-colors group">
+<input class="rounded-none border-outline-variant text-primary-container focus:ring-0" type="checkbox"/>
+<span class="text-[10px] font-bold group-hover:text-primary">DEEP_WASTE</span>
+</label>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary-container font-bold py-4 uppercase tracking-widest hover:bg-on-surface hover:text-background transition-all active:scale-95" type="submit">
+                            EXECUTE_ONBOARDING
+                        </button>
+</form>
+<div class="mt-8 pt-6 border-t border-surface-variant">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-primary opacity-50">fingerprint</span>
+</div>
+<div>
+<p class="text-[10px] text-surface-variant">BIOMETRIC_LOCK_ACTIVE</p>
+<p class="text-xs font-mono">ID_VERIFICATION_PENDING...</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Column: Field Units Roster -->
+<section class="col-span-12 lg:col-span-8 space-y-6">
+<div class="flex justify-between items-end mb-4 px-2">
+<h3 class="text-xl font-bold uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container">shield</span>
+                            FIELD_UNITS_ROSTER
+                        </h3>
+<div class="flex gap-4 font-mono text-[10px]">
+<span class="flex items-center gap-1"><span class="w-2 h-2 bg-secondary-container"></span> ACTIVE</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 bg-error"></span> CRITICAL</span>
+<span class="flex items-center gap-1 text-surface-variant">STBY: 12</span>
+</div>
+</div>
+<!-- Unit Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Unit 1 -->
+<div class="bg-surface-container border-l-4 border-secondary-container p-5 hover:bg-surface-container-high transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-4">
+<div class="w-14 h-14 bg-background border border-outline-variant relative">
+<img alt="Operator Portrait" class="w-full h-full object-cover grayscale brightness-75 contrast-125" data-alt="extreme close up of man's face in harsh top lighting with gritty texture and technical overlays on dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-xzxFhn1OrBbvNMyDaboJzRe-EiRB2roIKyr057KkXPU0mqZTRC07sqEcEfbdjGFyt0RbhUUrpH3lobFfGCUdFh6B_VrsArDwuNmX6GIOexqGlbh1SZ14u_zGzmO1088pWOp05iBbqEzRq1-8MWc9nHaGf6KK-XHAIvLDPMtLXUGcCDixXYXybU-oVj7dNZqYbDinWfiaD01hRqC9UUlBwUjmQqZ7S1cWqFKa-5hSbnO7KancVq3tJ34orN0Muw2unpitOofzEW8"/>
+<div class="absolute bottom-0 right-0 bg-secondary-container w-3 h-3 border-2 border-background"></div>
+</div>
+<div>
+<h4 class="font-bold text-lg leading-tight">VANCE_K</h4>
+<p class="text-[10px] text-primary uppercase font-mono tracking-tighter">MECH_OPERATOR_L4</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-surface-variant uppercase font-mono">HR_RATE</div>
+<div class="text-secondary-container font-mono">112%</div>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between items-center text-[10px] uppercase font-mono bg-background/50 p-2">
+<span class="opacity-50">Current_Machine:</span>
+<span class="text-on-surface">HARVESTER_X1</span>
+</div>
+<div class="flex justify-between items-center text-[10px] uppercase font-mono bg-background/50 p-2">
+<span class="opacity-50">Current_Zone:</span>
+<span class="text-secondary-container">ZONE_C_WASTE</span>
+</div>
+</div>
+<button class="w-full border-2 border-outline py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-background hover:border-primary transition-all">
+                                REASSIGN_UNIT
+                            </button>
+</div>
+<!-- Unit 2 -->
+<div class="bg-surface-container border-l-4 border-error p-5 hover:bg-surface-container-high transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-4">
+<div class="w-14 h-14 bg-background border border-outline-variant relative">
+<img alt="Operator Portrait" class="w-full h-full object-cover grayscale brightness-75 contrast-125" data-alt="woman's face in high contrast dramatic lighting with visible grain and industrial tech aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYqHZQbHMgRRHxaXcZwzkIOuT7omSW6E901AzdPntXEoOO0h559q2_FTOqWukF1rikgFkeG7vhxMAHFYPuP3Sb-rjLqVrtME2rBvzGElOtZaKsdbMn_8L9xreTpKRtnYMMXmktyyBM7A40I6WNWiiX1RNLqN2PHLA69eB0fYXkNLIPmGk-YBsgGgBmh4iUm-25QblgXFubNTKitprnNFsH063Rx3sA-q1ssQ_ILBvZ-oP1TMsP6uPp7pM0v1oHJPZvdRIwFRvVmYc"/>
+<div class="absolute bottom-0 right-0 bg-error w-3 h-3 border-2 border-background"></div>
+</div>
+<div>
+<h4 class="font-bold text-lg leading-tight">SARA_L</h4>
+<p class="text-[10px] text-error uppercase font-mono tracking-tighter">STRUCTURAL_ENG_L2</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-surface-variant uppercase font-mono">STATUS</div>
+<div class="text-error font-mono">STRESS</div>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between items-center text-[10px] uppercase font-mono bg-background/50 p-2">
+<span class="opacity-50">Current_Machine:</span>
+<span class="text-on-surface">NULL</span>
+</div>
+<div class="flex justify-between items-center text-[10px] uppercase font-mono bg-background/50 p-2">
+<span class="opacity-50">Current_Zone:</span>
+<span class="text-on-surface">MED_BAY_04</span>
+</div>
+</div>
+<button class="w-full border-2 border-error py-2 text-[10px] font-bold uppercase tracking-widest text-error hover:bg-error hover:text-background transition-all">
+                                SYSTEM_RECALL
+                            </button>
+</div>
+<!-- Unit 3 -->
+<div class="bg-surface-container border-l-4 border-outline-variant p-5 hover:bg-surface-container-high transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-4">
+<div class="w-14 h-14 bg-background border border-outline-variant relative">
+<img alt="Operator Portrait" class="w-full h-full object-cover grayscale brightness-75 contrast-125" data-alt="man's face with goggles pushed up on forehead industrial setting sharp lighting and heavy shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_Cg37YFq1L6D5ZTmFVIXE2GZxZfLOv0hvCYwJfIwEnBtiRhkl8iUDnh5eVILqWzqdPeVLPstxf1oonUM8aNUAZIT0zUmNc-8ovi6QNP0pzPvz3vhakzM7OIbiejZm0q-FKgF2vsJ5PzRHHFa16SrPISyxK9mT-otqfYYcD61nDUIqq9mNPtHnJxvC9L5PRXQBaJVz_7ekKB5mjeeroyOd0jCFPAzvO6AyWrymjAwpFb1crk63D0aNmAKOEJLBYoF8-yXDJjXiZoY"/>
+<div class="absolute bottom-0 right-0 bg-surface-variant w-3 h-3 border-2 border-background"></div>
+</div>
+<div>
+<h4 class="font-bold text-lg leading-tight">ROK_33</h4>
+<p class="text-[10px] text-primary uppercase font-mono tracking-tighter">SCAV_UNIT_ELITE</p>
+</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-surface-variant uppercase font-mono">UPTIME</div>
+<div class="text-on-surface font-mono">14.2h</div>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between items-center text-[10px] uppercase font-mono bg-background/50 p-2">
+<span class="opacity-50">Current_Machine:</span>
+<span class="text-on-surface">SCOUT_DRONE_09</span>
+</div>
+<div class="flex justify-between items-center text-[10px] uppercase font-mono bg-background/50 p-2">
+<span class="opacity-50">Current_Zone:</span>
+<span class="text-on-surface">PERIMETER_NORTH</span>
+</div>
+</div>
+<button class="w-full border-2 border-outline py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-primary hover:text-background hover:border-primary transition-all">
+                                REASSIGN_UNIT
+                            </button>
+</div>
+<!-- Add New Shortcut -->
+<div class="border-2 border-dashed border-outline-variant flex flex-col items-center justify-center p-5 group cursor-pointer hover:border-primary transition-all">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-primary mb-2">add_to_photos</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-outline-variant group-hover:text-primary">DEPLOY_NEW_ID</span>
+</div>
+</div>
+<!-- Machine Assignment Overlay (Mini-Module) -->
+<div class="bg-surface-container-highest border-2 border-primary p-6 mt-8">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-primary">link</span>
+<h4 class="font-bold uppercase text-sm tracking-widest">RAPID_MACHINE_LINK</h4>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="space-y-2">
+<label class="text-[9px] uppercase font-mono text-primary opacity-60">SELECT_UNIT</label>
+<div class="bg-background border border-outline-variant p-2 text-xs font-mono uppercase">VANCE_K</div>
+</div>
+<div class="space-y-2">
+<label class="text-[9px] uppercase font-mono text-primary opacity-60">AVAILABLE_HARDWARE</label>
+<select class="w-full bg-background border border-outline-variant p-2 text-xs font-mono uppercase focus:ring-0">
+<option>EXCAVATOR_MKII [94%_FUELED]</option>
+<option>CRUSHER_700 [MAINT_REQUIRED]</option>
+<option>TRUCK_CAB_12 [AVAILABLE]</option>
+</select>
+</div>
+<div class="flex items-end">
+<button class="w-full bg-secondary-container text-on-secondary-container font-bold py-2 text-xs uppercase hover:invert transition-all">
+                                    INITIATE_LINK
+                                </button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Footer Stats Data Stream -->
+<footer class="mt-12 border-t border-surface-variant pt-4 flex flex-wrap gap-8 opacity-40 font-mono text-[10px] uppercase">
+<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-secondary-container"></span> DB_SYNC: ACTIVE</div>
+<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-primary"></span> LOCAL_TIME: 22:44_GST</div>
+<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-error"></span> ERR_LOG: 0_ENTRIES</div>
+<div class="ml-auto flex items-center gap-4">
+<span>© 2099_NEO_CORP</span>
+<span>SEC_LEVEL: ALPHA_7</span>
+</div>
+</footer>
+</div>
+</main>
+<!-- Floating Action Button - Supressed based on context of sub-screen, but provided as a ghost state if needed for a global 'Alert' -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-error text-background shadow-[0_0_30px_rgba(255,180,171,0.3)] flex items-center justify-center active:scale-95 transition-all group">
+<span class="material-symbols-outlined text-3xl font-variation-settings-'FILL'1">priority_high</span>
+<span class="absolute right-full mr-4 bg-error text-background px-3 py-1 text-[10px] font-bold uppercase opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity">EMERGENCY_BROADCAST</span>
+</button>
+</body></html>

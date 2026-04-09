@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HEAVY_MECH_OS_V4 - OPERATOR_HUD</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "error": "#ffb4ab",
+                    "background": "#131313",
+                    "surface-tint": "#ffb693",
+                    "surface-container-low": "#1c1b1b",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "inverse-on-surface": "#313030",
+                    "surface-container-lowest": "#0e0e0e",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container-highest": "#353534",
+                    "tertiary": "#c6c6c7",
+                    "outline": "#a98a7d",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-secondary-fixed": "#002203",
+                    "primary-fixed": "#ffdbcc",
+                    "on-tertiary-container": "#2f3132",
+                    "secondary": "#ecffe3",
+                    "on-background": "#e5e2e1",
+                    "surface": "#131313",
+                    "on-tertiary": "#2f3131",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "primary": "#ffb693",
+                    "on-error-container": "#ffdad6",
+                    "error-container": "#93000a",
+                    "on-surface": "#e5e2e1",
+                    "on-secondary": "#003907",
+                    "on-secondary-container": "#007117",
+                    "surface-bright": "#3a3939",
+                    "tertiary-fixed": "#e2e2e2",
+                    "outline-variant": "#5a4136",
+                    "surface-variant": "#353534",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "secondary-container": "#13ff43",
+                    "on-primary-fixed": "#351000",
+                    "surface-container": "#201f1f",
+                    "primary-fixed-dim": "#ffb693",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "on-primary": "#561f00",
+                    "secondary-fixed": "#72ff70",
+                    "primary-container": "#ff6b00",
+                    "tertiary-container": "#989999",
+                    "surface-dim": "#131313",
+                    "surface-container-high": "#2a2a2a",
+                    "on-surface-variant": "#e2bfb0",
+                    "inverse-primary": "#a04100",
+                    "on-primary-container": "#572000",
+                    "on-error": "#690005",
+                    "secondary-fixed-dim": "#00e639"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0rem",
+                    "lg": "0rem",
+                    "xl": "0rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #131313; color: #e5e2e1; overflow: hidden; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glitch-border { border: 1px solid #a98a7d; position: relative; }
+        .glitch-border::before { content: ''; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border: 1px solid rgba(255, 107, 0, 0.2); pointer-events: none; }
+        .scanline { background: linear-gradient(to bottom, transparent 50%, rgba(255, 182, 147, 0.05) 50%); background-size: 100% 4px; pointer-events: none; }
+        .hud-grid { background-image: radial-gradient(circle, #353534 1px, transparent 1px); background-size: 40px 40px; }
+    </style>
+</head>
+<body class="bg-background selection:bg-primary-container selection:text-white">
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b-2 border-[#A98A7D]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold tracking-tighter text-orange-600">HEAVY_MULCH_OS_V4</span>
+<nav class="hidden md:flex gap-6 items-center h-full">
+<a class="font-['Space_Grotesk'] uppercase tracking-tight text-sm text-orange-500 border-b-2 border-orange-500 pb-1" href="#">PASTURES</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tight text-sm text-zinc-500 hover:bg-zinc-800 hover:text-white transition-colors" href="#">VITALS</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tight text-sm text-zinc-500 hover:bg-zinc-800 hover:text-white transition-colors" href="#">CREW</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tight text-sm text-zinc-500 hover:bg-zinc-800 hover:text-white transition-colors" href="#">TERRAIN</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-orange-500 hover:bg-zinc-800 p-2">settings_input_component</button>
+<button class="material-symbols-outlined text-orange-500 hover:bg-zinc-800 p-2">sensors</button>
+<button class="material-symbols-outlined text-orange-500 hover:bg-zinc-800 p-2">power_settings_new</button>
+</div>
+</header>
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-24 flex flex-col items-center py-4 bg-[#131313] border-r-2 border-[#A98A7D] z-40">
+<div class="mb-8 flex flex-col items-center">
+<div class="w-12 h-12 bg-surface-container-highest border border-outline flex items-center justify-center mb-1">
+<span class="text-xs font-black text-white">77</span>
+</div>
+<span class="text-[10px] font-bold text-zinc-500">OP_HUD_ALPHA</span>
+</div>
+<div class="flex flex-col w-full">
+<button class="flex flex-col items-center justify-center py-4 bg-orange-600 text-black border-l-4 border-white contrast-125">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">radar</span>
+<span class="font-['Space_Grotesk'] font-bold text-[10px] mt-1">SCANNER</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 text-zinc-400 border-l-4 border-transparent hover:bg-zinc-900 hover:text-orange-400">
+<span class="material-symbols-outlined">precision_manufacturing</span>
+<span class="font-['Space_Grotesk'] font-bold text-[10px] mt-1">MULCHER</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 text-zinc-400 border-l-4 border-transparent hover:bg-zinc-900 hover:text-orange-400">
+<span class="material-symbols-outlined">landscape</span>
+<span class="font-['Space_Grotesk'] font-bold text-[10px] mt-1">TERRAIN</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 text-zinc-400 border-l-4 border-transparent hover:bg-zinc-900 hover:text-orange-400">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-['Space_Grotesk'] font-bold text-[10px] mt-1">CARGO</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 text-zinc-400 border-l-4 border-transparent hover:bg-zinc-900 hover:text-orange-400">
+<span class="material-symbols-outlined">terminal</span>
+<span class="font-['Space_Grotesk'] font-bold text-[10px] mt-1">SYSTEM</span>
+</button>
+</div>
+<div class="mt-auto flex flex-col w-full items-center gap-4">
+<button class="flex flex-col items-center text-zinc-400 hover:text-white">
+<span class="material-symbols-outlined">construction</span>
+<span class="text-[8px] font-bold">DIAGNOSTICS</span>
+</button>
+<button class="bg-red-900/20 text-red-500 border border-red-500 text-[8px] font-bold px-1 py-2 leading-tight text-center uppercase">
+                EMERGENCY<br/>STOP
+            </button>
+</div>
+</aside>
+<main class="fixed left-24 top-16 right-0 bottom-20 overflow-hidden hud-grid">
+<div class="absolute inset-0 scanline opacity-30"></div>
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-60 mix-blend-screen grayscale" data-alt="3D wireframe topographic landscape of rugged mountain terrain with glowing green and orange altitude lines on a black technical digital grid" data-location="Sector 04 Canyon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDX9Lrd6n-AVYAyPJlLOSL2XKrqSWgFu7__T_eVVK_B0oFbPBrk7JZZJTk3VvGKHQGCxI28U4IjgvSKIManMptVoq49gSQ7D8N8IV1wWtamgU68LZIuirrZC60IVb8eOkRiekLAiPoCCtz_-H_RhmArJtNexgtOUyd4GMLLWd9fZ7U8k7a-dR40YgoUACGmzIqV3DG5LokZXd64rrORjDviyJXB4EQ98cMUO_HWaDTuJSvsnCGQDZZ9QWJyabsu0thImBR1KqCgQdc"/>
+</div>
+<div class="relative z-10 grid grid-cols-12 grid-rows-6 h-full p-6 gap-4">
+<div class="col-span-3 row-span-2 bg-black/60 border border-outline p-4 backdrop-blur-md">
+<div class="flex justify-between items-center border-b border-outline-variant pb-2 mb-4">
+<span class="text-xs font-bold uppercase tracking-widest text-primary">Machine Vitals</span>
+<span class="text-[10px] text-secondary-container">STATUS: OPTIMAL</span>
+</div>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between text-[10px] mb-1">
+<span>FUEL_RESERVE</span>
+<span>84%</span>
+</div>
+<div class="h-2 bg-surface-container-highest flex">
+<div class="w-[84%] bg-secondary-container"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[10px] mb-1">
+<span>ENGINE_TEMP</span>
+<span>82.8°C</span>
+</div>
+<div class="h-2 bg-surface-container-highest flex">
+<div class="w-[42%] bg-primary"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[10px] mb-1">
+<span>HYDRAULIC_PSI</span>
+<span>3250</span>
+</div>
+<div class="h-2 bg-surface-container-highest flex">
+<div class="w-[65%] bg-secondary-container"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[10px] mb-1">
+<span>MULCHER_RPM</span>
+<span>2400</span>
+</div>
+<div class="h-2 bg-surface-container-highest flex">
+<div class="w-[80%] bg-primary"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-6 row-span-1 flex items-center justify-center">
+<div class="bg-black/80 px-8 py-2 border-x-2 border-primary-container text-center">
+<h2 class="text-xl font-black tracking-widest uppercase italic text-white">JOB_PROGRESS: 42%</h2>
+<div class="flex justify-center gap-4 mt-1 text-[10px] font-mono text-primary">
+<span>LAT: 45.32.11 N</span>
+<span>LONG: 12.09.44 W</span>
+<span>ROCK_DENSITY: LOW</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 row-span-3 bg-black/60 border border-outline p-4 backdrop-blur-md flex flex-col">
+<div class="flex justify-between items-center border-b border-outline-variant pb-2 mb-4">
+<span class="text-xs font-bold uppercase tracking-widest text-secondary-container">CREW_CHAT</span>
+<span class="material-symbols-outlined text-xs">forum</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-3 font-mono text-[10px]">
+<div class="border-l-2 border-secondary-container pl-2 py-1">
+<p class="text-secondary-container font-bold">OFFICE_COMMS:</p>
+<p class="text-on-surface">Proceed to Pasture Delta. Watch for loose shale.</p>
+<p class="text-zinc-500 text-[8px] mt-1">T-MINUS 04:12</p>
+</div>
+<div class="border-l-2 border-outline pl-2 py-1">
+<p class="text-outline font-bold">OP_UNIT_12:</p>
+<p class="text-on-surface">Clearance confirmed. Mulching beginning now.</p>
+<p class="text-zinc-500 text-[8px] mt-1">T-MINUS 02:45</p>
+</div>
+<div class="border-l-2 border-primary pl-2 py-1 bg-primary/5">
+<p class="text-primary font-bold">SYSTEM:</p>
+<p class="text-on-surface">Obstacle detected at COORDS: 45.3, 12.1.</p>
+<p class="text-zinc-500 text-[8px] mt-1">JUST NOW</p>
+</div>
+</div>
+<div class="mt-4 flex gap-2">
+<input class="bg-surface-container-lowest border border-outline-variant text-[10px] px-2 py-1 w-full focus:outline-none focus:border-secondary-container uppercase" placeholder="SEND MESSAGE..." type="text"/>
+<button class="bg-secondary-container text-black px-2 py-1 text-[10px] font-bold">SEND</button>
+</div>
+</div>
+<div class="col-start-1 col-span-2 row-start-6 flex items-end">
+<div class="bg-black/60 border border-outline p-2 w-full">
+<div class="text-[8px] text-zinc-500 mb-1 tracking-tighter uppercase">TERRAIN_DIFFICULTY</div>
+<div class="flex gap-1 items-end h-8">
+<div class="w-1 bg-secondary-container h-[20%]"></div>
+<div class="w-1 bg-secondary-container h-[40%]"></div>
+<div class="w-1 bg-secondary-container h-[65%]"></div>
+<div class="w-1 bg-secondary-container h-[90%]"></div>
+<div class="w-1 bg-secondary-container h-[80%]"></div>
+<div class="w-1 bg-secondary-container h-[100%]"></div>
+</div>
+</div>
+</div>
+<div class="col-start-11 col-span-2 row-start-6 flex items-end justify-end">
+<div class="bg-black/60 border border-outline p-2 w-full text-right">
+<div class="text-[8px] text-zinc-500 mb-1 tracking-tighter uppercase">System_Clock</div>
+<div class="text-xl font-bold text-white tracking-widest">23:54:02</div>
+<div class="text-[8px] text-primary">UPTIME: 08:14:45</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="fixed bottom-0 left-24 right-0 z-50 flex justify-around items-center h-20 bg-[#131313] border-t-2 border-[#A98A7D] shadow-[0_-10px_40px_rgba(255,107,0,0.1)]">
+<button class="flex flex-col items-center justify-center text-emerald-900 p-4 hover:bg-emerald-800 hover:text-white transition-all active:scale-90">
+<span class="material-symbols-outlined">rocket_launch</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-black">ENGAGE</span>
+</button>
+<div class="h-full flex items-center gap-4 px-6 border-x border-outline-variant bg-surface-container-lowest">
+<button class="bg-primary-container text-black h-12 px-6 font-black uppercase text-xs tracking-widest hover:invert transition-all border border-black active:scale-95">
+                MARK OBSTACLE
+            </button>
+<button class="bg-secondary-container text-black h-12 px-6 font-black uppercase text-xs tracking-widest hover:invert transition-all border border-black active:scale-95">
+                PASTURE COMPLETE
+            </button>
+<button class="bg-surface-container-highest text-white h-12 px-6 font-black uppercase text-xs tracking-widest border border-outline hover:bg-white hover:text-black transition-all active:scale-95">
+                CLOCK OUT
+            </button>
+</div>
+<button class="flex flex-col items-center justify-center text-emerald-900 p-4 hover:bg-emerald-800 hover:text-white transition-all active:scale-90">
+<span class="material-symbols-outlined">keyboard_double_arrow_left</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-black">BACKTRACK</span>
+</button>
+<button class="flex flex-col items-center justify-center text-emerald-900 p-4 hover:bg-emerald-800 hover:text-white transition-all active:scale-90">
+<span class="material-symbols-outlined">warning</span>
+<span class="font-['Space_Grotesk'] uppercase text-[10px] font-black">OVERRIDE</span>
+</button>
+</footer>
+<div class="fixed top-20 right-8 z-40 flex flex-col gap-2 pointer-events-none">
+<div class="bg-primary-container/20 text-primary border border-primary px-3 py-1 text-[10px] font-black tracking-widest">
+            CALIBRATING_OPTICS... [OK]
+        </div>
+<div class="bg-secondary-container/20 text-secondary-container border border-secondary-container px-3 py-1 text-[10px] font-black tracking-widest">
+            MULCHER_LINK_STABLE [99%]
+        </div>
+</div>
+</body></html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Asset Management Terminal | WASTELAND_CRM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#353534",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-secondary-container": "#007117",
+                        "secondary-fixed": "#72ff70",
+                        "on-primary": "#561f00",
+                        "surface-container-highest": "#353534",
+                        "surface-container-high": "#2a2a2a",
+                        "on-primary-container": "#572000",
+                        "tertiary": "#c6c6c7",
+                        "primary": "#ffb693",
+                        "inverse-on-surface": "#313030",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "tertiary-container": "#989999",
+                        "secondary-container": "#13ff43",
+                        "on-secondary": "#003907",
+                        "inverse-surface": "#e5e2e1",
+                        "background": "#131313",
+                        "inverse-primary": "#a04100",
+                        "surface-container-low": "#1c1b1b",
+                        "surface": "#131313",
+                        "outline": "#a98a7d",
+                        "on-error-container": "#ffdad6",
+                        "on-error": "#690005",
+                        "error-container": "#93000a",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-secondary-fixed": "#002203",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "secondary": "#ecffe3",
+                        "outline-variant": "#5a4136",
+                        "surface-bright": "#3a3939",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#00e639",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-container": "#201f1f",
+                        "on-primary-fixed": "#351000",
+                        "primary-fixed-dim": "#ffb693",
+                        "surface-tint": "#ffb693",
+                        "on-tertiary-container": "#2f3132",
+                        "on-surface": "#e5e2e1",
+                        "on-background": "#e5e2e1",
+                        "surface-dim": "#131313",
+                        "primary-fixed": "#ffdbcc",
+                        "on-tertiary": "#2f3131",
+                        "primary-container": "#ff6b00",
+                        "on-surface-variant": "#e2bfb0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #353534; border-radius: 0px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff6b00; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b-2 border-[#353534] shadow-[0_4px_20px_rgba(255,107,0,0.05)]">
+<div class="flex items-center gap-4">
+<span class="text-lg font-black text-[#FF6B00] tracking-tighter">SYSTEM_STATUS:ONLINE</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-4 items-center font-['Space_Grotesk'] uppercase tracking-widest text-xs text-[#FFB693]">
+<span class="material-symbols-outlined text-sm">terminal</span>
+<span class="material-symbols-outlined text-sm">notifications</span>
+<span class="material-symbols-outlined text-sm">sensors</span>
+</div>
+<button class="font-['Space_Grotesk'] uppercase tracking-widest text-xs text-[#E5E2E1] border border-[#353534] px-3 py-1 hover:bg-[#FFB693] hover:text-[#131313] transition-all duration-75 active:invert">LOGOUT</button>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col pt-20 pb-8 z-40 bg-[#131313] border-r-2 border-[#353534] w-64">
+<div class="px-6 mb-8">
+<h1 class="text-xl font-bold text-[#FF6B00] mb-1">WASTELAND_CRM</h1>
+<p class="font-['Space_Grotesk'] uppercase text-[10px] tracking-widest opacity-60">CLEARANCE_OPS_V.4.2</p>
+</div>
+<nav class="flex-grow flex flex-col gap-1">
+<a class="flex items-center gap-3 bg-[#FF6B00] text-[#131313] font-bold px-6 py-4 border-none transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="construction">construction</span>
+<span class="font-['Space_Grotesk'] uppercase text-sm font-medium">Equipment</span>
+</a>
+<a class="flex items-center gap-3 text-[#E5E2E1] opacity-80 px-6 py-4 hover:bg-[#353534] transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-['Space_Grotesk'] uppercase text-sm font-medium">Employees</span>
+</a>
+<a class="flex items-center gap-3 text-[#E5E2E1] opacity-80 px-6 py-4 hover:bg-[#353534] transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="settings_suggest">settings_suggest</span>
+<span class="font-['Space_Grotesk'] uppercase text-sm font-medium">Job Controls</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-1 border-t border-[#353534] pt-4">
+<a class="flex items-center gap-3 text-[#E5E2E1] opacity-80 px-6 py-4 hover:bg-[#353534] transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Space_Grotesk'] uppercase text-sm font-medium">Settings</span>
+</a>
+<a class="flex items-center gap-3 text-[#E5E2E1] opacity-80 px-6 py-4 hover:bg-[#353534] transition-transform active:translate-x-1" href="#">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+<span class="font-['Space_Grotesk'] uppercase text-sm font-medium">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 pt-24 px-8 pb-12 min-h-screen">
+<div class="grid grid-cols-12 gap-8">
+<!-- Header Section -->
+<div class="col-span-12 flex justify-between items-end border-l-4 border-primary-container pl-6 mb-4">
+<div>
+<h2 class="text-4xl font-black uppercase tracking-tighter">Asset Terminal</h2>
+<p class="text-primary font-mono text-xs mt-1">LOC: SECTOR_7_OUTPOST // AUTH: OVERRIDE_ADMIN</p>
+</div>
+<div class="text-right">
+<p class="text-xs opacity-50 uppercase tracking-widest">System Time</p>
+<p class="text-xl font-bold font-mono">22:41:09</p>
+</div>
+</div>
+<!-- Left Column: Form & Actions -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-8">
+<!-- NEW_ASSET_ENTRY Form -->
+<section class="bg-surface-container-high border-2 border-outline-variant p-6 relative overflow-hidden">
+<div class="absolute top-0 right-0 bg-primary-container text-on-primary-container text-[10px] font-bold px-2 py-1">FORM_ID: 909-X</div>
+<h3 class="text-lg font-bold uppercase mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">add_box</span>
+                        NEW_ASSET_ENTRY
+                    </h3>
+<form class="space-y-4">
+<div>
+<label class="block text-[10px] text-primary uppercase font-bold mb-1 tracking-widest">Asset Designation</label>
+<input class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-secondary-container focus:ring-0 text-sm font-mono placeholder:opacity-30" placeholder="e.g. MULCHER_V3" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-[10px] text-primary uppercase font-bold mb-1 tracking-widest">Unit Category</label>
+<select class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-secondary-container focus:ring-0 text-sm font-mono">
+<option>HEAVY_LOADER</option>
+<option>INDUSTRIAL_MULCHER</option>
+<option>LOGISTICS_TRUCK</option>
+</select>
+</div>
+<div>
+<label class="block text-[10px] text-primary uppercase font-bold mb-1 tracking-widest">Serial Key</label>
+<input class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant focus:border-secondary-container focus:ring-0 text-sm font-mono" placeholder="SN-XXXX" type="text"/>
+</div>
+</div>
+<div class="pt-4">
+<button class="w-full bg-primary-container text-on-primary-container font-black py-4 uppercase tracking-widest hover:bg-on-surface hover:text-background transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">save</span>
+                                Commit Asset
+                            </button>
+</div>
+</form>
+</section>
+<!-- DECOMMISSION_UNIT Action -->
+<section class="bg-surface-container-lowest border-2 border-error-container p-6">
+<h3 class="text-error text-sm font-bold uppercase mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">dangerous</span>
+                        DECOMMISSION_UNIT
+                    </h3>
+<p class="text-xs opacity-70 mb-4 font-mono leading-relaxed">Permanent removal of unit from active directory. This action is logged and irreversible.</p>
+<div class="relative">
+<input class="w-full bg-surface-container-high border-2 border-error-container/30 focus:border-error focus:ring-0 text-xs font-mono py-3 px-4 uppercase placeholder:text-error/30" placeholder="Enter Serial to Confirm..." type="text"/>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 text-error hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</section>
+</div>
+<!-- Right Column: Data Visualization & Searchable List -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
+<!-- Search & Filters -->
+<div class="flex flex-wrap gap-4 items-center bg-surface-container p-4 border-2 border-outline-variant">
+<div class="flex-grow relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-primary text-sm">search</span>
+<input class="w-full pl-10 bg-transparent border-0 border-b border-outline-variant focus:border-primary focus:ring-0 text-sm font-mono uppercase" placeholder="SEARCH_FLEET_REGISTRY..." type="text"/>
+</div>
+<div class="flex gap-2">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold">ACTIVE: 12</span>
+<span class="px-3 py-1 bg-surface-container-highest text-primary text-[10px] font-bold">IN_SHOP: 04</span>
+<span class="px-3 py-1 bg-surface-container-highest text-on-surface text-[10px] font-bold">DEPLOYED: 08</span>
+</div>
+</div>
+<!-- Asset List Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Asset Card 01 -->
+<div class="bg-surface-container-high border border-outline-variant group hover:border-primary transition-colors">
+<div class="flex h-32 overflow-hidden bg-background">
+<img class="w-1/3 object-cover opacity-60 group-hover:opacity-100 transition-opacity" data-alt="gritty industrial mulcher machine with heavy metal teeth and orange safety markings in a dark wasteland workshop" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDN60m16_zm0bqI0iArDXS4Zc7eISTiFgAB2QXE0P66ThsWErmNoR5ifgDAX9bvylaVcOn3E14MBmGwlXW5SNoBv20FXcOL3H4db6mPV9GsxBq4wXqZY39E57WwXg6WEslXukohJjjjdCPQ8JRn9ruWtUJj13HJ1Fm46QrCCjNvGQ9TiIzoGa84ap1qJsCeHiM8WK6TvhGzwXFaj3k2Uce2yhXCSeEDxDK_DICrV8QFOfUmJiz3plFqd_F5_Y7VtQjL4Us4u1BgE1I"/>
+<div class="flex-grow p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-[10px] text-primary font-mono">SN: 8829-MULCH</p>
+<h4 class="font-bold text-lg leading-none uppercase">Apex_Destroyer_V4</h4>
+</div>
+<span class="bg-secondary-container/20 text-secondary-container px-2 py-0.5 text-[9px] font-bold border border-secondary-container/30">ACTIVE</span>
+</div>
+<div class="flex gap-4">
+<div class="flex-grow h-1 bg-surface-container-highest mt-2 flex">
+<div class="h-full bg-secondary-container w-[88%]"></div>
+</div>
+<span class="text-[10px] font-mono text-secondary-container">88% FUEL</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Asset Card 02 -->
+<div class="bg-surface-container-high border border-outline-variant group hover:border-primary transition-colors">
+<div class="flex h-32 overflow-hidden bg-background">
+<img class="w-1/3 object-cover opacity-60 group-hover:opacity-100 transition-opacity" data-alt="rugged flatbed transport truck with reinforced armor plating and utility racks in a desert reclamation zone" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlw3VhsiT7rp4r4R7Aus8KAM_b1zP0f3gYb-Dir9XKOGjjNHGJXKLNktVrxbaKWQwTNJkMo1_vvJB5eB_YzW2xeIAVfZlDftfYzalgOxmerNISuU3iIYlCP7zEVgX6mFF72r6kHlqHvZn-Z0HYZw1UELYTKM-Uf-HR3PmdN6Ww3ndoE8-hM0vhe2JDmVt-Nm01MWBIPxwvM6DIKgCfQEjhNrFkU-u6Kid__8qt2xFF75uWbrqTmzHrydHoY3bnFlGVRK2rXWy8zaE"/>
+<div class="flex-grow p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-[10px] text-primary font-mono">SN: 4410-LOGI</p>
+<h4 class="font-bold text-lg leading-none uppercase">Hauler_Unit_07</h4>
+</div>
+<span class="bg-primary-container/20 text-primary-container px-2 py-0.5 text-[9px] font-bold border border-primary-container/30">DEPLOYED</span>
+</div>
+<div class="flex gap-4">
+<div class="flex-grow h-1 bg-surface-container-highest mt-2 flex">
+<div class="h-full bg-primary-container w-[42%]"></div>
+</div>
+<span class="text-[10px] font-mono text-primary">42% LOAD</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Asset Card 03 -->
+<div class="bg-surface-container-high border border-outline-variant group hover:border-primary transition-colors">
+<div class="flex h-32 overflow-hidden bg-background">
+<img class="w-1/3 object-cover opacity-60 group-hover:opacity-100 transition-opacity" data-alt="mechanical front loader with massive claw attachment undergoing repairs with sparks flying in a dark industrial garage" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhoQo5Y7OZguUmSna-OO57u9yTkHnOLOXNxeR_eI8M73We5V_4IHkXg9AFw1oz6KBvOvA2oAgs7fpa9znhKNYWg_5brJUswcFd_WSvGjKMfyL7ZoghyJYDoVZ5DOc45bdNkBF3xs6V7UuVMgg-KymH8BzZQRd7rWERwPOfSz2Y3GSfzwVT4zAISCCU401YrzRdHAwreVfJI5Xrz9mOhk5ls4qUxSB6b03lFWKEyDyPLhpX5cqjvcYveZKD-4jMlWRN67o4Mm7DVFs"/>
+<div class="flex-grow p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-[10px] text-primary font-mono">SN: 1102-HEVY</p>
+<h4 class="font-bold text-lg leading-none uppercase">Terra_Lifter_X</h4>
+</div>
+<span class="bg-surface-variant text-tertiary px-2 py-0.5 text-[9px] font-bold border border-outline-variant">IN_SHOP</span>
+</div>
+<div class="flex gap-4">
+<div class="flex-grow h-1 bg-surface-container-highest mt-2 flex">
+<div class="h-full bg-error w-[15%]"></div>
+</div>
+<span class="text-[10px] font-mono text-error">15% INTEGRITY</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Asset Card 04 -->
+<div class="bg-surface-container-high border border-outline-variant group hover:border-primary transition-colors">
+<div class="flex h-32 overflow-hidden bg-background">
+<img class="w-1/3 object-cover opacity-60 group-hover:opacity-100 transition-opacity" data-alt="heavy duty excavation machine with rust and grit parked in a dusty wasteland quarry under a hazy orange sun" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2102pcBgUrY74l1M674cOcJM_0eMHktKGZinjFVgzVZaVOgpMm77AWAJOUpnEirclwodTHPHK_ZqXbO-StbOI_VKQq-ygJNpQAYvYZBngkPhbCG08bafxpqB569Tw2MdeV46q6UQnTQt77RppctXfsZh9uaRJdg8HxUJMJ0ELqvupJzZ6wGiEFZMes0lcIxdvtEbil4RVjzinCJcBAwM18yd-jDSty4dtg1vdK5YkPCaVIe0YP2jd_P3VXtnMjU4PqSD4UWfabp8"/>
+<div class="flex-grow p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-[10px] text-primary font-mono">SN: 9942-MULCH</p>
+<h4 class="font-bold text-lg leading-none uppercase">Vulture_Muncher</h4>
+</div>
+<span class="bg-secondary-container/20 text-secondary-container px-2 py-0.5 text-[9px] font-bold border border-secondary-container/30">ACTIVE</span>
+</div>
+<div class="flex gap-4">
+<div class="flex-grow h-1 bg-surface-container-highest mt-2 flex">
+<div class="h-full bg-secondary-container w-[95%]"></div>
+</div>
+<span class="text-[10px] font-mono text-secondary-container">95% READY</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Telemetry Feed -->
+<div class="bg-surface-container-lowest p-4 border border-outline-variant font-mono text-[10px] h-32 overflow-y-auto space-y-1">
+<p class="text-secondary-container">[12:04:11] UNIT: APEX_DESTROYER_V4 // HEARTBEAT DETECTED</p>
+<p class="text-tertiary">[12:03:55] RECLAIM_LOG_009 // UPLOADING SENSOR DATA...</p>
+<p class="text-primary">[12:02:40] ALERT: TERRA_LIFTER_X // HYDRAULIC PRESSURE LOW</p>
+<p class="text-tertiary">[12:01:12] SESSION_START // OPERATOR: ADMIN_X12</p>
+<p class="text-secondary-container">[12:00:01] SYSTEM CHECK // ALL CORES NOMINAL</p>
+<p class="text-error">[11:58:22] ERROR: ASSET_9901_NOT_FOUND // SYNC FAILURE</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating HUD Elements -->
+<div class="fixed bottom-6 right-6 flex flex-col gap-4">
+<div class="bg-surface-variant/40 backdrop-blur-md p-4 border border-outline-variant shadow-2xl flex items-center gap-4">
+<div class="h-10 w-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-background">warning</span>
+</div>
+<div>
+<p class="text-[10px] text-primary font-black uppercase tracking-widest leading-none">Global Warnings</p>
+<p class="text-sm font-bold uppercase leading-none mt-1">Radiation Spike: SECTOR_7</p>
+</div>
+</div>
+</div>
+</body></html>

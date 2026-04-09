@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container-high": "#2a2a2a",
+                    "on-background": "#e5e2e1",
+                    "on-primary-container": "#572000",
+                    "on-error": "#690005",
+                    "inverse-primary": "#a04100",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "inverse-on-surface": "#313030",
+                    "on-primary-fixed": "#351000",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "primary": "#ffb693",
+                    "on-surface": "#e5e2e1",
+                    "on-surface-variant": "#e2bfb0",
+                    "tertiary": "#c6c6c7",
+                    "surface-dim": "#131313",
+                    "surface-tint": "#ffb693",
+                    "error": "#ffb4ab",
+                    "secondary-container": "#13ff43",
+                    "primary-container": "#ff6b00",
+                    "on-tertiary": "#2f3131",
+                    "surface-variant": "#353534",
+                    "secondary": "#ecffe3",
+                    "tertiary-container": "#989999",
+                    "surface-container-highest": "#353534",
+                    "surface-container": "#201f1f",
+                    "on-error-container": "#ffdad6",
+                    "secondary-fixed": "#72ff70",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "on-secondary-fixed": "#002203",
+                    "primary-fixed": "#ffdbcc",
+                    "outline": "#a98a7d",
+                    "on-secondary": "#003907",
+                    "secondary-fixed-dim": "#00e639",
+                    "surface-container-lowest": "#0e0e0e",
+                    "background": "#131313",
+                    "surface-bright": "#3a3939",
+                    "surface": "#131313",
+                    "on-tertiary-container": "#2f3132",
+                    "outline-variant": "#5a4136",
+                    "error-container": "#93000a",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "primary-fixed-dim": "#ffb693",
+                    "on-primary": "#561f00",
+                    "on-secondary-container": "#007117"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scan-line {
+            background: linear-gradient(to bottom, transparent 50%, rgba(255, 107, 0, 0.05) 50%);
+            background-size: 100% 4px;
+        }
+        .glow-orange {
+            text-shadow: 0 0 10px rgba(255, 107, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body scan-line">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 border-b-2 border-[#A98A7D] bg-[#131313] flex justify-between items-center px-6 py-4">
+<div class="text-2xl font-black text-[#FF6B00] tracking-tighter font-['Space_Grotesk'] uppercase">
+            TERRA_SCAN
+        </div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="font-['Space_Grotesk'] uppercase tracking-tight font-bold text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1" href="#">INTEL</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tight font-bold text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1" href="#">FLEET</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tight font-bold text-[#FF6B00] border-b-2 border-[#FF6B00] pb-1" href="#">DENSITY</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tight font-bold text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1" href="#">CALIBRATE</a>
+</nav>
+<button class="bg-primary-container text-on-primary-container px-6 py-2 font-bold uppercase tracking-widest scale-95 active:bg-white transition-all">
+            REQUEST_DEMO
+        </button>
+</header>
+<main class="pt-20">
+<!-- Hero Section -->
+<section class="relative h-[921px] flex items-center justify-start px-6 md:px-20 overflow-hidden border-b-4 border-outline">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-40 mix-blend-luminosity" data-alt="Cinematic high-contrast shot of a heavy-duty forestry mulcher clearing cedar trees in a dusty, industrial wasteland setting with dramatic orange sunlight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAX5I57MKr4M83jxfSXzORaEVRsw11Owe9BoK3S8pEF7YHKood2qDikswE2dW4Mv-RXU49COv7gWj92NXicc_TuIX3oXGh0gixX61ELVwVIO5tWNu2uuk0Xvh-gk6RsTiWG-SMYpHFpHEowfgfbJqV7RODoNAheuA6Yo2OomyClx_1Mp5OFbFxNKBl3WRmA-UdHb8bDi9Q7ufK6Tox56ds0ytVu86TjS-t0MSjwv03wxQ7kcofM63X1y2EdsdgHti8hyMA7jh9L6o"/>
+<div class="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent"></div>
+</div>
+<div class="relative z-10 max-w-4xl border-l-4 border-primary-container pl-8 py-12 bg-background/20 backdrop-blur-sm">
+<div class="flex items-center gap-4 mb-6">
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 text-xs font-black tracking-widest">SYSTEM_LIVE</span>
+<span class="text-primary text-xs font-mono">COORD: 30.2672° N, 97.7431° W</span>
+</div>
+<h1 class="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-8 glow-orange">
+                    The Future of <br/><span class="text-primary-container">Land Clearing</span> <br/>is Here.
+                </h1>
+<p class="text-xl md:text-2xl text-on-surface-variant max-w-xl mb-10 font-light leading-relaxed">
+                    AI-driven telemetry and tactical terrain mapping for the modern clearing fleet. Scan, analyze, and deploy with industrial precision.
+                </p>
+<div class="flex flex-wrap gap-6">
+<button class="bg-primary-container text-black font-black px-10 py-5 text-lg uppercase tracking-widest hover:bg-white transition-all">
+                        Request a Demo
+                    </button>
+<button class="border-2 border-outline text-primary font-black px-10 py-5 text-lg uppercase tracking-widest hover:bg-primary-container hover:text-black transition-all">
+                        View the Tech
+                    </button>
+</div>
+</div>
+<!-- Side Metadata HUD -->
+<div class="absolute right-10 bottom-20 hidden lg:block text-right border-r-2 border-outline-variant pr-4">
+<div class="text-outline text-[10px] tracking-[0.3em] uppercase mb-2">Satellite_Link_Status</div>
+<div class="text-secondary-container font-black text-xl mb-4">OPTIMAL_FEED</div>
+<div class="text-outline text-[10px] tracking-[0.3em] uppercase mb-2">Active_Drones</div>
+<div class="text-primary-container font-black text-xl">04_STANDBY</div>
+</div>
+</section>
+<!-- Social Proof Bar -->
+<section class="bg-surface-container py-6 border-b-2 border-outline-variant flex flex-wrap justify-around items-center gap-8 px-10">
+<div class="flex items-center gap-4">
+<span class="text-primary-container font-black text-4xl">25%</span>
+<span class="text-xs uppercase tracking-widest text-on-surface-variant font-bold leading-tight">Increase in <br/>Bid Accuracy</span>
+</div>
+<div class="w-px h-12 bg-outline-variant hidden md:block"></div>
+<div class="flex items-center gap-4">
+<span class="text-secondary-container font-black text-4xl">90%</span>
+<span class="text-xs uppercase tracking-widest text-on-surface-variant font-bold leading-tight">Detection <br/>Precision</span>
+</div>
+<div class="w-px h-12 bg-outline-variant hidden md:block"></div>
+<div class="flex items-center gap-4">
+<span class="text-primary-container font-black text-4xl">14ms</span>
+<span class="text-xs uppercase tracking-widest text-on-surface-variant font-bold leading-tight">Telemetry <br/>Latency</span>
+</div>
+</section>
+<!-- Key Features Section -->
+<section class="p-6 md:p-20 bg-background">
+<div class="flex items-end justify-between mb-16">
+<div>
+<h2 class="text-primary text-xs font-mono tracking-[0.5em] uppercase mb-4">// TACTICAL_MODULES</h2>
+<h3 class="text-4xl md:text-6xl font-black uppercase tracking-tighter">Industrial Grid</h3>
+</div>
+<div class="hidden md:block h-px flex-1 mx-10 bg-outline-variant"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 border-2 border-outline-variant">
+<!-- Feature 1 -->
+<div class="border-outline-variant border-r-0 md:border-r lg:border-r border-b lg:border-b-0 p-8 hover:bg-surface-container-high transition-colors group">
+<div class="mb-12">
+<span class="material-symbols-outlined text-primary-container text-5xl group-hover:scale-110 transition-transform block mb-4" data-icon="biotech">biotech</span>
+<h4 class="text-2xl font-black uppercase mb-4 leading-none">AI Cedar Detection</h4>
+<p class="text-on-surface-variant text-sm leading-relaxed">Proprietary neural networks provide 90% accuracy in density analysis and biological classification.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 flex justify-between items-center">
+<span class="text-[10px] text-outline font-mono">MOD_ID: 0x992</span>
+<span class="text-secondary-container text-xs font-bold">READY</span>
+</div>
+</div>
+<!-- Feature 2 -->
+<div class="border-outline-variant border-r-0 md:border-r-0 lg:border-r border-b lg:border-b-0 p-8 hover:bg-surface-container-high transition-colors group">
+<div class="mb-12">
+<span class="material-symbols-outlined text-primary-container text-5xl group-hover:scale-110 transition-transform block mb-4" data-icon="view_in_ar">view_in_ar</span>
+<h4 class="text-2xl font-black uppercase mb-4 leading-none">Tactical Map Engine</h4>
+<p class="text-on-surface-variant text-sm leading-relaxed">Holographic 3D 'God's Eye' view with integrated drawing tools for precision clearing zones.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 flex justify-between items-center">
+<span class="text-[10px] text-outline font-mono">MOD_ID: 0x441</span>
+<span class="text-secondary-container text-xs font-bold">ACTIVE</span>
+</div>
+</div>
+<!-- Feature 3 -->
+<div class="border-outline-variant border-r-0 md:border-r lg:border-r border-b md:border-b-0 p-8 hover:bg-surface-container-high transition-colors group">
+<div class="mb-12">
+<span class="material-symbols-outlined text-primary-container text-5xl group-hover:scale-110 transition-transform block mb-4" data-icon="precision_manufacturing">precision_manufacturing</span>
+<h4 class="text-2xl font-black uppercase mb-4 leading-none">Fleet Telematics</h4>
+<p class="text-on-surface-variant text-sm leading-relaxed">Real-time machine tracking with auto-progress calculation and fuel consumption metrics.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 flex justify-between items-center">
+<span class="text-[10px] text-outline font-mono">MOD_ID: 0x775</span>
+<span class="text-secondary-container text-xs font-bold">SYNCED</span>
+</div>
+</div>
+<!-- Feature 4 -->
+<div class="p-8 hover:bg-surface-container-high transition-colors group">
+<div class="mb-12">
+<span class="material-symbols-outlined text-primary-container text-5xl group-hover:scale-110 transition-transform block mb-4" data-icon="bar_chart">bar_chart</span>
+<h4 class="text-2xl font-black uppercase mb-4 leading-none">Data-Driven Bidding</h4>
+<p class="text-on-surface-variant text-sm leading-relaxed">Leverage historical telemetry to generate bids with surgical precision, minimizing margin error.</p>
+</div>
+<div class="border-t border-outline-variant pt-4 flex justify-between items-center">
+<span class="text-[10px] text-outline font-mono">MOD_ID: 0x112</span>
+<span class="text-secondary-container text-xs font-bold">READY</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Visualization Section -->
+<section class="bg-surface-container-low border-y-2 border-outline-variant grid grid-cols-1 lg:grid-cols-3">
+<div class="p-12 border-r-2 border-outline-variant">
+<img class="w-full aspect-square object-cover grayscale brightness-75 border-2 border-primary-container p-2" data-alt="Holographic green wireframe 3D terrain map showing elevation changes and vegetation density overlays in a dark tactical interface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgAdev1hYLRP3Fd_ZebUy7zkg1Gp0mfTo_eKAbZsMCcft95Tb7Ik90b6mhcpQsYLwH80YKhmIiyqDlHv-OzPv6bZNhBh55r9G-d_Sj80fB86Wi05W3L2R5kvbyDQhvewkZxLQMFWeZ2i6h0nW2lc2wU8p_D-anqwXW8uW9okL-7ziKOZ6g-xHvVvPQOEDpChEFDd9b-JWnsoXrLk2pZRN7x3-bXdqvyXWhftbdH4SCljczBUYIoFoDF7xam4AaOmG5kNN9w7r-Ouw"/>
+<div class="mt-6 text-xs font-mono text-outline uppercase tracking-widest">Interface_Ref: DATA_011</div>
+</div>
+<div class="p-12 border-r-2 border-outline-variant">
+<img class="w-full aspect-square object-cover grayscale brightness-75 border-2 border-primary-container p-2" data-alt="Abstract orange heat map of a forest area showing cedar density levels with tactical coordinates and digital UI elements" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_zaI7dGmksekq6Kv0vDaXLy8Zqm1WPUKDmH17e2gVeVSc5NoofxqJORdVpPXjSh3lKYS3jYs6q399eQJ3BqAavctGyhLSePeIwGXp7Gn14GwsVnUNr9brc-luoGtuZTJAeElGRk3t1GSbCqw-_q3jC17QCnXj1jKjFwj5raazdhc7drkzTP0NCMpeDqUrdCDnbZxAcLnYLVMoVcSz3sk4ab1Z0AYH-b1l__9Nc6Xx4aEDctiTWKTFFGzafzfrdZhc_BqKrKFlOcw"/>
+<div class="mt-6 text-xs font-mono text-outline uppercase tracking-widest">Interface_Ref: DATA_012</div>
+</div>
+<div class="p-12">
+<img class="w-full aspect-square object-cover grayscale brightness-75 border-2 border-primary-container p-2" data-alt="Dark monochrome satellite imagery of a land clearing site with neon green outlines marking progress zones and equipment locations" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIdNnnCWQroYGruhEeXxitkY75qAAgWCeR1fSs6r7SQ7W6d4vQLBgmVD6X2zcojlZnSykwrwW2ra130kTPMuVnWlwYVlhqDjCi-pHwKIQcKCx6yXLh6G8JXRkrDyJp7ReYsdi0qXbDm47EKoBG184337SmDxf-AXDCpo9HtJtYMxZFsYzaI5vxcBadTewJt1JQFGpncyltO6q80dHnlWloiCmRC3wTIJgapQotgkTzicT1yiXUuUNS42e1XtfZaXo4LMyZ0hoJOp4"/>
+<div class="mt-6 text-xs font-mono text-outline uppercase tracking-widest">Interface_Ref: DATA_013</div>
+</div>
+</section>
+<!-- How It Works Section -->
+<section class="px-6 py-24 md:px-20 relative overflow-hidden">
+<div class="mb-20 text-center">
+<h3 class="text-primary text-xs font-mono tracking-[0.5em] uppercase mb-4">PROTOCOL_EXECUTION</h3>
+<h2 class="text-5xl md:text-7xl font-black uppercase tracking-tighter">How It Works</h2>
+</div>
+<div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-12 items-stretch">
+<!-- Step 1 -->
+<div class="flex-1 relative border-l-4 border-primary p-8 bg-surface-container-highest/20">
+<span class="absolute -top-6 -left-6 bg-primary-container text-black font-black text-4xl p-2 w-16 h-16 flex items-center justify-center">01</span>
+<h4 class="text-3xl font-black uppercase mb-6 mt-4">SCAN</h4>
+<p class="text-on-surface-variant leading-relaxed">Deploy drone or satellite scans. Our AI instantly converts visual data into a tactical density heatmap of your project site.</p>
+</div>
+<div class="hidden md:flex items-center justify-center">
+<span class="material-symbols-outlined text-outline text-4xl" data-icon="chevron_right">chevron_right</span>
+</div>
+<!-- Step 2 -->
+<div class="flex-1 relative border-l-4 border-primary p-8 bg-surface-container-highest/20">
+<span class="absolute -top-6 -left-6 bg-primary-container text-black font-black text-4xl p-2 w-16 h-16 flex items-center justify-center">02</span>
+<h4 class="text-3xl font-black uppercase mb-6 mt-4">PLAN</h4>
+<p class="text-on-surface-variant leading-relaxed">Draw clearing zones on the 3D map. Calculate exact machine hours and fuel requirements based on actual vegetation density.</p>
+</div>
+<div class="hidden md:flex items-center justify-center">
+<span class="material-symbols-outlined text-outline text-4xl" data-icon="chevron_right">chevron_right</span>
+</div>
+<!-- Step 3 -->
+<div class="flex-1 relative border-l-4 border-primary p-8 bg-surface-container-highest/20">
+<span class="absolute -top-6 -left-6 bg-primary-container text-black font-black text-4xl p-2 w-16 h-16 flex items-center justify-center">03</span>
+<h4 class="text-3xl font-black uppercase mb-6 mt-4">CLEAR</h4>
+<p class="text-on-surface-variant leading-relaxed">Sync to equipment telematics. Monitor progress in real-time and provide automated reports to clients from the field.</p>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="bg-primary-container p-12 md:p-24 m-6 md:m-20 text-black">
+<div class="max-w-4xl">
+<h2 class="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-none mb-8">Ready to <br/>Secure the Perimeter?</h2>
+<p class="text-xl md:text-2xl font-bold uppercase mb-12 tracking-tight opacity-80">Stop guessing. Start measuring. Deploy Terra_Scan today.</p>
+<div class="flex flex-wrap gap-4">
+<button class="bg-black text-white px-12 py-6 text-xl font-black uppercase tracking-widest hover:bg-surface-container-highest transition-all">
+                        Initialize Demo
+                    </button>
+<button class="border-4 border-black text-black px-12 py-6 text-xl font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all">
+                        Contact Command
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full border-t-2 border-[#353534] bg-[#131313] flex flex-col md:flex-row justify-between items-center px-10 py-12 gap-8">
+<div class="text-lg font-bold text-[#FF6B00] font-['Space_Grotesk'] uppercase tracking-widest">
+            CEDAR_HACK_OPS
+        </div>
+<div class="flex flex-wrap justify-center gap-8">
+<a class="font-['Space_Grotesk'] text-[0.75rem] tracking-widest uppercase text-[#353534] hover:text-[#FFB693] transition-opacity duration-300" href="#">TERMINAL_ACCESS</a>
+<a class="font-['Space_Grotesk'] text-[0.75rem] tracking-widest uppercase text-[#353534] hover:text-[#FFB693] transition-opacity duration-300" href="#">SATELLITE_FEED</a>
+<a class="font-['Space_Grotesk'] text-[0.75rem] tracking-widest uppercase text-[#353534] hover:text-[#FFB693] transition-opacity duration-300" href="#">PRIVACY_ENCRYPTION</a>
+<a class="font-['Space_Grotesk'] text-[0.75rem] tracking-widest uppercase text-[#13FF43]" href="#">SYSTEM_STATUS</a>
+</div>
+<div class="font-['Space_Grotesk'] text-[0.75rem] tracking-widest uppercase text-[#353534]">
+            ©2024 WASTELAND_TECH_OPERATIONS. ALL RIGHTS RESERVED.
+        </div>
+</footer>
+</body></html>

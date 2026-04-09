@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OPERATIVE_FLOW_001</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300&amp;family=JetBrains+Mono:wght@100;300;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "accent": "#00f3ff",
+              "background": "#050505",
+              "surface": "#0a0a0a",
+              "muted": "#222222",
+              "data": "#e0e0e0"
+            },
+            fontFamily: {
+              "sans": ["Outfit", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"]
+            }
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-data selection:bg-accent/30;
+                letter-spacing: -0.01em;
+            }
+        }
+        .data-grid {
+            background-image: radial-gradient(circle, #ffffff05 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .scanline {
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00f3ff22, transparent);
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .blur-bg {
+            filter: blur(60px);
+            opacity: 0.15;
+            mix-blend-mode: screen;
+        }
+    </style>
+</head>
+<body class="font-sans font-light min-h-screen relative overflow-x-hidden">
+<div class="fixed inset-0 data-grid pointer-events-none"></div>
+<div class="fixed top-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-accent/10 rounded-full blur-bg"></div>
+<div class="fixed bottom-[-10%] left-[-10%] w-[30vw] h-[30vw] bg-accent/5 rounded-full blur-bg"></div>
+<nav class="fixed top-0 left-0 w-full h-20 px-12 flex items-center justify-between z-50 mix-blend-difference">
+<div class="flex items-center gap-12">
+<span class="text-[10px] font-mono tracking-[0.5em] text-accent">SYSTEM.AI_V1.4</span>
+<div class="h-[1px] w-24 bg-muted"></div>
+<span class="text-[10px] font-mono tracking-[0.3em] uppercase opacity-40">Operative: NULL_SEQ</span>
+</div>
+<div class="flex items-center gap-8">
+<span class="text-[10px] font-mono tracking-widest text-accent">04:22:15_UTC</span>
+<span class="material-symbols-outlined text-sm opacity-50 hover:opacity-100 transition-opacity cursor-pointer">radio_button_checked</span>
+</div>
+</nav>
+<main class="relative z-10 pt-40 px-12 md:px-24 max-w-[1600px] mx-auto">
+<header class="mb-32 flex flex-col gap-4">
+<h1 class="text-7xl md:text-8xl font-thin tracking-tighter leading-none">
+                Operative <span class="text-accent">Flow</span>
+</h1>
+<div class="flex items-center gap-4 mt-4">
+<span class="text-[10px] font-mono tracking-widest text-muted uppercase">Directive Trajectory:</span>
+<span class="text-[10px] font-mono tracking-[0.2em] uppercase">Sector_09_Active</span>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-x-24 gap-y-32 items-start">
+<div class="lg:col-span-7 space-y-32">
+<section>
+<div class="flex items-center gap-4 mb-12">
+<span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+<h2 class="text-[10px] font-mono tracking-[0.4em] uppercase opacity-40">System_Integrity</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-16">
+<div class="group border-l border-muted pl-6 py-2">
+<p class="text-[10px] font-mono text-muted mb-4 tracking-widest">KINETIC_SYNC</p>
+<p class="text-4xl font-extralight tracking-tight group-hover:text-accent transition-colors">94.8<span class="text-lg opacity-30">%</span></p>
+<p class="text-[10px] font-mono text-muted mt-2 tracking-tighter">NODE_A // VECTOR_LOCK</p>
+</div>
+<div class="group border-l border-muted pl-6 py-2">
+<p class="text-[10px] font-mono text-muted mb-4 tracking-widest">FLUID_LOAD</p>
+<p class="text-4xl font-extralight tracking-tight group-hover:text-accent transition-colors">12.0<span class="text-lg opacity-30">Hz</span></p>
+<p class="text-[10px] font-mono text-muted mt-2 tracking-tighter">PULSE_WIDTH_MOD</p>
+</div>
+</div>
+</section>
+<section class="relative aspect-video w-full overflow-hidden border border-muted/30">
+<img alt="Abstract gradient" class="w-full h-full object-cover grayscale opacity-20 hover:opacity-40 transition-opacity duration-1000" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAztoLulm9z2MehUvLHa4gFPAtHATRMNwnaDBJN-etmudlnL3mc18UvdQDO886O1mnBFlyb6ozAI8gTErp2UVLNuLfUqTKHOZvr_6Fji0WlNGBMaHYRlwkWlxiCaFXN88qy3Jb31OOgt63WFJz_TfrcgOtcn_s5HCFCccH-C0dubuR3JEK9-EGMEQMKBEcEod8FyjYJvuw9CAfqFJozO-rgdEWqmSXR4eVXZ5fBSmJoWySYUxcX-BR8XOnqIDTMPkr7UWHk87ENFyo"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
+<div class="absolute bottom-8 left-8">
+<p class="text-[9px] font-mono tracking-[0.5em] text-accent uppercase">Topographical_Shadow_Map</p>
+</div>
+<div class="scanline"></div>
+</section>
+<section>
+<div class="flex justify-between items-center mb-12">
+<h2 class="text-[10px] font-mono tracking-[0.4em] uppercase opacity-40">Event_Log</h2>
+<span class="text-[9px] font-mono text-accent cursor-pointer hover:underline uppercase">Export_Raw</span>
+</div>
+<div class="space-y-6">
+<div class="flex justify-between items-end border-b border-muted pb-4">
+<div>
+<p class="text-[11px] font-mono tracking-wide uppercase">Incursion_Det</p>
+<p class="text-[10px] text-muted font-mono mt-1">E-12 // Verified_NULL</p>
+</div>
+<p class="text-[10px] font-mono text-muted">13:45:12</p>
+</div>
+<div class="flex justify-between items-end border-b border-muted pb-4">
+<div>
+<p class="text-[11px] font-mono tracking-wide uppercase">Cycle_Reset</p>
+<p class="text-[10px] text-muted font-mono mt-1">Biomass_Target_04</p>
+</div>
+<p class="text-[10px] font-mono text-muted">11:30:00</p>
+</div>
+<div class="flex justify-between items-end border-b border-muted pb-4">
+<div>
+<p class="text-[11px] font-mono tracking-wide uppercase text-accent">Optimization_End</p>
+<p class="text-[10px] text-muted font-mono mt-1">Blade_Pitch_+4.5</p>
+</div>
+<p class="text-[10px] font-mono text-muted">10:15:00</p>
+</div>
+</div>
+</section>
+</div>
+<div class="lg:col-span-5 space-y-32 sticky top-40">
+<section class="flex flex-col items-center">
+<div class="relative w-64 h-64 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90">
+<circle class="text-muted" cx="128" cy="128" fill="transparent" r="120" stroke="currentColor" stroke-width="1"></circle>
+<circle class="text-accent" cx="128" cy="128" fill="transparent" r="120" stroke="currentColor" stroke-dasharray="753.6" stroke-dashoffset="188.4" stroke-width="2"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<p class="text-6xl font-thin tracking-tighter">75</p>
+<p class="text-[9px] font-mono tracking-[0.4em] text-muted uppercase mt-2">Completion</p>
+</div>
+</div>
+<div class="mt-16 w-full space-y-8 max-w-sm">
+<div class="flex justify-between border-b border-muted pb-2">
+<span class="text-[10px] font-mono text-muted uppercase">Aggregate_A</span>
+<span class="text-[10px] font-mono">1,428.00</span>
+</div>
+<div class="flex justify-between border-b border-muted pb-2">
+<span class="text-[10px] font-mono text-muted uppercase">Quota_Rem</span>
+<span class="text-[10px] font-mono text-accent">572.00</span>
+</div>
+</div>
+</section>
+<section class="p-12 border border-muted/40">
+<p class="text-[10px] font-mono tracking-[0.4em] uppercase opacity-40 mb-12">Dynamics_State</p>
+<div class="space-y-12">
+<div>
+<div class="flex justify-between mb-4">
+<span class="text-[10px] font-mono uppercase">Rotor_VEL</span>
+<span class="text-[10px] font-mono text-accent">2.45K</span>
+</div>
+<div class="w-full h-[1px] bg-muted">
+<div class="h-full bg-accent w-4/5 shadow-[0_0_10px_#00f3ff]"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-4">
+<span class="text-[10px] font-mono uppercase">Thermal_OUT</span>
+<span class="text-[10px] font-mono">94°C</span>
+</div>
+<div class="w-full h-[1px] bg-muted">
+<div class="h-full bg-data w-1/3"></div>
+</div>
+</div>
+<div class="pt-8 text-[10px] font-mono leading-relaxed text-muted">
+                            // PREDICTIVE_REPLACEMENT_ETA: 48.5H <br/>
+                            // COMPONENT: HYDRAULIC_UNIT_F1 <br/>
+                            // STATUS: NOMINAL
+                        </div>
+</div>
+</section>
+</div>
+</div>
+<footer class="mt-64 py-24 border-t border-muted/20 flex flex-col md:flex-row justify-between items-center gap-12">
+<div class="flex gap-12 opacity-30 text-[9px] font-mono tracking-[0.2em] uppercase">
+<a class="hover:text-accent transition-colors" href="#">Documentation</a>
+<a class="hover:text-accent transition-colors" href="#">API_Gateway</a>
+<a class="hover:text-accent transition-colors" href="#">Global_Sync</a>
+</div>
+<p class="text-[9px] font-mono tracking-[0.2em] opacity-20 uppercase">End_Of_Stream_Sequence_042</p>
+</footer>
+</main>
+<button class="fixed bottom-12 right-12 w-10 h-10 border border-muted hover:border-accent transition-colors flex items-center justify-center z-50 bg-background/80 backdrop-blur">
+<span class="material-symbols-outlined text-sm font-light text-accent">add</span>
+</button>
+
+</body></html>

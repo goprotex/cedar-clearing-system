@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .glow-orange { box-shadow: 0 0 20px rgba(255, 107, 0, 0.2); }
+        .glow-green { box-shadow: 0 0 20px rgba(19, 255, 67, 0.15); }
+        .weather-scan {
+            background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(19, 255, 67, 0.05) 1px, rgba(19, 255, 67, 0.05) 2px);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#003907",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "primary-fixed-dim": "#ffb693",
+                        "secondary": "#ecffe3",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-container": "#989999",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#e2bfb0",
+                        "on-background": "#e5e2e1",
+                        "tertiary-fixed": "#e2e2e2",
+                        "inverse-primary": "#a04100",
+                        "surface-variant": "#353534",
+                        "error": "#ffb4ab",
+                        "tertiary": "#c6c6c7",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-container-low": "#1c1b1b",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-fixed": "#002203",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "secondary-fixed-dim": "#00e639",
+                        "surface-tint": "#ffb693",
+                        "on-tertiary": "#2f3131",
+                        "on-error": "#690005",
+                        "surface-container-high": "#2a2a2a",
+                        "background": "#131313",
+                        "on-primary": "#561f00",
+                        "outline-variant": "#5a4136",
+                        "primary-fixed": "#ffdbcc",
+                        "on-tertiary-container": "#2f3132",
+                        "surface-bright": "#3a3939",
+                        "error-container": "#93000a",
+                        "secondary-container": "#13ff43",
+                        "inverse-on-surface": "#313030",
+                        "outline": "#a98a7d",
+                        "on-secondary-container": "#007117",
+                        "primary": "#ffb693",
+                        "surface-container-highest": "#353534",
+                        "on-primary-container": "#572000",
+                        "primary-container": "#ff6b00",
+                        "surface-dim": "#131313",
+                        "secondary-fixed": "#72ff70",
+                        "surface": "#131313",
+                        "on-primary-fixed": "#351000",
+                        "surface-container": "#201f1f"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-container selection:text-black">
+<div class="crt-overlay"></div>
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b-2 border-[#A98A7D] border-solid shadow-[0_0_40px_rgba(255,107,0,0.1)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-[#FF6B00] tracking-widest font-['Space_Grotesk'] uppercase">CEDAR_HACK_HQ_V2.0</span>
+<div class="hidden md:flex gap-6 ml-12">
+<span class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 cursor-pointer px-2">FREQ_88.1</span>
+<span class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-[#13FF43] border-b-2 border-[#13FF43] px-2">GPS_LOCKED</span>
+<span class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 cursor-pointer px-2">FLEET_SYNC_OK</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#FFB693] cursor-pointer hover:bg-[#FF6B00] hover:text-black p-1">settings_input_antenna</span>
+<span class="material-symbols-outlined text-[#FFB693] cursor-pointer hover:bg-[#FF6B00] hover:text-black p-1">bolt</span>
+<span class="material-symbols-outlined text-[#FFB693] cursor-pointer hover:bg-[#FF6B00] hover:text-black p-1">security</span>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 flex flex-col z-40 bg-[#131313] border-r-2 border-[#A98A7D] border-solid">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 bg-surface-container-highest border border-outline flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">engineering</span>
+</div>
+<div>
+<div class="text-[#FF6B00] font-black font-['Space_Grotesk'] text-xs uppercase">FLEET_SUPERVISOR</div>
+<div class="text-[#E5E2E1] opacity-70 font-['Space_Grotesk'] text-[10px] uppercase">STATUS: MONITORING</div>
+</div>
+</div>
+</div>
+<nav class="flex-grow py-4">
+<div class="flex items-center gap-3 px-6 py-3 bg-[#FF6B00] text-black font-black font-['Space_Grotesk'] text-xs uppercase cursor-pointer transition-transform active:translate-x-1">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Fleet Dashboard</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-[#E5E2E1] opacity-70 font-['Space_Grotesk'] text-xs uppercase cursor-pointer hover:bg-[#353534] hover:text-[#13FF43] transition-colors">
+<span class="material-symbols-outlined">map</span>
+<span>Site Plotter</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-[#E5E2E1] opacity-70 font-['Space_Grotesk'] text-xs uppercase cursor-pointer hover:bg-[#353534] hover:text-[#13FF43] transition-colors">
+<span class="material-symbols-outlined">agriculture</span>
+<span>Mulching Schedule</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-[#E5E2E1] opacity-70 font-['Space_Grotesk'] text-xs uppercase cursor-pointer hover:bg-[#353534] hover:text-[#13FF43] transition-colors">
+<span class="material-symbols-outlined">fact_check</span>
+<span>Job Alerts</span>
+</div>
+</nav>
+<div class="p-4 mt-auto space-y-2 border-t border-outline-variant">
+<button class="w-full bg-primary-container text-black font-bold text-xs py-3 uppercase tracking-widest hover:bg-white transition-colors duration-100">INITIATE_JOB</button>
+<div class="flex justify-between px-2 pt-2">
+<div class="flex items-center gap-2 text-[#E5E2E1] opacity-70 text-[10px] font-bold uppercase cursor-pointer hover:text-primary">
+<span class="material-symbols-outlined text-sm">terminal</span>
+                    TERMINAL
+                </div>
+<div class="flex items-center gap-2 text-[#E5E2E1] opacity-70 text-[10px] font-bold uppercase cursor-pointer hover:text-error">
+<span class="material-symbols-outlined text-sm">power_settings_new</span>
+                    LOGOUT
+                </div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 mt-16 p-8 min-h-screen">
+<!-- Weather Alert Banner -->
+<div class="mb-6 bg-error-container border-2 border-error p-3 flex items-center gap-4 animate-pulse">
+<span class="material-symbols-outlined text-error text-2xl">thunderstorm</span>
+<div class="flex-grow">
+<div class="text-error font-black text-xs uppercase tracking-[0.2em]">High Priority Alert: Severe Thunderstorm Watch</div>
+<div class="text-[#ffdad6] text-[10px] font-mono uppercase">Immediate Area // Active until 18:00 // Units advised to secure cutter heads</div>
+</div>
+<div class="px-3 py-1 bg-error text-black font-black text-[10px] uppercase">ACT_NOW</div>
+</div>
+<!-- Header Branding -->
+<header class="mb-10 flex justify-between items-end">
+<div>
+<h1 class="text-5xl font-black uppercase tracking-tighter text-on-surface">CEDAR_HACK_FLEET</h1>
+<p class="text-primary font-bold tracking-[0.3em] uppercase text-xs mt-2">Industrial Land Clearing Interface // Unit ID: CH-9900</p>
+</div>
+<div class="text-right">
+<div class="text-secondary-container font-mono text-sm">[ SYSTEM_STATUS: OPERATIONAL ]</div>
+<div class="text-outline text-xs mt-1">Total Engine Hours: 4,822.4</div>
+</div>
+</header>
+<!-- High-Precision Bento Grid -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Site Completion Gauge -->
+<div class="col-span-12 md:col-span-4 bg-surface-container-low border-2 border-outline p-6 relative overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">SITE PROGRESSION</h2>
+<span class="material-symbols-outlined text-primary text-sm">terrain</span>
+</div>
+<div class="flex flex-col items-center justify-center py-4">
+<div class="relative w-48 h-48">
+<!-- SVG Gauge -->
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-highest" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary-container" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502.6" stroke-dashoffset="125.6" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-4xl font-black text-on-surface">75%</span>
+<span class="text-[10px] font-bold text-outline uppercase tracking-tighter">Cleared Target</span>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-2 gap-8 w-full text-center">
+<div>
+<div class="text-xs text-outline uppercase font-bold">Acres Done</div>
+<div class="text-lg font-black text-secondary-container">142.0</div>
+</div>
+<div>
+<div class="text-xs text-outline uppercase font-bold">Remaining</div>
+<div class="text-lg font-black text-error">47.3</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Active Field Units -->
+<div class="col-span-12 md:col-span-8 bg-surface-container-low border-2 border-outline p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">MULCHERS IN FIELD</h2>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-secondary-container text-black text-[10px] font-bold">IN_FIELD: 04</span>
+<span class="px-2 py-1 bg-error text-black text-[10px] font-bold">ALERT: 01</span>
+</div>
+</div>
+<div class="space-y-3">
+<!-- Unit Card -->
+<div class="flex items-center justify-between p-4 bg-surface-container hover:bg-surface-bright transition-colors border-l-4 border-secondary-container">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary-container" data-weight="fill">precision_manufacturing</span>
+<div>
+<div class="text-sm font-bold uppercase tracking-tight">Mulcher-Alpha_01</div>
+<div class="text-[10px] text-outline font-mono">SITE: Sector 7-C // ENG: 42.1 hrs</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[10px] text-outline uppercase font-bold">Fuel</div>
+<div class="text-sm font-black text-secondary-container">88%</div>
+</div>
+<span class="px-3 py-1 bg-secondary-container/10 border border-secondary-container text-secondary-container text-[10px] font-black uppercase">CLEARING</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container hover:bg-surface-bright transition-colors border-l-4 border-secondary-container">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary-container" data-weight="fill">precision_manufacturing</span>
+<div>
+<div class="text-sm font-bold uppercase tracking-tight">Mulcher-Beta_04</div>
+<div class="text-[10px] text-outline font-mono">SITE: Sector 7-C // ENG: 38.4 hrs</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[10px] text-outline uppercase font-bold">Fuel</div>
+<div class="text-sm font-black text-secondary-container">62%</div>
+</div>
+<span class="px-3 py-1 bg-secondary-container/10 border border-secondary-container text-secondary-container text-[10px] font-black uppercase">CLEARING</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-high hover:bg-surface-bright transition-colors border-l-4 border-error">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-error" data-weight="fill">precision_manufacturing</span>
+<div>
+<div class="text-sm font-bold uppercase tracking-tight">Mulcher-Gamma_09</div>
+<div class="text-[10px] text-outline font-mono">SITE: Sector 7-B // ENG: 112.9 hrs</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[10px] text-outline uppercase font-bold">Fuel</div>
+<div class="text-sm font-black text-error">12%</div>
+</div>
+<span class="px-3 py-1 bg-error/10 border border-error text-error text-[10px] font-black uppercase">LOW_FUEL</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Unit Dynamics & Live Weather Feed -->
+<div class="col-span-12 md:col-span-7 bg-surface-container-low border-2 border-outline p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">UNIT_DYNAMICS &amp; SITE_ENV</h2>
+<div class="flex gap-4 items-center">
+<div class="text-[10px] font-mono text-outline uppercase">PRECIP: 85%</div>
+<div class="text-[10px] font-mono text-error uppercase font-bold">WIND: 35MPH_GUST</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-4 bg-background border border-outline-variant">
+<div class="text-[10px] text-outline font-bold uppercase mb-2">Hydraulic Pressure</div>
+<div class="flex items-end gap-1 h-12">
+<div class="flex-1 bg-secondary-container h-[40%]"></div>
+<div class="flex-1 bg-secondary-container h-[60%]"></div>
+<div class="flex-1 bg-secondary-container h-[85%]"></div>
+<div class="flex-1 bg-secondary-container h-[70%]"></div>
+<div class="flex-1 bg-primary-container h-[95%]"></div>
+</div>
+<div class="mt-2 text-right text-xs font-black">2800 PSI</div>
+</div>
+<!-- Weather Feed Integration -->
+<div class="p-4 bg-background border border-outline-variant flex flex-col justify-between">
+<div>
+<div class="text-[10px] text-outline font-bold uppercase mb-1">Local Conditions</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-error">storm</span>
+<span class="text-lg font-black text-on-surface">72°F</span>
+</div>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between text-[10px] font-mono">
+<span class="text-outline">HUMIDITY</span>
+<span class="text-secondary-container">92%</span>
+</div>
+<div class="flex justify-between text-[10px] font-mono">
+<span class="text-outline">DEW_POINT</span>
+<span class="text-on-surface">68°</span>
+</div>
+</div>
+</div>
+<div class="p-4 bg-background border border-outline-variant col-span-2 lg:col-span-1">
+<div class="text-[10px] text-outline font-bold uppercase mb-4">Lidar Survey (Site 7-A)</div>
+<div class="h-40 bg-surface-container-highest flex items-center justify-center border border-outline-variant relative">
+<img class="w-full h-full object-cover opacity-30 grayscale contrast-150" data-alt="Dark industrial ruins seen through a green lidar scan filter with digital overlays and grid lines" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtX9U5yvCTD2HU6-uis1ehqnLlFPDCjjzKJ3UwLHBIXpLlbmMDnveSzgfYWb_mwqCvGh5pbbBeEDWN2BX7ebN0IR7Kwy8MXJN1Bd3jzIn_htWmAyNQfSUnAZuzBh1z63EsUIrAUW80YtWU9rVEEizV7Lr_AijxwUl0Uab5r-zsRY6TbQa26mXVQXlZ8fGmgWkhxdXh6nCgczoJQ7r6Hw5jJYT47W69-AyctDhCM5t8KlXkzAqsPooZuHmtPcUvb9lPsZlMYl_wkr4"/>
+<div class="absolute inset-0 border-[20px] border-transparent border-t-primary/20 border-l-primary/20 pointer-events-none"></div>
+<div class="absolute top-2 right-2 flex items-center gap-1 text-primary text-[8px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span> LIVE_SCAN
+                            </div>
+</div>
+</div>
+<!-- Weather Radar Mini-Map -->
+<div class="p-4 bg-background border border-outline-variant col-span-2 lg:col-span-1">
+<div class="text-[10px] text-outline font-bold uppercase mb-4 flex justify-between">
+<span>Weather Radar</span>
+<span class="text-error font-mono animate-pulse">STORMS_DETECTED</span>
+</div>
+<div class="h-40 bg-[#0e0e0e] border border-outline-variant relative overflow-hidden weather-scan">
+<div class="absolute inset-0 opacity-40">
+<div class="absolute top-4 left-8 w-16 h-16 bg-error rounded-full blur-xl animate-pulse"></div>
+<div class="absolute top-10 left-12 w-20 h-20 bg-primary-container rounded-full blur-2xl opacity-50"></div>
+<div class="absolute bottom-4 right-10 w-12 h-12 bg-secondary-container rounded-full blur-xl opacity-30"></div>
+</div>
+<!-- Radar Grid -->
+<div class="absolute inset-0 grid grid-cols-4 grid-rows-4 border-outline-variant/20">
+<div class="border-r border-b border-outline-variant/10"></div><div class="border-r border-b border-outline-variant/10"></div><div class="border-r border-b border-outline-variant/10"></div><div class="border-b border-outline-variant/10"></div>
+<div class="border-r border-b border-outline-variant/10"></div><div class="border-r border-b border-outline-variant/10"></div><div class="border-r border-b border-outline-variant/10"></div><div class="border-b border-outline-variant/10"></div>
+<div class="border-r border-b border-outline-variant/10"></div><div class="border-r border-b border-outline-variant/10"></div><div class="border-r border-b border-outline-variant/10"></div><div class="border-b border-outline-variant/10"></div>
+<div class="border-r border-outline-variant/10"></div><div class="border-r border-outline-variant/10"></div><div class="border-r border-outline-variant/10"></div><div></div>
+</div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-1 h-1 bg-white rounded-full shadow-[0_0_8px_white]"></div>
+<div class="text-[8px] font-mono text-white mt-4">SITE_CENTER</div>
+</div>
+<div class="absolute bottom-1 right-1 text-[8px] font-mono text-outline">RANGE: 50KM</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Job Alerts -->
+<div class="col-span-12 md:col-span-5 bg-surface-container-low border-2 border-outline p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">FIELD_LOG</h2>
+<span class="text-[10px] font-mono text-outline">v2.4.0_LIVE</span>
+</div>
+<div class="space-y-4 font-mono text-xs overflow-y-auto max-h-[400px] pr-2">
+<div class="border-b border-outline-variant pb-2">
+<span class="text-error">[ENV]</span> <span class="text-outline">T-12:50:00</span>
+<p class="mt-1 text-on-surface font-bold">MET_OFFICE: Thunderstorm warning upgraded to Level 2. All operations monitor wind gusts.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-secondary-container">[INFO]</span> <span class="text-outline">T-12:44:02</span>
+<p class="mt-1 text-on-surface">Unit Alpha_01 reporting transition to Sector 7-C.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-primary-container">[WARN]</span> <span class="text-outline">T-12:43:55</span>
+<p class="mt-1 text-on-surface">Unit Gamma_09 fuel reserves below 15%. Recommend immediate refueling sequence.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-secondary-container">[INFO]</span> <span class="text-outline">T-12:40:12</span>
+<p class="mt-1 text-on-surface">GPS precision optimized via Base Station 04. 1cm accuracy achieved.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-error">[CRIT]</span> <span class="text-outline">T-12:35:10</span>
+<p class="mt-1 text-on-surface">Mulcher Unit Delta_02 vibration alert in 'Heavy Timber Zone'. Inspection required.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-secondary-container">[INFO]</span> <span class="text-outline">T-12:30:00</span>
+<p class="mt-1 text-on-surface">Daily clearing quota: 75% complete. 5 hours remaining in site window.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Terminal Overlay -->
+<footer class="mt-12 flex justify-between items-center border-t border-outline-variant pt-6">
+<div class="flex gap-12">
+<div>
+<div class="text-[10px] font-bold text-outline uppercase tracking-widest">CONNECTIVITY</div>
+<div class="text-sm font-black text-secondary-container">STABLE</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-outline uppercase tracking-widest">DATA_ENCRYPTION</div>
+<div class="text-sm font-black text-secondary-container">SECURE</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-outline uppercase tracking-widest">LATENCY</div>
+<div class="text-sm font-black text-on-surface">0.02ms</div>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2 border-2 border-outline text-outline font-bold text-xs uppercase hover:bg-white hover:text-black transition-all">JOB_REPORT</button>
+<button class="px-6 py-2 bg-primary-container text-black font-black text-xs uppercase tracking-tighter glow-orange">EMERGENCY_STOP</button>
+</div>
+</footer>
+</main>
+<!-- Contextual FAB -->
+<div class="fixed bottom-8 right-8 z-50">
+<button class="w-16 h-16 bg-[#FF6B00] text-black shadow-[0_0_20px_rgba(255,107,0,0.5)] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform group">
+<span class="material-symbols-outlined text-3xl font-black">add_task</span>
+<div class="absolute right-20 bg-[#131313] border-2 border-[#FF6B00] px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+<span class="text-[#FF6B00] font-black text-xs">ADD_NEW_JOB</span>
+</div>
+</button>
+</div>
+</body></html>

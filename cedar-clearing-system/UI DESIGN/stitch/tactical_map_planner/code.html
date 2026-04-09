@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WASTELAND_CRM_V1.0 | CEDAR_HACK_PLANNER</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #131313;
+            color: #e5e2e1;
+            margin: 0;
+            overflow: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .crt-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(19, 255, 67, 0.1);
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#003907",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "primary-fixed-dim": "#ffb693",
+                        "secondary": "#ecffe3",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-container": "#989999",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#e2bfb0",
+                        "on-background": "#e5e2e1",
+                        "tertiary-fixed": "#e2e2e2",
+                        "inverse-primary": "#a04100",
+                        "surface-variant": "#353534",
+                        "error": "#ffb4ab",
+                        "tertiary": "#c6c6c7",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-container-low": "#1c1b1b",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-secondary-fixed": "#002203",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "secondary-fixed-dim": "#00e639",
+                        "surface-tint": "#ffb693",
+                        "on-tertiary": "#2f3131",
+                        "on-error": "#690005",
+                        "surface-container-high": "#2a2a2a",
+                        "background": "#131313",
+                        "on-primary": "#561f00",
+                        "outline-variant": "#5a4136",
+                        "primary-fixed": "#ffdbcc",
+                        "on-tertiary-container": "#2f3132",
+                        "surface-bright": "#3a3939",
+                        "error-container": "#93000a",
+                        "secondary-container": "#13ff43",
+                        "inverse-on-surface": "#313030",
+                        "outline": "#a98a7d",
+                        "on-secondary-container": "#007117",
+                        "primary": "#ffb693",
+                        "surface-container-highest": "#353534",
+                        "on-primary-container": "#572000",
+                        "primary-container": "#ff6b00",
+                        "surface-dim": "#131313",
+                        "secondary-fixed": "#72ff70",
+                        "surface": "#131313",
+                        "on-primary-fixed": "#351000",
+                        "surface-container": "#201f1f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0rem",
+                        "lg": "0rem",
+                        "xl": "0rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface select-none">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313] border-b-2 border-[#A98A7D] border-solid shadow-[0_0_40px_rgba(255,107,0,0.1)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-[#FF6B00] tracking-widest font-['Space_Grotesk']">WASTELAND_CRM_V1.0</span>
+<div class="h-4 w-[2px] bg-outline-variant"></div>
+<span class="text-secondary-container font-black tracking-tighter text-sm">OPERATIONAL_MODE: ACTIVE</span>
+</div>
+<nav class="hidden md:flex gap-8 items-center">
+<div class="flex flex-col items-center text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 px-4 py-1 cursor-pointer font-['Space_Grotesk'] uppercase tracking-tighter font-bold">
+<span class="text-[10px] opacity-50">CHANNEL</span>
+<span>FREQ_88.1</span>
+</div>
+<div class="flex flex-col items-center text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 px-4 py-1 cursor-pointer font-['Space_Grotesk'] uppercase tracking-tighter font-bold">
+<span class="text-[10px] opacity-50">LINK</span>
+<span>SIG_STRENGTH_MAX</span>
+</div>
+<div class="flex flex-col items-center text-[#13FF43] border-b-2 border-[#13FF43] hover:bg-[#FF6B00] hover:text-black transition-colors duration-100 px-4 py-1 cursor-pointer font-['Space_Grotesk'] uppercase tracking-tighter font-bold">
+<span class="text-[10px] opacity-50 text-inherit">POWER</span>
+<span>BATT_98%</span>
+</div>
+</nav>
+<div class="flex gap-4">
+<button class="material-symbols-outlined text-[#FFB693] hover:bg-[#FF6B00] hover:text-black p-2 transition-all">settings_input_antenna</button>
+<button class="material-symbols-outlined text-[#FFB693] hover:bg-[#FF6B00] hover:text-black p-2 transition-all">bolt</button>
+<button class="material-symbols-outlined text-[#FFB693] hover:bg-[#FF6B00] hover:text-black p-2 transition-all">security</button>
+</div>
+</header>
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col z-40 bg-[#131313] border-r-2 border-[#A98A7D] border-solid w-64 font-['Space_Grotesk'] text-xs font-bold uppercase">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 bg-surface-container-highest border border-outline flex items-center justify-center overflow-hidden">
+<img alt="OPERATOR_01_AVATAR" class="w-full h-full object-cover grayscale brightness-150 contrast-150" data-alt="Digital glitch portrait of a futuristic soldier with holographic visor in high-contrast neon green and orange lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDF_k-NnB3lKJCtMeW5YqupqnUcT6NoN8sejoAX4Waw81TgmO4Vk0aai8Y3rh7BBrPKfBBOHjaKgf42qkBSOCq9V_5bjK3opqn5iwkt8Q8k99fSdnFI1NhAOYWRj9VE_kbRH7JxqYzkEmfD1t1LGLCawRnIv-CsVjqymhuGbTBch2wKwsW425jsItKFf6xHKPl8r9bDbSYInZku2eR7zReyCu309axhQOt_dnuVWy_r2zIGcn1OrjURNZhytfuye2DWUY1xt9jLFVQ"/>
+</div>
+<div>
+<div class="text-[#FF6B00] font-black">SECTOR_7_OPS</div>
+<div class="text-[10px] text-secondary-container">STATUS: STABLE</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 py-4 overflow-y-auto">
+<div class="flex items-center gap-4 px-6 py-3 text-[#E5E2E1] opacity-70 hover:bg-[#353534] hover:text-[#13FF43] cursor-pointer transition-all active:translate-x-1">
+<span class="material-symbols-outlined" data-icon="radar">radar</span>
+<span>Signal Tower</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-3 bg-[#FF6B00] text-black font-black cursor-pointer transition-all active:translate-x-1">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span>Dead Zone Map</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-3 text-[#E5E2E1] opacity-70 hover:bg-[#353534] hover:text-[#13FF43] cursor-pointer transition-all active:translate-x-1">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span>Resource Scavenge</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-3 text-[#E5E2E1] opacity-70 hover:bg-[#353534] hover:text-[#13FF43] cursor-pointer transition-all active:translate-x-1">
+<span class="material-symbols-outlined" data-icon="history_edu">history_edu</span>
+<span>Incident Log</span>
+</div>
+</nav>
+<div class="p-6 space-y-4 border-t border-outline-variant">
+<button class="w-full py-3 bg-primary-container text-black font-black tracking-widest hover:bg-on-surface hover:text-black transition-colors">
+                INITIATE_SWEEP
+            </button>
+<div class="space-y-1">
+<div class="flex items-center gap-4 px-2 py-1 text-[#E5E2E1] opacity-70 hover:text-[#13FF43] cursor-pointer text-[10px]">
+<span class="material-symbols-outlined text-sm" data-icon="terminal">terminal</span>
+<span>TERMINAL</span>
+</div>
+<div class="flex items-center gap-4 px-2 py-1 text-[#E5E2E1] opacity-70 hover:text-error cursor-pointer text-[10px]">
+<span class="material-symbols-outlined text-sm" data-icon="power_settings_new">power_settings_new</span>
+<span>LOGOUT</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 h-screen flex relative overflow-hidden">
+<!-- Interactive Map Background -->
+<div class="absolute inset-0 z-0 bg-[#0e0e0e]">
+<img class="w-full h-full object-cover opacity-40 mix-blend-screen contrast-150 grayscale" data-alt="High-contrast dark topographic map of a forest terrain with neon green glowing density heatmaps and tactical vector overlays" data-location="Cedar Hack Sector" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIafuV8dmeQfqxPmqMPNyzns0mVWj068ZmT_MjsXHGRepbgH1NNdlZox1EqjiGAIrNJQXkWlwUSBmKi-olfH5rKVHZgsNfa9qIiqqVd6YAk_hgtAqvX7Bok8NIHfiCj3j-JcqDAzFCe7JuOm__Mgjg1DshQu3E20dnqJVUHIKJ2RtFNCNt8akU6N2oI8xAyg0nPpa4v0rGwBSJ5j2Xc1tu2FtXcCnYPVScP0QXRtsgSWByXOmmQKvT5N6X-F8naxgKvZMFjft8YGs"/>
+<!-- Map HUD Overlays -->
+<div class="absolute inset-0 pointer-events-none border-[12px] border-surface-container-low opacity-20"></div>
+<div class="absolute inset-0 crt-overlay"></div>
+<!-- Animated Scanline Simulation -->
+<div class="scanline animate-pulse"></div>
+<!-- Glowing Markers -->
+<div class="absolute top-1/4 left-1/3 w-32 h-32 rounded-full bg-secondary-container/10 border border-secondary-container shadow-[0_0_20px_#13ff43] flex items-center justify-center">
+<span class="text-[10px] text-secondary-container font-black">HIGH_DENSITY</span>
+</div>
+<div class="absolute bottom-1/4 right-1/4 w-48 h-48 rounded-full bg-primary-container/10 border border-primary-container shadow-[0_0_20px_#ff6b00] flex items-center justify-center">
+<span class="text-[10px] text-primary-container font-black">EXTRACTION_ZONE_B</span>
+</div>
+</div>
+<!-- Right Side Panel: Terrain Analysis -->
+<div class="absolute right-0 top-0 h-full w-80 bg-surface-container-lowest/90 backdrop-blur-md border-l border-outline p-6 z-10 flex flex-col gap-6">
+<div class="border-b border-outline pb-4">
+<h2 class="text-primary font-black text-xl tracking-tighter uppercase mb-1">TERRAIN ANALYSIS</h2>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 bg-secondary-container animate-ping"></div>
+<span class="text-[10px] text-secondary tracking-widest uppercase">LIVE SATELLITE FEED</span>
+</div>
+</div>
+<!-- Data Modules -->
+<div class="space-y-4 flex-1">
+<div class="bg-surface-container-high border-l-4 border-secondary-container p-4">
+<span class="text-[10px] text-outline uppercase block mb-1">Cedar Density</span>
+<div class="flex justify-between items-end">
+<span class="text-3xl font-black text-secondary-container tracking-tighter">84.2%</span>
+<span class="text-xs text-on-surface-variant font-bold">CRITICAL_LEVEL</span>
+</div>
+<div class="mt-2 w-full h-1 bg-surface-variant">
+<div class="h-full bg-secondary-container w-[84%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-high border-l-4 border-primary p-4">
+<span class="text-[10px] text-outline uppercase block mb-1">Total Area Coverage</span>
+<div class="flex justify-between items-end">
+<span class="text-3xl font-black text-primary tracking-tighter">1,240</span>
+<span class="text-xs text-on-surface-variant font-bold">ACRES</span>
+</div>
+</div>
+<div class="bg-surface-container-high border-l-4 border-tertiary-fixed-dim p-4">
+<span class="text-[10px] text-outline uppercase block mb-1">Est. Work Time</span>
+<div class="flex justify-between items-end">
+<span class="text-3xl font-black text-on-surface tracking-tighter">164:20</span>
+<span class="text-xs text-on-surface-variant font-bold">HOURS</span>
+</div>
+</div>
+<!-- Bento Style Sub-Data -->
+<div class="grid grid-cols-2 gap-2 mt-4">
+<div class="bg-surface-container p-3 border border-outline-variant">
+<span class="text-[9px] text-outline uppercase block">Moisture</span>
+<span class="text-lg font-bold">12%</span>
+</div>
+<div class="bg-surface-container p-3 border border-outline-variant">
+<span class="text-[9px] text-outline uppercase block">Slope</span>
+<span class="text-lg font-bold text-error">32°</span>
+</div>
+<div class="bg-surface-container p-3 border border-outline-variant">
+<span class="text-[9px] text-outline uppercase block">Obstacles</span>
+<span class="text-lg font-bold">L-04</span>
+</div>
+<div class="bg-surface-container p-3 border border-outline-variant">
+<span class="text-[9px] text-outline uppercase block">Visibility</span>
+<span class="text-lg font-bold">94%</span>
+</div>
+</div>
+</div>
+<!-- Primary CTA -->
+<div class="pt-6 border-t border-outline">
+<button class="w-full py-4 bg-primary-container hover:bg-white hover:text-black text-black font-black text-lg tracking-[0.2em] transition-all transform active:scale-95 flex items-center justify-center gap-3">
+<span class="material-symbols-outlined" data-weight="fill">description</span>
+                    GENERATE PROPOSAL
+                </button>
+<div class="mt-4 flex justify-between text-[9px] font-bold text-outline uppercase tracking-widest opacity-50">
+<span>AUTH_CODE: 0x8892</span>
+<span>MD5_VERIFIED</span>
+</div>
+</div>
+</div>
+<!-- Floating HUD Elements on Map -->
+<div class="absolute bottom-8 left-8 flex flex-col gap-2 z-10">
+<div class="flex items-center gap-4 bg-surface-container-lowest/80 border border-outline p-2 px-4 backdrop-blur-sm">
+<div class="flex flex-col">
+<span class="text-[8px] text-outline uppercase">Coordinate_X</span>
+<span class="text-xs font-black tracking-tighter">45.0234.992</span>
+</div>
+<div class="w-[1px] h-6 bg-outline-variant"></div>
+<div class="flex flex-col">
+<span class="text-[8px] text-outline uppercase">Coordinate_Y</span>
+<span class="text-xs font-black tracking-tighter">-112.045.211</span>
+</div>
+<div class="w-[1px] h-6 bg-outline-variant"></div>
+<div class="flex flex-col">
+<span class="text-[8px] text-outline uppercase">Elev_AMSL</span>
+<span class="text-xs font-black tracking-tighter">4,200ft</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="w-10 h-10 bg-surface-container-lowest border border-outline flex items-center justify-center hover:bg-primary hover:text-black transition-colors">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="w-10 h-10 bg-surface-container-lowest border border-outline flex items-center justify-center hover:bg-primary hover:text-black transition-colors">
+<span class="material-symbols-outlined">remove</span>
+</button>
+<button class="w-10 h-10 bg-surface-container-lowest border border-outline flex items-center justify-center hover:bg-primary hover:text-black transition-colors">
+<span class="material-symbols-outlined">layers</span>
+</button>
+</div>
+</div>
+<!-- System Message Toast -->
+<div class="absolute top-8 left-1/2 -translate-x-1/2 z-10">
+<div class="bg-[#FF6B00] text-black px-6 py-1 font-black text-xs tracking-widest animate-pulse border-x-8 border-black">
+                WARNING: EXCLUSION_ZONE_ACTIVE
+            </div>
+</div>
+</main>
+<!-- Corner Branding Graphics -->
+<div class="fixed bottom-4 right-84 z-50 pointer-events-none">
+<div class="flex flex-col items-end opacity-20">
+<span class="text-xs font-black">PROPERTY_OF_SEC7</span>
+<span class="text-[8px] tracking-[0.5em]">DO_NOT_DISTRIBUTE</span>
+</div>
+</div>
+</body></html>

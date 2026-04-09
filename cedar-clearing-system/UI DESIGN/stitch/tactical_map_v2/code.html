@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WASTELAND_CRM_V1.0 | CEDAR_HACK_PLANNER</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-[#0c0a09] text-[#d1d5db] font-mono selection:bg-[#92400e]/50;
+                background-image: 
+                    radial-gradient(circle at 50% 50%, rgba(20, 20, 20, 0.4) 0%, rgba(0, 0, 0, 0.9) 100%),
+                    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15) 0px, rgba(0, 0, 0, 0.15) 1px, transparent 1px, transparent 2px);
+                background-size: 100% 100%, 100% 3px;
+                margin: 0;
+                overflow: hidden;
+            }
+        }
+        .distressed-border {
+            border: 1px solid #44403c;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .distressed-border::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, transparent 95%, rgba(146, 64, 14, 0.2) 100%);
+            pointer-events: none;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .crt-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(74, 222, 128, 0.1);
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+        .grit-texture {
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#92400e",
+                        "danger": "#b91c1c",
+                        "rust": "#92400e",
+                        "dust": "#d1d5db",
+                        "waste": "#1c1917",
+                        "terminal": "#4ade80",
+                        "background": "#0c0a09"
+                    },
+                    "fontFamily": {
+                        "headline": ["Chakra Petch", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-dust select-none overflow-hidden h-screen">
+<div class="fixed inset-0 grit-texture pointer-events-none z-[60]"></div>
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-14 bg-stone-900/95 border-b-2 border-rust/40 backdrop-blur-md">
+<div class="flex items-center gap-4">
+<div class="bg-rust p-1 px-3 skew-x-[-12deg]">
+<h1 class="text-lg font-bold tracking-widest text-white font-headline uppercase italic">WASTELAND_CRM_V1.0</h1>
+</div>
+<div class="hidden md:flex items-center bg-black/50 border border-stone-700 px-3 py-0.5">
+<span class="text-[10px] text-terminal font-bold mr-2 uppercase italic">OPERATIONAL_MODE: ACTIVE</span>
+</div>
+</div>
+<nav class="hidden lg:flex gap-6 items-center">
+<div class="flex flex-col items-center group cursor-pointer">
+<span class="text-[9px] text-stone-500 uppercase font-bold">Channel</span>
+<span class="text-xs font-bold text-dust group-hover:text-rust transition-colors">FREQ_88.1</span>
+</div>
+<div class="flex flex-col items-center group cursor-pointer">
+<span class="text-[9px] text-stone-500 uppercase font-bold">Link</span>
+<span class="text-xs font-bold text-dust group-hover:text-rust transition-colors">SIG_STRENGTH_MAX</span>
+</div>
+<div class="flex flex-col items-center border-b border-terminal px-2">
+<span class="text-[9px] text-stone-500 uppercase font-bold">Power</span>
+<span class="text-xs font-bold text-terminal">BATT_98%</span>
+</div>
+</nav>
+<div class="flex gap-2">
+<button class="material-symbols-outlined text-rust hover:text-white p-1 transition-all">settings_input_antenna</button>
+<button class="material-symbols-outlined text-rust hover:text-white p-1 transition-all">bolt</button>
+<div class="w-8 h-8 border border-rust ml-2 bg-stone-800">
+<img alt="OPERATOR_01_AVATAR" class="w-full h-full object-cover grayscale contrast-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDF_k-NnB3lKJCtMeW5YqupqnUcT6NoN8sejoAX4Waw81TgmO4Vk0aai8Y3rh7BBrPKfBBOHjaKgf42qkBSOCq9V_5bjK3opqn5iwkt8Q8k99fSdnFI1NhAOYWRj9VE_kbRH7JxqYzkEmfD1t1LGLCawRnIv-CsVjqymhuGbTBch2wKwsW425jsItKFf6xHKPl8r9bDbSYInZku2eR7zReyCu309axhQOt_dnuVWy_r2zIGcn1OrjURNZhytfuye2DWUY1xt9jLFVQ"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-14 h-[calc(100vh-56px)] flex flex-col z-40 bg-black/40 backdrop-blur-sm border-r border-stone-800 w-64 pt-6">
+<nav class="flex-1 space-y-1 px-2">
+<div class="p-4 mb-4 border-b border-stone-800/50">
+<div class="text-[10px] text-stone-500 uppercase font-bold mb-1">Sector Lead</div>
+<div class="text-rust font-headline font-bold text-lg tracking-tighter italic">SECTOR_7_OPS</div>
+<div class="text-[9px] text-terminal font-bold uppercase mt-1">Status: Stable</div>
+</div>
+<a class="group border border-stone-800 p-3 flex items-center gap-4 transition-all hover:border-dust/30" href="#">
+<span class="material-symbols-outlined text-stone-600 group-hover:text-dust" data-icon="radar">radar</span>
+<span class="text-xs font-bold uppercase">Signal Tower</span>
+</a>
+<a class="group border border-rust/50 bg-rust/10 p-3 flex items-center gap-4 transition-all hover:bg-rust/20" href="#">
+<span class="material-symbols-outlined text-rust" data-icon="map">map</span>
+<span class="text-xs font-bold uppercase">Dead Zone Map</span>
+</a>
+<a class="group border border-stone-800 p-3 flex items-center gap-4 transition-all hover:border-dust/30" href="#">
+<span class="material-symbols-outlined text-stone-600 group-hover:text-dust" data-icon="query_stats">query_stats</span>
+<span class="text-xs font-bold uppercase">Resource Scavenge</span>
+</a>
+<a class="group border border-danger/30 p-3 flex items-center gap-4 transition-all hover:bg-danger/10" href="#">
+<span class="material-symbols-outlined text-danger" data-icon="history_edu">history_edu</span>
+<span class="text-xs font-bold uppercase text-danger">Incident Log</span>
+</a>
+</nav>
+<div class="p-4 space-y-4">
+<button class="w-full py-3 bg-rust text-white font-headline font-bold tracking-widest hover:bg-white hover:text-black transition-colors skew-x-[-6deg]">
+                INITIATE_SWEEP
+            </button>
+<div class="p-3 bg-stone-900 border-t-2 border-rust text-[9px] uppercase leading-tight">
+<p class="text-stone-500">Rad Level</p>
+<p class="text-terminal font-bold">0.02 mSv/h - SAFE</p>
+</div>
+<div class="flex justify-between items-center px-2 py-1 text-stone-500 text-[10px] font-bold">
+<div class="flex items-center gap-2 cursor-pointer hover:text-terminal">
+<span class="material-symbols-outlined text-xs">terminal</span>
+<span>TERMINAL</span>
+</div>
+<div class="flex items-center gap-2 cursor-pointer hover:text-danger">
+<span class="material-symbols-outlined text-xs">power_settings_new</span>
+<span>LOGOUT</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-14 h-full flex relative overflow-hidden">
+<!-- Interactive Map Background -->
+<div class="absolute inset-0 z-0 bg-background">
+<img class="w-full h-full object-cover opacity-20 contrast-125 grayscale" data-alt="High-contrast dark topographic map of a forest terrain with neon green glowing density heatmaps and tactical vector overlays" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIafuV8dmeQfqxPmqMPNyzns0mVWj068ZmT_MjsXHGRepbgH1NNdlZox1EqjiGAIrNJQXkWlwUSBmKi-olfH5rKVHZgsNfa9qIiqqVd6YAk_hgtAqvX7Bok8NIHfiCj3j-JcqDAzFCe7JuOm__Mgjg1DshQu3E20dnqJVUHIKJ2RtFNCNt8akU6N2oI8xAyg0nPpa4v0rGwBSJ5j2Xc1tu2FtXcCnYPVScP0QXRtsgSWByXOmmQKvT5N6X-F8naxgKvZMFjft8YGs"/>
+<div class="absolute inset-0 crt-overlay"></div>
+<div class="scanline animate-pulse"></div>
+<!-- Map Markers -->
+<div class="absolute top-1/4 left-1/3 w-32 h-32 rounded-full border border-terminal/50 bg-terminal/5 shadow-[0_0_15px_rgba(74,222,128,0.2)] flex items-center justify-center">
+<span class="text-[9px] text-terminal font-bold bg-black/60 px-2 py-1">HIGH_DENSITY</span>
+</div>
+<div class="absolute bottom-1/4 right-1/4 w-48 h-48 rounded-full border border-rust/50 bg-rust/5 shadow-[0_0_15px_rgba(146,64,14,0.2)] flex items-center justify-center">
+<span class="text-[9px] text-rust font-bold bg-black/60 px-2 py-1 uppercase">Extraction_Zone_B</span>
+</div>
+</div>
+<!-- Right Side Panel: Terrain Analysis -->
+<div class="absolute right-0 top-0 h-full w-80 bg-stone-900/90 backdrop-blur-md border-l border-stone-800 p-6 z-10 flex flex-col gap-6">
+<div class="border-b border-stone-800 pb-2">
+<h2 class="text-dust font-headline font-bold text-xl tracking-tighter uppercase italic">Terrain_Analysis</h2>
+<div class="flex items-center gap-2 mt-1">
+<div class="w-1.5 h-1.5 bg-terminal animate-ping"></div>
+<span class="text-[9px] text-stone-500 tracking-widest uppercase font-bold">Live Satellite Feed</span>
+</div>
+</div>
+<div class="space-y-4 flex-1">
+<div class="bg-black/40 border-l-2 border-terminal p-4 distressed-border">
+<span class="text-[9px] text-stone-500 uppercase font-bold block mb-1">Cedar Density</span>
+<div class="flex justify-between items-end">
+<span class="text-3xl font-headline font-bold text-terminal italic">84.2%</span>
+<span class="text-[10px] text-danger font-bold uppercase italic">Critical</span>
+</div>
+<div class="mt-2 w-full h-1.5 bg-stone-800 overflow-hidden">
+<div class="h-full bg-terminal w-[84%] shadow-[0_0_8px_rgba(74,222,128,0.5)]"></div>
+</div>
+</div>
+<div class="bg-black/40 border-l-2 border-rust p-4 distressed-border">
+<span class="text-[9px] text-stone-500 uppercase font-bold block mb-1">Total Area Coverage</span>
+<div class="flex justify-between items-end">
+<span class="text-3xl font-headline font-bold text-rust italic">1,240</span>
+<span class="text-[10px] text-stone-400 font-bold uppercase">Acres</span>
+</div>
+</div>
+<div class="bg-black/40 border-l-2 border-stone-600 p-4 distressed-border">
+<span class="text-[9px] text-stone-500 uppercase font-bold block mb-1">Est. Work Time</span>
+<div class="flex justify-between items-end">
+<span class="text-3xl font-headline font-bold text-dust italic">164:20</span>
+<span class="text-[10px] text-stone-400 font-bold uppercase">Hours</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-2">
+<div class="bg-black/40 border border-stone-800 p-2 distressed-border">
+<p class="text-[9px] text-stone-500 uppercase font-bold">Moisture</p>
+<p class="text-lg font-headline font-bold text-dust">12%</p>
+</div>
+<div class="bg-black/40 border border-stone-800 p-2 distressed-border">
+<p class="text-[9px] text-stone-500 uppercase font-bold">Slope</p>
+<p class="text-lg font-headline font-bold text-danger">32°</p>
+</div>
+<div class="bg-black/40 border border-stone-800 p-2 distressed-border">
+<p class="text-[9px] text-stone-500 uppercase font-bold">Obstacles</p>
+<p class="text-lg font-headline font-bold text-dust">L-04</p>
+</div>
+<div class="bg-black/40 border border-stone-800 p-2 distressed-border">
+<p class="text-[9px] text-stone-500 uppercase font-bold">Visibility</p>
+<p class="text-lg font-headline font-bold text-terminal">94%</p>
+</div>
+</div>
+</div>
+<div class="pt-6 border-t border-stone-800">
+<button class="w-full py-4 bg-rust text-white font-headline font-bold text-lg tracking-widest transition-all hover:bg-white hover:text-black flex items-center justify-center gap-3 italic group skew-x-[-6deg]">
+<span class="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">description</span>
+                    GENERATE PROPOSAL
+                </button>
+<div class="mt-4 flex justify-between text-[8px] font-bold text-stone-600 uppercase tracking-widest">
+<span>Auth: 0x8892</span>
+<span>MD5_VERIFIED</span>
+</div>
+</div>
+</div>
+<!-- Floating HUD Elements -->
+<div class="absolute bottom-6 left-6 flex flex-col gap-3 z-10">
+<div class="flex items-center gap-6 bg-black/80 border border-stone-800 p-2 px-4 backdrop-blur-sm distressed-border">
+<div class="flex flex-col">
+<span class="text-[8px] text-stone-500 uppercase font-bold">Coord_X</span>
+<span class="text-xs font-bold text-dust">45.0234.992</span>
+</div>
+<div class="w-[1px] h-6 bg-stone-800"></div>
+<div class="flex flex-col">
+<span class="text-[8px] text-stone-500 uppercase font-bold">Coord_Y</span>
+<span class="text-xs font-bold text-dust">-112.045.211</span>
+</div>
+<div class="w-[1px] h-6 bg-stone-800"></div>
+<div class="flex flex-col">
+<span class="text-[8px] text-stone-500 uppercase font-bold">Elev_AMSL</span>
+<span class="text-xs font-bold text-dust">4,200FT</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="w-10 h-10 bg-stone-900 border border-stone-700 flex items-center justify-center hover:bg-rust hover:text-white transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+</button>
+<button class="w-10 h-10 bg-stone-900 border border-stone-700 flex items-center justify-center hover:bg-rust hover:text-white transition-colors">
+<span class="material-symbols-outlined text-sm">remove</span>
+</button>
+<button class="w-10 h-10 bg-stone-900 border border-stone-700 flex items-center justify-center hover:bg-rust hover:text-white transition-colors">
+<span class="material-symbols-outlined text-sm">layers</span>
+</button>
+</div>
+</div>
+<!-- Alert Banner -->
+<div class="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+<div class="bg-danger/20 border-x-4 border-danger text-danger px-8 py-1.5 font-headline font-bold text-xs tracking-[0.2em] animate-pulse italic">
+                WARNING: EXCLUSION_ZONE_ACTIVE
+            </div>
+</div>
+</main>
+<!-- Background Decoration -->
+<div class="fixed bottom-4 right-[340px] z-50 pointer-events-none">
+<div class="flex flex-col items-end opacity-20">
+<span class="text-[9px] font-bold text-rust">PROPERTY_OF_SEC7</span>
+<span class="text-[7px] tracking-[0.6em] text-stone-500">DO_NOT_DISTRIBUTE</span>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TERRA_CLEAR_v1.0 | CLIENT_DB</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#454747",
+                    "on-surface": "#e5e2e1",
+                    "on-secondary-container": "#007117",
+                    "secondary": "#ecffe3",
+                    "outline": "#a98a7d",
+                    "surface": "#131313",
+                    "on-tertiary": "#2f3131",
+                    "tertiary": "#c6c6c7",
+                    "on-primary-container": "#572000",
+                    "outline-variant": "#5a4136",
+                    "surface-container-highest": "#353534",
+                    "primary-container": "#ff6b00",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "surface-tint": "#ffb693",
+                    "background": "#131313",
+                    "on-secondary-fixed": "#002203",
+                    "on-tertiary-container": "#2f3132",
+                    "secondary-fixed-dim": "#00e639",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "on-surface-variant": "#e2bfb0",
+                    "on-background": "#e5e2e1",
+                    "surface-variant": "#353534",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-primary-fixed": "#351000",
+                    "on-primary": "#561f00",
+                    "on-error": "#690005",
+                    "inverse-on-surface": "#313030",
+                    "surface-dim": "#131313",
+                    "secondary-fixed": "#72ff70",
+                    "primary-fixed": "#ffdbcc",
+                    "on-error-container": "#ffdad6",
+                    "surface-container-lowest": "#0e0e0e",
+                    "error": "#ffb4ab",
+                    "tertiary-container": "#989999",
+                    "inverse-surface": "#e5e2e1",
+                    "surface-container": "#201f1f",
+                    "error-container": "#93000a",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "primary": "#ffb693",
+                    "surface-container-high": "#2a2a2a",
+                    "tertiary-fixed": "#e2e2e2",
+                    "on-secondary": "#003907",
+                    "primary-fixed-dim": "#ffb693",
+                    "surface-container-low": "#1c1b1b",
+                    "inverse-primary": "#a04100",
+                    "surface-bright": "#3a3939",
+                    "secondary-container": "#13ff43"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "0px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Space Grotesk', sans-serif; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #5a4136; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff6b00; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-container selection:text-black">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full border-b-2 border-[#A98A7D] bg-[#131313] z-50 shadow-[0_0_40px_rgba(255,107,0,0.1)] flex justify-between items-center h-16 px-6">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold text-orange-500 tracking-[0.2em] font-['Space_Grotesk'] uppercase">TERRA_CLEAR_v1.0</span>
+<nav class="hidden md:flex gap-6">
+<a class="font-['Space_Grotesk'] tracking-tighter uppercase transition-all duration-75 active:scale-95 text-neutral-400 hover:bg-white hover:text-black px-2 py-1" href="#">SQUAD_COMMS</a>
+<a class="font-['Space_Grotesk'] tracking-tighter uppercase transition-all duration-75 active:scale-95 text-neutral-400 hover:bg-white hover:text-black px-2 py-1" href="#">ZONE_MAP</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-highest flex items-center px-3 py-1 border border-outline-variant">
+<span class="material-symbols-outlined text-primary text-sm mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs font-label uppercase text-on-surface-variant w-48" placeholder="QUERY_CLIENT..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-orange-500 hover:bg-white hover:text-black p-1 transition-all">sensors</button>
+<button class="material-symbols-outlined text-orange-500 hover:bg-white hover:text-black p-1 transition-all">terminal</button>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r-2 border-[#A98A7D] bg-[#131313] hidden md:flex flex-col h-full pt-20 pb-8 z-40">
+<div class="px-6 mb-8 border-b border-outline-variant pb-4">
+<h2 class="text-orange-500 font-black font-['Space_Grotesk'] text-sm uppercase">SECTOR_7_OPS</h2>
+<p class="text-[10px] text-secondary-fixed-dim font-label">STATUS: STABLE</p>
+</div>
+<nav class="flex-1">
+<ul class="space-y-1">
+<li><a class="flex items-center px-6 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 active:translate-x-1" href="#"><span class="material-symbols-outlined mr-3">precision_manufacturing</span>OPERATIONS</a></li>
+<li><a class="flex items-center px-6 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase bg-orange-600 text-black border-l-4 border-emerald-400 active:translate-x-1" href="#"><span class="material-symbols-outlined mr-3" style="font-variation-settings: 'FILL' 1;">group</span>CLIENT_DB</a></li>
+<li><a class="flex items-center px-6 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 active:translate-x-1" href="#"><span class="material-symbols-outlined mr-3">local_shipping</span>FLEET_LOGS</a></li>
+<li><a class="flex items-center px-6 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 active:translate-x-1" href="#"><span class="material-symbols-outlined mr-3">agriculture</span>CLEAR_TECH</a></li>
+<li><a class="flex items-center px-6 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 active:translate-x-1" href="#"><span class="material-symbols-outlined mr-3">settings</span>SYSTEM_ROOT</a></li>
+</ul>
+</nav>
+<div class="px-6 mt-auto">
+<div class="flex items-center gap-3 p-2 bg-surface-container-low mb-4 border border-outline-variant">
+<img class="w-8 h-8 bg-neutral-700" data-alt="Cyberpunk commander profile avatar with orange glowing tactical HUD elements and industrial background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-tM77BugZo8tVKsSe0VRn-jnlhixQsRm_avV10ZL_9Udy-XBQK8Y5tmcjBC0wqRqx8oduBTvUfDD05E8nyk_GaxbSjf-IRK14jtjyLSrr8BTXCls1Zdm58WBHvvvVjtGFgJN7hx_lw_PZutxd38m-TAT-Ey7v_i5lAQUyC9afhjtiX9K1zWzwRJNMhDVsY4yUdt42BVcBZ6ykkJ_70JB2Jvbm6uE5vBTpID7VmxPqbKhMe02zU8QVIqPwcHgjvQ2NIyWNp82MJwo"/>
+<div>
+<p class="text-[10px] font-bold">CONTRACTOR_ID_042</p>
+<p class="text-[8px] text-neutral-500">LEVEL_04_AUTHORIZATION</p>
+</div>
+</div>
+<button class="flex items-center w-full px-4 py-2 font-['Space_Grotesk'] text-sm font-bold uppercase text-error hover:bg-error-container hover:text-on-error transition-all">
+<span class="material-symbols-outlined mr-3">power_settings_new</span>DISCONNECT
+            </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:pl-64 pt-16 h-screen flex overflow-hidden">
+<!-- Client List Section -->
+<section class="flex-1 flex flex-col border-r border-outline-variant bg-surface-container-lowest overflow-hidden">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center bg-surface">
+<div>
+<h1 class="text-2xl font-black uppercase tracking-tight text-on-surface">CLIENT_DIRECTORY</h1>
+<p class="text-xs font-label text-on-surface-variant uppercase">ACTIVE_CONTRACTS: 1,204 | PRIORITY_SITE_CLEAR: 42</p>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 bg-primary-container text-black font-bold uppercase text-xs hover:bg-white transition-colors">NEW_CLIENT</button>
+<button class="p-2 border border-outline text-outline hover:text-white hover:border-white"><span class="material-symbols-outlined">filter_list</span></button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-2">
+<!-- Data Header -->
+<div class="grid grid-cols-12 gap-4 px-4 py-2 text-[10px] font-bold text-neutral-500 uppercase tracking-widest border-b border-outline-variant">
+<div class="col-span-4">CLIENT_IDENTITY</div>
+<div class="col-span-3">SITE_LOCATION</div>
+<div class="col-span-2">CONTRACT_STATUS</div>
+<div class="col-span-2">LAST_CONTACT</div>
+<div class="col-span-1">ASSETS</div>
+</div>
+<!-- Client Item: Active -->
+<div class="grid grid-cols-12 gap-4 px-4 py-4 bg-surface-container-high border-l-4 border-primary items-center hover:bg-surface-bright transition-colors cursor-pointer group">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-10 h-10 bg-neutral-800 flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<p class="text-sm font-bold text-primary uppercase">VALERIA_VANCE</p>
+<p class="text-[10px] text-neutral-500">ID: #V7-8892-XP</p>
+</div>
+</div>
+<div class="col-span-3 text-[11px] font-mono text-on-surface-variant">
+                        40.7128° N, 74.0060° W<br/>
+<span class="text-[9px] text-neutral-500">ZONE_RED_CLEARANCE_AREA</span>
+</div>
+<div class="col-span-2">
+<span class="px-2 py-0.5 bg-secondary-container text-black text-[9px] font-bold uppercase">VERIFIED</span>
+</div>
+<div class="col-span-2 text-[10px] text-on-surface-variant font-label">
+                        02_HRS_AGO
+                    </div>
+<div class="col-span-1 flex gap-1">
+<div class="w-2 h-2 bg-primary"></div>
+<div class="w-2 h-2 bg-secondary-container"></div>
+</div>
+</div>
+<!-- Client Item: Lead -->
+<div class="grid grid-cols-12 gap-4 px-4 py-4 bg-surface-container-low border-l-4 border-transparent items-center hover:bg-surface-bright transition-colors cursor-pointer">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-10 h-10 bg-neutral-800 flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-neutral-400">factory</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface uppercase">KAIZEN_CORP_LOGISTICS</p>
+<p class="text-[10px] text-neutral-500">ID: #C9-1120-ZZ</p>
+</div>
+</div>
+<div class="col-span-3 text-[11px] font-mono text-on-surface-variant">
+                        34.0522° N, 118.2437° W<br/>
+<span class="text-[9px] text-neutral-500">INDUSTRIAL_PLANT_ALPHA</span>
+</div>
+<div class="col-span-2">
+<span class="px-2 py-0.5 bg-surface-container-highest text-neutral-400 text-[9px] font-bold uppercase">NEGOTIATING</span>
+</div>
+<div class="col-span-2 text-[10px] text-on-surface-variant font-label">
+                        14_HRS_AGO
+                    </div>
+<div class="col-span-1 flex gap-1">
+<div class="w-2 h-2 bg-error"></div>
+</div>
+</div>
+<!-- Repeated Client Item for density -->
+<div class="grid grid-cols-12 gap-4 px-4 py-4 bg-surface-container-low border-l-4 border-transparent items-center hover:bg-surface-bright transition-colors cursor-pointer">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-10 h-10 bg-neutral-800 flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-neutral-400">agriculture</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface uppercase">BIO_DOME_LANDWORKS</p>
+<p class="text-[10px] text-neutral-500">ID: #B3-4412-MK</p>
+</div>
+</div>
+<div class="col-span-3 text-[11px] font-mono text-on-surface-variant">
+                        45.5231° N, 122.6765° W<br/>
+<span class="text-[9px] text-neutral-500">RECLAMATION_SECTOR_04</span>
+</div>
+<div class="col-span-2">
+<span class="px-2 py-0.5 bg-primary text-black text-[9px] font-bold uppercase">URGENT</span>
+</div>
+<div class="col-span-2 text-[10px] text-on-surface-variant font-label">
+                        05_MINS_AGO
+                    </div>
+<div class="col-span-1 flex gap-1">
+<div class="w-2 h-2 bg-primary"></div>
+</div>
+</div>
+<!-- More items for UI visual -->
+<div class="grid grid-cols-12 gap-4 px-4 py-4 bg-surface-container-low border-l-4 border-transparent items-center hover:bg-surface-bright transition-colors cursor-pointer">
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-10 h-10 bg-neutral-800 flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-neutral-400">shield</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface uppercase">IRON_GUARD_OUTPOST</p>
+<p class="text-[10px] text-neutral-500">ID: #I4-0019-PP</p>
+</div>
+</div>
+<div class="col-span-3 text-[11px] font-mono text-on-surface-variant">
+                        51.5074° N, 0.1278° W<br/>
+<span class="text-[9px] text-neutral-500">SITE_SECURITY_GRID</span>
+</div>
+<div class="col-span-2">
+<span class="px-2 py-0.5 bg-secondary-container text-black text-[9px] font-bold uppercase">VERIFIED</span>
+</div>
+<div class="col-span-2 text-[10px] text-on-surface-variant font-label">
+                        2_DAYS_AGO
+                    </div>
+<div class="col-span-1 flex gap-1"></div>
+</div>
+</div>
+</section>
+<!-- Profile Sidebar / Detailed View -->
+<aside class="w-96 bg-surface flex flex-col overflow-y-auto">
+<div class="relative h-48 bg-neutral-900 overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-t from-surface to-transparent z-10"></div>
+<div class="h-full w-full bg-cover bg-center" data-alt="Topographic tactical map overlay with orange grid lines and neon green location markers in a dark data-heavy interface" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCnN9xxvFVNLheHzs4ofYS51J233SjDjp1ssASlmOGGSli9AJibn--0pLS8zV6JkJfNhjavOFvm78PAYgFG51AUPSeGs8v2XL0SAQRkIoMrMRQJ_9uRiSOUrm-zksu4plu_oykaH_Usz0AF6NseP_ZA2VS3kJ7po15SdQyVWlI6XCMfVYaDcVD8f7cTtnAad8CPjREDlC5JD5LQC3vXMR16fjg_hqEzgpZEEUj3H7M9pe2Mp9H23ohtfRHWiyiQFOjQNcMQD0G6fhE')"></div>
+<div class="absolute top-4 left-4 z-20 flex gap-2">
+<span class="px-2 py-1 bg-black/60 backdrop-blur-md text-[10px] font-bold border border-primary text-primary">SITE_LOCKED</span>
+<span class="px-2 py-1 bg-black/60 backdrop-blur-md text-[10px] font-bold border border-secondary-container text-secondary-container">SITE_ANALYSIS: OPTIMAL</span>
+</div>
+</div>
+<div class="px-6 -mt-12 z-20 relative">
+<div class="w-24 h-24 border-4 border-surface bg-neutral-800 p-1 mb-4">
+<img class="w-full h-full grayscale hover:grayscale-0 transition-all" data-alt="High-detail gritty portrait of a waste management operator in tactical gear with orange visor reflections" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQv_NlzPSPHw19CucngVDnOsjg5pOjVFbs8tdYa4ZB0VJxuMU1hSTy2an4-uDjlnim6y2l7jd-h_7MOmxgk70HvTOHbvvIBBnScrMVPRHm03SgZWZqUQC1fFQyyARf3sZdtGbo5NI2ICUm4LhK7YiFh6t9O569yyRpf9pognpIbZlqOq1NtxTuaW5SSpcRKwTV2qPxBiHBAQPm3wVr092q-Tc8Ilzj4wlmhj3nHEZUcP8uG2MXv6mGV4ZFsiRJFK6EHmIQIbjgh14"/>
+</div>
+<h2 class="text-2xl font-black text-on-surface tracking-tight uppercase leading-none">VALERIA_VANCE</h2>
+<p class="text-xs font-label text-primary uppercase mt-1">CLIENT_PROFILE // CONTRACT_REF: V7</p>
+<div class="mt-8 space-y-6">
+<!-- JOB_HISTORY -->
+<div>
+<div class="flex items-center justify-between border-b border-outline-variant pb-2 mb-4">
+<h3 class="text-xs font-bold uppercase tracking-widest text-neutral-400">JOB_HISTORY</h3>
+<span class="material-symbols-outlined text-xs text-neutral-500">open_in_new</span>
+</div>
+<div class="space-y-3">
+<div class="p-3 bg-surface-container-low border border-outline-variant">
+<div class="flex justify-between text-[10px] font-bold mb-1">
+<span class="text-on-surface">SCRAP_YARD_CLEAR_SEC-D</span>
+<span class="text-secondary-fixed-dim">CLOSED</span>
+</div>
+<p class="text-[9px] text-neutral-500 leading-tight">Clearing 4.5 tons of structural debris. Disposal protocols completed.</p>
+<p class="text-[8px] font-mono mt-2 text-neutral-600 uppercase">LOG_STAMP: 2044.11.12.0944</p>
+</div>
+<div class="p-3 bg-surface-container-low border border-outline-variant">
+<div class="flex justify-between text-[10px] font-bold mb-1">
+<span class="text-on-surface">REFINERY_309_SANITIZATION</span>
+<span class="text-primary">IN_PROGRESS</span>
+</div>
+<p class="text-[9px] text-neutral-500 leading-tight">Site preparation and land remediation. Industrial hazmat required.</p>
+<p class="text-[8px] font-mono mt-2 text-neutral-600 uppercase">LOG_STAMP: 2044.11.15.1420</p>
+</div>
+</div>
+</div>
+<!-- SITE_NOTES -->
+<div>
+<div class="flex items-center justify-between border-b border-outline-variant pb-2 mb-4">
+<h3 class="text-xs font-bold uppercase tracking-widest text-neutral-400">SITE_ANALYSIS_NOTES</h3>
+<button class="material-symbols-outlined text-xs text-primary">add_box</button>
+</div>
+<div class="font-mono text-[11px] space-y-4 text-on-surface-variant bg-surface-container-highest p-4 border-l-2 border-primary">
+<p><span class="text-primary">@MGMT:</span> "Client maintains a consistent payment schedule. Prefers operations during low-load utility windows."</p>
+<p><span class="text-primary">@OPS:</span> "Verified procurement contact for specialized industrial equipment. Formal communication required."</p>
+</div>
+</div>
+<!-- CTA Actions -->
+<div class="grid grid-cols-2 gap-2 pb-8">
+<button class="w-full py-3 bg-surface-container-highest border border-outline-variant text-[10px] font-bold uppercase hover:bg-neutral-700 transition-colors">ARCHIVE_CONTRACT</button>
+<button class="w-full py-3 bg-primary text-black text-[10px] font-bold uppercase hover:bg-white transition-colors">CONTACT_CLIENT</button>
+</div>
+</div>
+</div>
+</aside>
+</main>
+<!-- Mobile Bottom Navigation Shell (Filter Applied: Only for top-level destinations) -->
+<footer class="md:hidden fixed bottom-0 w-full bg-[#131313] border-t-2 border-[#A98A7D] flex justify-around items-center h-16 z-50">
+<button class="flex flex-col items-center text-neutral-500">
+<span class="material-symbols-outlined">precision_manufacturing</span>
+<span class="text-[8px] font-bold uppercase mt-1">OPS</span>
+</button>
+<button class="flex flex-col items-center text-orange-400">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="text-[8px] font-bold uppercase mt-1">CLIENTS</span>
+</button>
+<button class="flex flex-col items-center text-neutral-500">
+<span class="material-symbols-outlined">local_shipping</span>
+<span class="text-[8px] font-bold uppercase mt-1">FLEET</span>
+</button>
+<button class="flex flex-col items-center text-neutral-500">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[8px] font-bold uppercase mt-1">ROOT</span>
+</button>
+</footer>
+</body></html>

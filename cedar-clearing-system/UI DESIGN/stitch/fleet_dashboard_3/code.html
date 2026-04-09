@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Eco-Integration &amp; Biomass Cultivation Network</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&amp;family=Fira+Code:wght@300;400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "moss": "#2d3e2d",
+              "forest": "#1b4332",
+              "lush": "#40916c",
+              "earth": "#5c4033",
+              "sprout": "#95d5b2",
+              "canopy": "#081c15",
+              "mist": "#f0f7f4",
+              "nectar": "#ffb703"
+            },
+            borderRadius: {
+              "organic": "30% 70% 70% 30% / 30% 30% 70% 70%",
+              "leaf": "0 100% 0 100% / 0 100% 0 100%",
+              "petal": "100% 100% 100% 100% / 100% 100% 100% 100%"
+            },
+            fontFamily: {
+              "humanist": ["Quicksand", "sans-serif"],
+              "natural-mono": ["Fira Code", "monospace"]
+            }
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-mist text-moss font-humanist;
+                background-image: 
+                    radial-gradient(at 0% 0%, rgba(64, 145, 108, 0.1) 0px, transparent 50%),
+                    radial-gradient(at 100% 100%, rgba(92, 64, 51, 0.05) 0px, transparent 50%);
+            }
+        }
+        .biomorphic-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(64, 145, 108, 0.15);
+            border-radius: 2.5rem;
+            box-shadow: 0 10px 30px -10px rgba(27, 67, 50, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .biomorphic-card:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 20px 40px -15px rgba(27, 67, 50, 0.15);
+        }
+        .organic-gradient {
+            background: linear-gradient(135deg, #1b4332 0%, #40916c 100%);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #95d5b2;
+            border-radius: 10px;
+        }
+        .leaf-icon {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="selection:bg-sprout/40 overflow-x-hidden">
+<header class="fixed top-4 left-4 right-4 h-16 bg-white/60 backdrop-blur-xl z-50 rounded-[2rem] border border-white/40 flex items-center justify-between px-8 shadow-sm">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 organic-gradient rounded-full flex items-center justify-center text-white">
+<span class="material-symbols-outlined leaf-icon">eco</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight text-forest">ECO_INTEGRATION</h1>
+</div>
+<div class="hidden md:flex items-center gap-8 text-sm font-semibold text-moss/70">
+<a class="hover:text-lush transition-colors" href="#">Harmony</a>
+<a class="hover:text-lush transition-colors" href="#">Cycles</a>
+<a class="hover:text-lush transition-colors" href="#">Systems</a>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3 bg-mist px-4 py-1.5 rounded-full border border-sprout/20">
+<span class="w-2 h-2 rounded-full bg-lush animate-pulse"></span>
+<span class="text-xs font-natural-mono text-lush font-medium uppercase">Network Online</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right hidden sm:block">
+<p class="text-xs font-bold text-forest leading-none">Caelum Thorne</p>
+<p class="text-[10px] text-earth/60 font-natural-mono mt-0.5">SYMBIONT_ID: 882</p>
+</div>
+<img alt="User" class="w-10 h-10 rounded-full border-2 border-sprout/40 p-0.5 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByJWBfcPNT6bEBUo-ocFfFPLTvPo8tB3H3kemJJXH9l2hc6UMTn0mzgfWN9s0Z1dSgM8Z0fh3NSozMzVz62PtqAXup351E5fupLMMY6m_XJ5zPX9PUuhW5SbOrvWnhJEWTfLbV962041rOLUIsCm6PfGMReNOZiSrpxVVTaUEXpLjBu56uIs8XNhnGGDg4S3KczS4JLMnhGX7HxkARqCPrx5r3TvAdec1yg8zZNKBjxiLEgbqT9O0RS7-bP9RjpS6kFk4J-R-Rqrc"/>
+</div>
+</div>
+</header>
+<main class="pt-28 pb-12 px-6 max-w-7xl mx-auto min-h-screen">
+<section class="flex flex-col lg:flex-row items-end justify-between mb-12 gap-8">
+<div class="relative">
+<span class="text-lush font-natural-mono text-xs uppercase tracking-[0.3em] mb-3 block">Regeneration Node // Amazonia VII</span>
+<h2 class="text-6xl font-bold text-forest leading-[1.1]">Ecosystem <br/><span class="text-lush italic">Harmony</span></h2>
+<div class="absolute -left-8 -top-8 w-24 h-24 bg-sprout/10 rounded-full blur-3xl -z-10"></div>
+</div>
+<div class="flex flex-wrap gap-4">
+<div class="biomorphic-card px-6 py-4 flex items-center gap-4">
+<span class="material-symbols-outlined text-lush text-3xl">filter_vintage</span>
+<div>
+<p class="text-[10px] text-earth uppercase font-bold tracking-widest opacity-60">Photosynthesis</p>
+<p class="text-xl font-bold font-natural-mono text-moss">92.4%</p>
+</div>
+</div>
+<div class="biomorphic-card px-6 py-4 flex items-center gap-4">
+<span class="material-symbols-outlined text-earth text-3xl">water_drop</span>
+<div>
+<p class="text-[10px] text-earth uppercase font-bold tracking-widest opacity-60">Hydration Index</p>
+<p class="text-xl font-bold font-natural-mono text-moss">0.78 <span class="text-xs">m³/d</span></p>
+</div>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<div class="lg:col-span-4 biomorphic-card p-8 flex flex-col items-center justify-between text-center overflow-hidden relative">
+<div class="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-sprout/20 rounded-full blur-3xl"></div>
+<div class="w-full text-left mb-6">
+<h3 class="text-xl font-bold text-forest">Restoration Cycle</h3>
+<p class="text-xs text-earth/70 font-natural-mono mt-1 italic">Phase 4: Microbiome Seeding</p>
+</div>
+<div class="relative w-64 h-64 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-mist" cx="128" cy="128" fill="transparent" r="110" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-lush" cx="128" cy="128" fill="transparent" r="110" stroke="currentColor" stroke-dasharray="691" stroke-dashoffset="193" stroke-linecap="round" stroke-width="20"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="text-5xl font-bold text-forest">72<span class="text-2xl">%</span></span>
+<span class="text-[10px] font-natural-mono uppercase text-lush font-bold tracking-widest">Biomass Density</span>
+</div>
+</div>
+<div class="w-full mt-8 grid grid-cols-2 gap-4">
+<div class="bg-mist p-3 rounded-2xl">
+<p class="text-[10px] font-bold text-earth/60 uppercase mb-1">Flora Variety</p>
+<p class="text-lg font-bold text-moss">142</p>
+</div>
+<div class="bg-mist p-3 rounded-2xl">
+<p class="text-[10px] font-bold text-earth/60 uppercase mb-1">Soil Vitality</p>
+<p class="text-lg font-bold text-lush">9.4/10</p>
+</div>
+</div>
+</div>
+<div class="lg:col-span-8 biomorphic-card overflow-hidden flex flex-col">
+<div class="relative h-64 w-full">
+<img alt="Forest Canopy" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBR5A9fm9A7PTCyaPlzEKUoelCeZvN9Chuqj-Apme2L8EZmJhqJvDhIZTC14ESKg0E8A7gN-TjqjDTWmN0htODNt_OOjyilwKN5LRsPKLGH0Kah_CBu_IYrRsfPT8d0UvbjR4f7U4ZyMSE8uGKK53rso5e5AF84IeOwj302-EVdf1xbAHGI7nRRQuWcmU9DL0HqAs-QbPfBdCcgwSaY977NQpWhEbucdy8IFPxF01rOxY4L11wDBrVHW0YAur9ez7ra80KDivqU4k"/>
+<div class="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent"></div>
+<div class="absolute bottom-6 left-8">
+<h3 class="text-3xl font-bold text-forest">Cultivation Systems</h3>
+<p class="text-xs font-natural-mono text-forest/70 uppercase tracking-widest">Active Symbiont Units: 04</p>
+</div>
+</div>
+<div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
+<div class="bg-mist/50 p-6 rounded-[2rem] border border-sprout/20 hover:bg-white transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-lush group-hover:scale-110 transition-transform">potted_plant</span>
+<span class="px-2 py-0.5 bg-lush/10 text-lush text-[9px] font-bold rounded-full font-natural-mono">OPTIMAL</span>
+</div>
+<p class="text-xs font-natural-mono text-earth mb-1">ROOT_01</p>
+<p class="text-lg font-bold text-forest leading-tight">Mycelial Web Expand</p>
+</div>
+<div class="bg-mist/50 p-6 rounded-[2rem] border border-sprout/20 hover:bg-white transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-earth group-hover:scale-110 transition-transform">compost</span>
+<span class="px-2 py-0.5 bg-earth/10 text-earth text-[9px] font-bold rounded-full font-natural-mono">PROCESS</span>
+</div>
+<p class="text-xs font-natural-mono text-earth mb-1">DECAY_04</p>
+<p class="text-lg font-bold text-forest leading-tight">Nitrogen Cycle Sync</p>
+</div>
+<div class="bg-mist/50 p-6 rounded-[2rem] border border-sprout/20 hover:bg-white transition-colors group">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-lush group-hover:scale-110 transition-transform">forest</span>
+<span class="px-2 py-0.5 bg-lush/10 text-lush text-[9px] font-bold rounded-full font-natural-mono">ACTIVE</span>
+</div>
+<p class="text-xs font-natural-mono text-earth mb-1">CANOPY_08</p>
+<p class="text-lg font-bold text-forest leading-tight">UV Filter Integrity</p>
+</div>
+</div>
+</div>
+<div class="lg:col-span-7 biomorphic-card p-8 flex flex-col h-[400px]">
+<div class="flex justify-between items-center mb-8">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-lush">sensors</span>
+<h3 class="text-xl font-bold text-forest">Recent Interactions</h3>
+</div>
+<button class="text-[10px] font-natural-mono font-bold text-lush uppercase hover:underline">Download Logs</button>
+</div>
+<div class="space-y-4 overflow-y-auto pr-4 custom-scrollbar">
+<div class="flex gap-4 p-4 bg-mist/30 rounded-3xl border-l-4 border-lush">
+<div class="text-[10px] font-natural-mono text-earth/50 w-16 pt-1">14:02:11</div>
+<div>
+<p class="text-sm font-bold text-forest">Phenological Shift Detected</p>
+<p class="text-xs text-earth/70 mt-1 font-natural-mono">Sector G-4: Early bloom cycle initiated due to sustained moisture levels (+12%).</p>
+</div>
+</div>
+<div class="flex gap-4 p-4 bg-mist/30 rounded-3xl border-l-4 border-earth">
+<div class="text-[10px] font-natural-mono text-earth/50 w-16 pt-1">11:45:00</div>
+<div>
+<p class="text-sm font-bold text-forest">Symbiont Handshake Success</p>
+<p class="text-xs text-earth/70 mt-1 font-natural-mono">Node_B-02 synchronized with fungal network. Information exchange: 4.2GB carbon data.</p>
+</div>
+</div>
+<div class="flex gap-4 p-4 bg-mist/30 rounded-3xl border-l-4 border-sprout">
+<div class="text-[10px] font-natural-mono text-earth/50 w-16 pt-1">09:12:44</div>
+<div>
+<p class="text-sm font-bold text-forest">Pollinator Swarm Migration</p>
+<p class="text-xs text-earth/70 mt-1 font-natural-mono">Density increase tracked in sub-sector 12. Flora enrichment expected in next cycle.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-5 biomorphic-card p-8 bg-forest text-mist relative overflow-hidden">
+<div class="absolute -bottom-10 -right-10 w-40 h-40 bg-lush/30 rounded-full blur-3xl"></div>
+<h3 class="text-xl font-bold mb-8">Sustainable Growth</h3>
+<div class="space-y-6 relative z-10">
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-natural-mono">
+<span class="uppercase opacity-70">Carbon Sequestration</span>
+<span class="font-bold">4.2 Tons / Month</span>
+</div>
+<div class="w-full bg-mist/10 h-3 rounded-full overflow-hidden">
+<div class="bg-sprout h-full w-[88%] rounded-full shadow-[0_0_15px_rgba(149,213,178,0.5)]"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-natural-mono">
+<span class="uppercase opacity-70">Oxygen Yield Surplus</span>
+<span class="font-bold">12.8%</span>
+</div>
+<div class="w-full bg-mist/10 h-3 rounded-full overflow-hidden">
+<div class="bg-lush h-full w-[72%] rounded-full shadow-[0_0_15px_rgba(64,145,108,0.5)]"></div>
+</div>
+</div>
+<div class="mt-8 p-5 bg-white/10 rounded-3xl border border-white/10">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-sprout text-xl">self_improvement</span>
+<p class="text-[10px] font-bold font-natural-mono uppercase tracking-widest text-sprout">Network Vitality Tip</p>
+</div>
+<p class="text-xs leading-relaxed text-mist/80">Mycelium expansion is currently favoring northern quadrant 7G. Recommend increasing nutrient dispersion in 7F to maintain spatial equilibrium.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<button class="fixed bottom-8 right-8 w-20 h-20 organic-gradient text-white rounded-[40%_60%_70%_30%/40%_40%_60%_60%] shadow-2xl shadow-lush/40 flex items-center justify-center hover:scale-110 transition-transform group z-50">
+<span class="material-symbols-outlined text-4xl group-hover:rotate-180 transition-transform duration-700">psychology_alt</span>
+<div class="absolute right-24 bg-forest text-mist px-4 py-2 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-xs font-bold font-natural-mono uppercase tracking-widest border border-lush/30 shadow-xl">
+        Deploy Regeneration Seed
+    </div>
+</button>
+<nav class="fixed left-8 top-1/2 -translate-y-1/2 flex flex-col gap-6 z-40">
+<a class="w-3 h-3 rounded-full bg-lush ring-4 ring-lush/20" href="#" title="Dashboard"></a>
+<a class="w-3 h-3 rounded-full bg-forest/20 hover:bg-lush transition-colors" href="#" title="Map"></a>
+<a class="w-3 h-3 rounded-full bg-forest/20 hover:bg-lush transition-colors" href="#" title="Metrics"></a>
+<a class="w-3 h-3 rounded-full bg-forest/20 hover:bg-lush transition-colors" href="#" title="Settings"></a>
+</nav>
+
+</body></html>

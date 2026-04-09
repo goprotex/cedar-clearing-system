@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CEDAR_HACK_v1.0 | POST-JOB ANALYTICS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#c6c6c7",
+                        "primary-fixed": "#ffdbcc",
+                        "background": "#131313",
+                        "surface-dim": "#131313",
+                        "on-surface": "#e5e2e1",
+                        "primary": "#ffb693",
+                        "primary-fixed-dim": "#ffb693",
+                        "error": "#ffb4ab",
+                        "secondary-container": "#13ff43",
+                        "inverse-primary": "#a04100",
+                        "surface-tint": "#ffb693",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "secondary-fixed-dim": "#00e639",
+                        "on-secondary-fixed": "#002203",
+                        "outline": "#a98a7d",
+                        "inverse-on-surface": "#313030",
+                        "on-primary": "#561f00",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#007117",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "surface-container-low": "#1c1b1b",
+                        "surface": "#131313",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "on-secondary": "#003907",
+                        "on-primary-container": "#572000",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "on-primary-fixed": "#351000",
+                        "on-tertiary-container": "#2f3132",
+                        "primary-container": "#ff6b00",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#72ff70",
+                        "on-surface-variant": "#e2bfb0",
+                        "surface-container": "#201f1f",
+                        "surface-container-high": "#2a2a2a",
+                        "secondary": "#ecffe3",
+                        "outline-variant": "#5a4136",
+                        "surface-variant": "#353534",
+                        "tertiary-fixed": "#e2e2e2",
+                        "tertiary-container": "#989999",
+                        "surface-container-highest": "#353534",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-tertiary": "#2f3131"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Space Grotesk', sans-serif;
+            text-transform: uppercase;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 107, 0, 0.1);
+            position: absolute;
+            z-index: 10;
+        }
+        .grid-bg {
+            background-image: linear-gradient(#1c1b1b 1px, transparent 1px), linear-gradient(90deg, #1c1b1b 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-24 grid-bg overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="bg-[#131313] text-[#FFB693] font-['Space_Grotesk'] uppercase tracking-tighter docked full-width top-0 border-b-2 border-[#A98A7D] flex justify-between items-center w-full px-6 py-4 sticky z-50">
+<div class="text-2xl font-black text-[#FF6B00] tracking-widest">CEDAR_HACK_v1.0</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-4">
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-[#131313] px-2 cursor-pointer transition-none">TELEMETRY</span>
+<span class="text-[#FFB693] font-bold px-2 cursor-pointer transition-none">ANALYTICS</span>
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-[#131313] px-2 cursor-pointer transition-none">LOGS</span>
+<span class="text-[#E5E2E1] hover:bg-[#FF6B00] hover:text-[#131313] px-2 cursor-pointer transition-none">NETWORK</span>
+</div>
+<div class="flex items-center gap-4 border-l border-[#A98A7D] pl-6">
+<span class="material-symbols-outlined hover:text-[#FF6B00] cursor-pointer">notifications_active</span>
+<span class="material-symbols-outlined hover:text-[#FF6B00] cursor-pointer">settings_input_component</span>
+<div class="w-8 h-8 bg-surface-container-high border border-[#A98A7D] flex items-center justify-center">
+<img alt="OPERATOR_ID_0421" class="w-full h-full object-cover" data-alt="ultra-detailed technical profile portrait of a futuristic industrial operator in a dark aesthetic with orange neon highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCaH4qn4k8k065Z3gX3eq3aSGZT4WZWcZpPnaFDG4hlnKKYYRxWsjXCudAtQsSMAzHUIGpDngFJSBfQoSx2h6SSjxVgFNBnvqyUI4jbxzK03ysj9ZRiA1Hq7qr4ldbs9xfxL82EdelHrtbY2iR95oK4iCqRLWBnuqk2PFKrp51RnXSPRvHoOKUxOU_hDrCYkEGkfXomsgmU1u6brseAcnm4XmFk6BlFxiF-_89i3ZaJ89Ov1Ge2Ox0QZDY6Ng6eqem17ksO3p0TOpk"/>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6 py-8">
+<!-- Job Summary Header -->
+<section class="mb-8 border-l-4 border-primary-container pl-6 py-2 bg-surface-container-lowest">
+<div class="flex justify-between items-end">
+<div>
+<h1 class="text-4xl font-black tracking-tighter text-on-surface">Job Summary: Henderson Ranch</h1>
+<p class="text-primary text-sm tracking-widest font-bold">COMPLETED: 2023.10.12 // LOCATION: SECTOR_7G</p>
+</div>
+<div class="text-right">
+<span class="block text-label-sm text-tertiary">Mission Status</span>
+<span class="text-secondary-container font-black text-2xl">DEBRIEFING_IN_PROGRESS</span>
+</div>
+</div>
+</section>
+<!-- Main Comparison Section: Predicted vs Actual -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+<!-- Acreage Module -->
+<div class="bg-surface-container border-2 border-outline p-6 relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<h2 class="text-xl font-extrabold text-on-surface">Acreage Coverage</h2>
+<span class="bg-secondary-container/10 text-secondary-container px-2 py-1 text-xs font-bold border border-secondary-container">PRECISE</span>
+</div>
+<div class="flex justify-between text-sm mb-6">
+<div>
+<span class="text-tertiary block">Predicted</span>
+<span class="text-2xl font-bold">450.0 <span class="text-xs">AC</span></span>
+</div>
+<div class="text-right">
+<span class="text-tertiary block">Actual</span>
+<span class="text-2xl font-black text-primary">452.3 <span class="text-xs text-on-surface">AC</span></span>
+</div>
+</div>
+<!-- Mini Chart -->
+<div class="h-4 bg-surface-container-low border border-outline-variant relative flex">
+<div class="h-full bg-primary-container" style="width: 99%"></div>
+<div class="absolute right-0 top-0 h-full w-[1%] bg-error"></div>
+</div>
+<div class="mt-2 flex justify-between text-[10px] font-bold">
+<span>VARIANCE: +0.51%</span>
+<span class="text-secondary-container">NOMINAL</span>
+</div>
+</div>
+<!-- Engine Hours Module -->
+<div class="bg-surface-container border-2 border-outline p-6 relative">
+<div class="flex justify-between items-start mb-4">
+<h2 class="text-xl font-extrabold text-on-surface">Engine Hours</h2>
+<span class="bg-error/10 text-error px-2 py-1 text-xs font-bold border border-error">LAG</span>
+</div>
+<div class="flex justify-between text-sm mb-6">
+<div>
+<span class="text-tertiary block">Predicted</span>
+<span class="text-2xl font-bold">72.0 <span class="text-xs">HRS</span></span>
+</div>
+<div class="text-right">
+<span class="text-tertiary block">Actual</span>
+<span class="text-2xl font-black text-error">81.5 <span class="text-xs text-on-surface">HRS</span></span>
+</div>
+</div>
+<div class="grid grid-cols-10 gap-1">
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-primary-container"></div>
+<div class="h-4 bg-error"></div>
+<div class="h-4 bg-surface-container-low"></div>
+</div>
+<div class="mt-2 flex justify-between text-[10px] font-bold">
+<span>VARIANCE: +13.19%</span>
+<span class="text-error font-black">OUTSIDE_TOLERANCE</span>
+</div>
+</div>
+<!-- Fuel Consumption Module -->
+<div class="bg-surface-container border-2 border-outline p-6">
+<div class="flex justify-between items-start mb-4">
+<h2 class="text-xl font-extrabold text-on-surface">Fuel Consumption</h2>
+<span class="bg-primary/10 text-primary px-2 py-1 text-xs font-bold border border-primary">WARN</span>
+</div>
+<div class="flex justify-between text-sm mb-6">
+<div>
+<span class="text-tertiary block">Predicted</span>
+<span class="text-2xl font-bold">1,840 <span class="text-xs">GAL</span></span>
+</div>
+<div class="text-right">
+<span class="text-tertiary block">Actual</span>
+<span class="text-2xl font-black text-primary">2,105 <span class="text-xs text-on-surface">GAL</span></span>
+</div>
+</div>
+<div class="relative h-20 flex items-end gap-2">
+<div class="w-1/2 bg-surface-container-high h-[70%] border border-outline-variant flex items-end justify-center text-[10px]">PRED</div>
+<div class="w-1/2 bg-primary-container h-full border border-primary flex items-end justify-center text-[10px] text-on-primary">ACTUAL</div>
+</div>
+<div class="mt-2 text-[10px] font-bold text-center">OVER_CONSUMPTION: 265 GAL</div>
+</div>
+<!-- Total Cost Module -->
+<div class="bg-surface-container border-2 border-outline p-6">
+<div class="flex justify-between items-start mb-4">
+<h2 class="text-xl font-extrabold text-on-surface">Total Cost</h2>
+<span class="bg-secondary-container/10 text-secondary-container px-2 py-1 text-xs font-bold border border-secondary-container">EFFICIENCY+</span>
+</div>
+<div class="flex justify-between text-sm mb-6">
+<div>
+<span class="text-tertiary block">Predicted</span>
+<span class="text-2xl font-bold">$12,400</span>
+</div>
+<div class="text-right">
+<span class="text-tertiary block">Actual</span>
+<span class="text-2xl font-black text-secondary-container">$11,850</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-full bg-surface-container-low h-2">
+<div class="h-full bg-secondary-container w-[95%]"></div>
+</div>
+<span class="text-xs font-black">-4.4%</span>
+</div>
+<div class="mt-4 p-2 bg-secondary-container/10 border-l-2 border-secondary-container text-[10px]">
+                    OPTIMIZED ROUTING REDUCED IDLE TIME BY 18%
+                </div>
+</div>
+</div>
+<!-- Machine Learning Update / Feedback Loop -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 bg-surface-container-high border-2 border-outline p-6">
+<h3 class="text-lg font-black mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container">construction</span>
+                    MACHINE LEARNING UPDATE: MODEL_v4.2.1
+                </h3>
+<div class="space-y-6">
+<div class="flex flex-col gap-2">
+<div class="flex justify-between text-xs font-bold">
+<span>Accuracy Improvement History</span>
+<span class="text-secondary-container">+2.4% THIS CYCLE</span>
+</div>
+<div class="h-24 flex items-end gap-1">
+<div class="flex-1 bg-surface-variant h-[40%]"></div>
+<div class="flex-1 bg-surface-variant h-[45%]"></div>
+<div class="flex-1 bg-surface-variant h-[42%]"></div>
+<div class="flex-1 bg-surface-variant h-[55%]"></div>
+<div class="flex-1 bg-surface-variant h-[60%]"></div>
+<div class="flex-1 bg-primary-container h-[75%]"></div>
+<div class="flex-1 bg-secondary-container h-[85%]"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-outline-variant">
+<div>
+<span class="text-[10px] text-tertiary block">Data Points</span>
+<span class="text-lg font-bold">1.2M+</span>
+</div>
+<div>
+<span class="text-[10px] text-tertiary block">Confidence</span>
+<span class="text-lg font-bold">94.8%</span>
+</div>
+<div>
+<span class="text-[10px] text-tertiary block">Learning Rate</span>
+<span class="text-lg font-bold">0.0034</span>
+</div>
+<div>
+<span class="text-[10px] text-tertiary block">Epochs</span>
+<span class="text-lg font-bold">542</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Self-Correction Note -->
+<div class="bg-surface-container-lowest border-2 border-secondary-container p-6 flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-2 text-secondary-container mb-4">
+<span class="material-symbols-outlined">hub</span>
+<h4 class="font-black text-sm tracking-widest">SELF-CORRECTION LOG</h4>
+</div>
+<p class="text-xs leading-relaxed font-medium">
+                        Divergence detected in <span class="text-secondary-container">Engine Hours</span> and <span class="text-secondary-container">Fuel Consumption</span> attributed to unforeseen clay density in Tarrant series substrate.
+                    </p>
+<div class="mt-6 p-4 bg-[#13FF43]/5 border border-[#13FF43]/20">
+<span class="text-[10px] text-secondary-container font-black block mb-1">SYSTEM ADJUSTMENT:</span>
+<p class="text-sm italic font-bold">"Soil difficulty multiplier adjusted for future Tarrant series bids (+1.14x load factor)."</p>
+</div>
+</div>
+<div class="pt-6">
+<button class="w-full py-3 bg-secondary-container text-on-secondary-fixed font-black text-xs hover:bg-on-secondary-fixed hover:text-secondary-container transition-all">
+                        COMMIT WEIGHT UPDATES
+                    </button>
+</div>
+</div>
+</section>
+<!-- Aesthetic Elements -->
+<div class="mt-12 opacity-30 flex justify-between items-center text-[10px] font-mono border-t border-outline-variant pt-4">
+<span>TERMINAL_ID: CR4-X001</span>
+<span>ENCRYPTION: AES-256-GCM</span>
+<span>DATA_STREAM: STABLE</span>
+<span>SYSTEM_TIME: 14:22:09 UTC</span>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-[#131313] border-t-2 border-[#A98A7D] shadow-[0_-4px_40px_rgba(255,107,0,0.1)]">
+<div class="flex flex-col items-center justify-center text-[#E5E2E1] p-2 hover:bg-[#353534] transition-all duration-75 active:scale-95 cursor-pointer flex-1">
+<span class="material-symbols-outlined">sensors</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">TELEMETRY</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#FF6B00] text-[#131313] p-2 transition-all duration-75 active:scale-95 cursor-pointer flex-1">
+<span class="material-symbols-outlined">bar_chart_4_bars</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">ANALYTICS</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#E5E2E1] p-2 hover:bg-[#353534] transition-all duration-75 active:scale-95 cursor-pointer flex-1">
+<span class="material-symbols-outlined">construction</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">LOGS</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#E5E2E1] p-2 hover:bg-[#353534] transition-all duration-75 active:scale-95 cursor-pointer flex-1">
+<span class="material-symbols-outlined">hub</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">NETWORK</span>
+</div>
+</nav>
+</body></html>

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FIELD_OP_v1.0 - Tactical Interface</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#131313",
+                        "secondary-fixed-dim": "#00e639",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "primary-fixed-dim": "#ffb693",
+                        "on-surface-variant": "#e2bfb0",
+                        "surface-container": "#201f1f",
+                        "primary-container": "#ff6b00",
+                        "on-surface": "#e5e2e1",
+                        "on-error-container": "#ffdad6",
+                        "surface-tint": "#ffb693",
+                        "surface-bright": "#3a3939",
+                        "outline": "#a98a7d",
+                        "secondary-fixed": "#72ff70",
+                        "surface-dim": "#131313",
+                        "surface-container-high": "#2a2a2a",
+                        "surface-container-low": "#1c1b1b",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "on-primary-container": "#572000",
+                        "on-secondary-container": "#007117",
+                        "tertiary": "#c6c6c7",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-primary-fixed": "#351000",
+                        "inverse-on-surface": "#313030",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "on-background": "#e5e2e1",
+                        "error": "#ffb4ab",
+                        "background": "#131313",
+                        "surface-container-highest": "#353534",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-secondary": "#003907",
+                        "tertiary-fixed": "#e2e2e2",
+                        "outline-variant": "#5a4136",
+                        "on-tertiary": "#2f3131",
+                        "on-secondary-fixed": "#002203",
+                        "secondary-container": "#13ff43",
+                        "inverse-primary": "#a04100",
+                        "primary": "#ffb693",
+                        "primary-fixed": "#ffdbcc",
+                        "on-primary": "#561f00",
+                        "inverse-surface": "#e5e2e1",
+                        "on-error": "#690005",
+                        "tertiary-container": "#989999",
+                        "surface-variant": "#353534",
+                        "secondary": "#ecffe3",
+                        "surface-container-lowest": "#0e0e0e",
+                        "error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0rem",
+                        "lg": "0rem",
+                        "xl": "0rem",
+                        "full": "0rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scanline {
+            background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        .heat-map-overlay {
+            background: radial-gradient(circle at 40% 40%, rgba(19, 255, 67, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 60%, rgba(255, 107, 0, 0.2) 0%, transparent 40%),
+                        radial-gradient(circle at 20% 80%, rgba(255, 107, 0, 0.25) 0%, transparent 35%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-4 h-16 bg-[#131313] text-[#FFB693] border-b-2 border-[#A98A7D] shrink-0 z-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#FF6B00]" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<h1 class="font-['Space_Grotesk'] uppercase tracking-tight font-bold text-lg">FIELD_OP_v1.0</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="text-[10px] font-mono text-right leading-none hidden sm:block">
+<p>LAT: 34.0522</p>
+<p>LON: -118.2437</p>
+</div>
+<span class="material-symbols-outlined text-[#FFB693]">signal_cellular_4_bar</span>
+</div>
+</header>
+<!-- Main Canvas: Tactical Map -->
+<main class="relative flex-grow bg-surface-container-lowest overflow-hidden">
+<!-- Map Visualization -->
+<div class="absolute inset-0 grayscale contrast-125 opacity-40">
+<img alt="Aerial satellite topography" class="w-full h-full object-cover" data-alt="high contrast black and white satellite view of rural farmland with distinct geometric property lines and rough terrain textures" data-location="Kansas Prairie" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACHQgrjENbl6OmoGVV80E_8Vm_kVRqgClJwO_pgY4_ngADS4ijpsD13nAewu5CAIKARXTdEt3VST_0w78lUD7I6z89Jw02wirJTAhoZJnPDmb61Xz2DOWtxulu8vm_TmogtTOTd1CWHhXrYnm9CeYQ7gTC_FEXvsd4b9xyLBw25oU_TQCb7viKfT3AvMVKTjpLMmct79-0Cu61wfAHpNSMkH0qnDleyIeWFBTyR5OGElL7zSPJUNhV-Fe4ptCyjW57boxmlG6blDI"/>
+</div>
+<!-- Heatmap and HUD Overlays -->
+<div class="absolute inset-0 heat-map-overlay mix-blend-screen"></div>
+<div class="absolute inset-0 scanline opacity-30"></div>
+<!-- Tactical Polygon -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" preserveaspectratio="none" viewbox="0 0 400 600">
+<path d="M 50,100 L 350,80 L 380,450 L 30,520 Z" fill="rgba(255, 107, 0, 0.1)" stroke="#FF6B00" stroke-dasharray="10 5" stroke-width="3"></path>
+<circle class="animate-pulse" cx="120" cy="240" fill="#13FF43" r="4"></circle>
+<text class="text-[10px] font-bold" fill="#FFB693" x="60" y="125">ZONE_DELTA_09</text>
+</svg>
+<!-- Floating Widgets (One-handed reach) -->
+<div class="absolute top-4 right-4 flex flex-col gap-2 w-40">
+<div class="bg-[#131313]/90 border-l-4 border-[#FF6B00] p-2 backdrop-blur-sm">
+<p class="text-[9px] uppercase text-[#A98A7D] font-bold">Mission Status</p>
+<p class="text-sm font-black text-[#FFB693]">68% CLEARED</p>
+<div class="w-full bg-surface-container h-1 mt-1 flex">
+<div class="h-full bg-secondary-container w-2/3"></div>
+</div>
+</div>
+</div>
+<!-- Machine Vitals Panel (Cockpit style) -->
+<div class="absolute left-4 bottom-24 flex flex-col gap-1 w-36">
+<div class="bg-[#131313]/95 border border-[#A98A7D]/30 p-2 flex items-center justify-between">
+<div>
+<p class="text-[8px] uppercase text-[#A98A7D]">Fuel</p>
+<p class="text-xs font-bold text-on-surface">42.8%</p>
+</div>
+<span class="material-symbols-outlined text-sm text-[#FFB693]">local_gas_station</span>
+</div>
+<div class="bg-[#131313]/95 border border-[#A98A7D]/30 p-2 flex items-center justify-between">
+<div>
+<p class="text-[8px] uppercase text-[#A98A7D]">Temp</p>
+<p class="text-xs font-bold text-error">104°C</p>
+</div>
+<span class="material-symbols-outlined text-sm text-error">device_thermostat</span>
+</div>
+<div class="bg-[#131313]/95 border border-[#A98A7D]/30 p-2 flex items-center justify-between">
+<div>
+<p class="text-[8px] uppercase text-[#A98A7D]">Hyd PSI</p>
+<p class="text-xs font-bold text-secondary-container">2840</p>
+</div>
+<span class="material-symbols-outlined text-sm text-secondary-container">compress</span>
+</div>
+</div>
+<!-- Primary Action FAB Cluster -->
+<div class="absolute bottom-24 right-4 flex flex-col items-end gap-3">
+<!-- Comms Button -->
+<button class="w-12 h-12 bg-surface-container-highest border-2 border-[#A98A7D] flex items-center justify-center text-[#E5E2E1] active:scale-95 transition-transform">
+<span class="material-symbols-outlined">chat_bubble</span>
+</button>
+<!-- Mark Cleared FAB -->
+<button class="bg-[#13FF43] text-black px-4 h-14 flex items-center gap-3 font-bold uppercase text-sm border-2 border-black shadow-[4px_4px_0px_0px_#00530e] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                MARK CLEARED
+            </button>
+</div>
+<!-- Clock In/Out Toggle (Tactical Slider Style) -->
+<div class="absolute top-4 left-4 w-48">
+<div class="bg-[#131313] border-2 border-[#A98A7D] p-1 flex">
+<button class="flex-1 py-2 text-[10px] font-black bg-[#FF6B00] text-black tracking-widest transition-colors">
+                    CLOCK OUT
+                </button>
+<button class="flex-1 py-2 text-[10px] font-black text-[#E5E2E1] tracking-widest opacity-30">
+                    CLOCK IN
+                </button>
+</div>
+<div class="mt-1 flex justify-between px-1">
+<span class="text-[8px] text-[#13FF43] font-bold">ACTIVE OPS</span>
+<span class="text-[8px] text-[#A98A7D]">04:22:15</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-stretch h-20 bg-[#131313] border-t-2 border-[#A98A7D] shadow-[0_-4px_40px_rgba(255,107,0,0.1)] shrink-0">
+<!-- MAP (Active) -->
+<a class="flex flex-col items-center justify-center bg-[#FF6B00] text-black h-full w-full transition-colors duration-75 active:invert" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">MAP</span>
+</a>
+<!-- VITALS -->
+<a class="flex flex-col items-center justify-center text-[#E5E2E1] h-full w-full hover:bg-[#353534] transition-colors duration-75 active:invert" href="#">
+<span class="material-symbols-outlined">sensors</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">VITALS</span>
+</a>
+<!-- LOGS -->
+<a class="flex flex-col items-center justify-center text-[#E5E2E1] h-full w-full hover:bg-[#353534] transition-colors duration-75 active:invert" href="#">
+<span class="material-symbols-outlined">list_alt</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">LOGS</span>
+</a>
+</nav>
+<!-- Interface Alert Overlay (Optional Warning) -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 z-[60] pointer-events-none">
+<div class="bg-error/10 border border-error px-4 py-1 flex items-center gap-2 backdrop-blur-md">
+<span class="w-2 h-2 bg-error animate-ping"></span>
+<span class="text-[10px] font-bold text-error uppercase tracking-tighter">HYDRAULIC TEMPERATURE CRITICAL</span>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CEDAR_HACK_CRM | Map Planner</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&amp;family=Inter:wght@300;400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary": "#d4c5a7",
+                      "primary-fixed": "#d4e7d7",
+                      "error": "#ffb4ab",
+                      "on-error": "#690005",
+                      "on-secondary-container": "#c2b496",
+                      "background": "#111411",
+                      "surface-tint": "#b8cbbb",
+                      "outline": "#8a938a",
+                      "on-secondary-fixed-variant": "#50462f",
+                      "on-background": "#e1e3de",
+                      "outline-variant": "#404941",
+                      "on-secondary-fixed": "#221b07",
+                      "on-primary-container": "#9aad9d",
+                      "surface-container-low": "#191c19",
+                      "on-tertiary-container": "#c79ea1",
+                      "on-secondary": "#382f1a",
+                      "on-primary-fixed": "#0f1f15",
+                      "inverse-on-surface": "#2e312e",
+                      "tertiary-fixed-dim": "#e7bcbf",
+                      "on-tertiary-fixed": "#2d1417",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed-variant": "#5e3e41",
+                      "surface": "#111411",
+                      "on-surface-variant": "#c0c9bf",
+                      "surface-container": "#1d201d",
+                      "inverse-primary": "#516355",
+                      "inverse-surface": "#e1e3de",
+                      "on-tertiary": "#45292c",
+                      "tertiary": "#e7bcbf",
+                      "secondary-fixed": "#f1e1c2",
+                      "surface-container-high": "#272b27",
+                      "surface-container-highest": "#323632",
+                      "secondary-fixed-dim": "#d4c5a7",
+                      "surface-container-lowest": "#0c0f0c",
+                      "tertiary-container": "#533538",
+                      "surface-bright": "#373a36",
+                      "on-primary-fixed-variant": "#3a4b3e",
+                      "on-surface": "#e1e3de",
+                      "tertiary-fixed": "#ffd9dc",
+                      "secondary-container": "#50462f",
+                      "surface-dim": "#111411",
+                      "primary-container": "#304135",
+                      "on-primary": "#243429",
+                      "on-error-container": "#ffdad6",
+                      "primary-fixed-dim": "#b8cbbb",
+                      "surface-variant": "#323632",
+                      "primary": "#b8cbbb"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "fontFamily": {
+                      "headline": ["Space Grotesk"],
+                      "body": ["Inter"],
+                      "label": ["Inter"]
+              }
+            },
+          }
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(16, 20, 21, 0.6);
+            backdrop-filter: blur(12px);
+        }
+        .hud-border {
+            position: relative;
+        }
+        .hud-border::before, .hud-border::after, .hud-border-inner::before, .hud-border-inner::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-color: #b8cbbb;
+        }
+        .hud-border::before { top: 0; left: 0; border-top: 2px solid; border-left: 2px solid; }
+        .hud-border::after { top: 0; right: 0; border-top: 2px solid; border-right: 2px solid; }
+        .hud-border-inner::before { bottom: 0; left: 0; border-bottom: 2px solid; border-left: 2px solid; }
+        .hud-border-inner::after { bottom: 0; right: 0; border-bottom: 2px solid; border-right: 2px solid; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopNavBar Implementation -->
+<nav class="bg-[#101415]/60 backdrop-blur-md flex justify-between items-center px-6 py-3 w-full z-50 fixed top-0">
+<div class="flex items-center gap-8">
+<span class="text-xl font-light tracking-tighter text-[#024725] dark:text-emerald-500 font-headline">CEDAR_HACK_CRM</span>
+<div class="hidden md:flex items-center gap-6 text-sm font-medium tracking-widest">
+<a class="text-emerald-400 font-bold transition-colors" href="#">PLANNER</a>
+<a class="text-slate-400 hover:text-emerald-300 transition-colors" href="#">FLEET</a>
+<a class="text-slate-400 hover:text-emerald-300 transition-colors" href="#">ARCHIVE</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<div class="absolute inset-0 bg-primary/10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<button class="p-2 text-on-surface-variant hover:bg-emerald-900/20 transition-colors rounded-lg">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-emerald-900/20 transition-colors rounded-lg">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img class="h-full w-full object-cover" data-alt="Portrait of a professional forestry operator in tech gear with a determined expression, studio lighting with green accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2efbWe--TMFGczvM3DG9bqv36KbmgDK-hIo7SIWxr8_VgC-6Mz1bCztsAybaMWLQOZwyOGgW1sLLzNq92mItC_4gPRbRxa_HoDBA61vDRDqVsLsCj-mxXsmFA8jQaLww8RoKC2AZKMOR3xC12ZNkHDiIjYVg_5FpNreoraOaDRHn92SSR9Dt2uW0Mn0Ys8iSsIi69r3v_Gi-t9Lu9gMzb8SaaCll1gSQxt7vrHgG_eSjFcFuikuU_t2WtuTfVt0waMY88XHNqlso"/>
+</div>
+</div>
+</nav>
+<!-- SideNavBar Implementation -->
+<aside class="bg-[#191C1E] flex flex-col h-full py-8 fixed left-0 top-0 h-screen w-64 border-r border-[#323537]/20 z-40 hidden lg:flex">
+<div class="px-6 mb-10 pt-12">
+<div class="text-emerald-600 font-black tracking-widest font-headline mb-1">OPERATOR_042</div>
+<div class="text-[10px] text-slate-500 font-mono tracking-tighter uppercase">Active Session: 4h 12m</div>
+</div>
+<nav class="flex-grow space-y-1">
+<a class="flex items-center gap-4 text-slate-500 px-4 py-3 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">precision_manufacturing</span>
+<span class="text-sm font-medium tracking-wide">Fleet HUD</span>
+</a>
+<a class="flex items-center gap-4 text-emerald-400 border-l-4 border-emerald-500 bg-emerald-500/5 px-4 py-3 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="text-sm font-medium tracking-wide">Terrain Map</span>
+</a>
+<a class="flex items-center gap-4 text-slate-500 px-4 py-3 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="text-sm font-medium tracking-wide">Analytics</span>
+</a>
+<a class="flex items-center gap-4 text-slate-500 px-4 py-3 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span class="text-sm font-medium tracking-wide">Mulcher Status</span>
+</a>
+<a class="flex items-center gap-4 text-slate-500 px-4 py-3 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span class="text-sm font-medium tracking-wide">Logs</span>
+</a>
+</nav>
+<div class="px-4 mt-auto">
+<button class="w-full py-4 bg-gradient-to-br from-primary-container to-primary/20 text-emerald-400 font-bold tracking-widest text-xs border border-emerald-500/30 rounded-lg hover:brightness-110 transition-all">
+                DEPLOY UNIT
+            </button>
+<div class="mt-6 flex flex-col gap-2">
+<a class="flex items-center gap-3 text-slate-500 hover:text-white px-2 py-1 text-xs transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">help</span> Support
+                </a>
+<a class="flex items-center gap-3 text-slate-500 hover:text-white px-2 py-1 text-xs transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">build</span> Diagnostic
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="lg:ml-64 pt-[60px] h-screen relative overflow-hidden bg-surface">
+<!-- Interactive Map Interface -->
+<div class="absolute inset-0 z-0">
+<div class="w-full h-full grayscale-[0.8] contrast-[1.2] brightness-[0.4]" data-alt="Cinematic aerial satellite view of a rugged texas landscape with dark green vegetation and winding dirt paths, midnight lighting" data-location="Austin, Texas" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBPqRyR5VaXSi8HXBau9V4FdcrdLZQAPbMlV8xgwaAfZyJJ87zorUP2M3geZMN6Wrea-bxe3NTrHasTCAKZrn68nepHWoZSbd-rU1tlbVeEgXdPb5GZap1k1FOI7IV7olbQ2-ZCL1GngZ-Iy_hkixWdE1MNsV9SSMqyYXsh6aPNDKOsAzFhkEPHIQGdHurRQRfseY1wM9xVMvwBWdSVmLaq86mDlmrxyLC871E3FxrEhadJP5z1PtEOByIG1juS4ZYzaYNe1GjbqZA'); background-size: cover; background-position: center;">
+</div>
+<!-- Simulated Heatmap & Polygons -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-60">
+<!-- Glowing Area Polygon -->
+<path class="animate-pulse" d="M 400 300 L 650 250 L 800 450 L 500 600 Z" fill="rgba(16, 185, 129, 0.15)" stroke="#10b981" stroke-width="2">
+<filter id="glow">
+<fegaussianblur result="coloredBlur" stddeviation="4"></fegaussianblur>
+<femerge>
+<femergenode in="coloredBlur"></femergenode><femergenode in="SourceGraphic"></femergenode>
+</femerge>
+</filter>
+</path>
+<!-- Heatmap Blotches -->
+<circle cx="550" cy="380" fill="url(#heat-gradient)" opacity="0.6" r="80"></circle>
+<circle cx="680" cy="320" fill="url(#heat-gradient)" opacity="0.4" r="120"></circle>
+<defs>
+<radialgradient id="heat-gradient">
+<stop offset="0%" stop-color="#10b981"></stop>
+<stop offset="100%" stop-color="transparent"></stop>
+</radialgradient>
+</defs>
+</svg>
+</div>
+<!-- Floating HUD Control Panels -->
+<!-- Left Side: Map Controls -->
+<div class="absolute top-8 left-8 flex flex-col gap-4 z-10">
+<div class="hud-border glass-panel p-1 rounded-lg">
+<div class="hud-border-inner flex flex-col gap-1 p-1">
+<button class="w-10 h-10 flex items-center justify-center bg-surface-container-highest/50 hover:bg-primary/20 text-on-surface transition-colors rounded">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center bg-surface-container-highest/50 hover:bg-primary/20 text-on-surface transition-colors rounded">
+<span class="material-symbols-outlined">remove</span>
+</button>
+</div>
+</div>
+<div class="hud-border glass-panel p-1 rounded-lg">
+<div class="hud-border-inner p-1">
+<button class="w-10 h-10 flex items-center justify-center bg-surface-container-highest/50 hover:bg-primary/20 text-on-surface transition-colors rounded">
+<span class="material-symbols-outlined">my_location</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Right Side: Data Visualization Panels (Bento Style) -->
+<div class="absolute top-8 right-8 w-80 flex flex-col gap-4 z-10">
+<!-- Analysis Tool Panel -->
+<section class="glass-panel p-6 rounded-xl border border-outline-variant/10 shadow-2xl">
+<header class="flex justify-between items-start mb-6">
+<div>
+<h2 class="font-headline text-lg tracking-tight font-light">Terrain Analysis</h2>
+<span class="text-[10px] font-mono text-emerald-500 uppercase tracking-widest">Zone: Sector_G7</span>
+</div>
+<span class="material-symbols-outlined text-emerald-500">monitoring</span>
+</header>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest/40 rounded-lg">
+<span class="text-xs font-mono text-slate-400">CEDAR DENSITY</span>
+<span class="text-sm font-bold text-emerald-400">84.2%</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest/40 rounded-lg">
+<span class="text-xs font-mono text-slate-400">TOTAL AREA</span>
+<span class="text-sm font-bold text-on-surface">12.4 ACRES</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest/40 rounded-lg">
+<span class="text-xs font-mono text-slate-400">EST. WORKTIME</span>
+<span class="text-sm font-bold text-on-surface">18.5 HRS</span>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-2 gap-2">
+<button class="flex flex-col items-center justify-center gap-2 p-4 bg-surface-container-high/40 hover:bg-primary/10 border border-outline-variant/20 rounded-lg transition-all group">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-emerald-400">polyline</span>
+<span class="text-[10px] font-mono tracking-widest text-slate-500 group-hover:text-white">DRAW AREA</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-2 p-4 bg-surface-container-high/40 hover:bg-primary/10 border border-outline-variant/20 rounded-lg transition-all group">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-emerald-400">calculate</span>
+<span class="text-[10px] font-mono tracking-widest text-slate-500 group-hover:text-white">DENSITY</span>
+</button>
+</div>
+</section>
+<!-- Mini Quote Calculator -->
+<section class="glass-panel p-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">request_quote</span>
+</div>
+<h3 class="text-xs font-mono tracking-widest text-emerald-500 mb-2">LIVE ESTIMATE</h3>
+<div class="flex items-baseline gap-1 mb-6">
+<span class="text-4xl font-headline font-light text-on-surface">$3,240</span>
+<span class="text-xs text-slate-500 font-mono">.00 USD</span>
+</div>
+<button class="w-full py-3 rounded bg-emerald-500 text-[#0f1f15] font-bold text-xs tracking-[0.2em] hover:bg-emerald-400 transition-colors">
+                    GENERATE PROPOSAL
+                </button>
+</section>
+</div>
+<!-- Bottom HUD: Active Layers & Legend -->
+<div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 glass-panel px-8 py-4 rounded-full border border-outline-variant/10 shadow-2xl z-10">
+<div class="flex items-center gap-2 group cursor-pointer">
+<div class="w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20"></div>
+<span class="text-[10px] font-mono tracking-widest text-emerald-400">DENSITY HEATMAP</span>
+</div>
+<div class="h-4 w-px bg-outline-variant/30"></div>
+<div class="flex items-center gap-2 group cursor-pointer">
+<div class="w-3 h-3 rounded-full bg-slate-600"></div>
+<span class="text-[10px] font-mono tracking-widest text-slate-500 group-hover:text-slate-300">TERRAIN SLOPES</span>
+</div>
+<div class="h-4 w-px bg-outline-variant/30"></div>
+<div class="flex items-center gap-2 group cursor-pointer">
+<div class="w-3 h-3 rounded-full bg-slate-600"></div>
+<span class="text-[10px] font-mono tracking-widest text-slate-500 group-hover:text-slate-300">SOIL COMPOSITION</span>
+</div>
+</div>
+<!-- Layer Toggle Action Button -->
+<div class="absolute bottom-8 right-8 z-10">
+<button class="w-14 h-14 rounded-full bg-surface-container-highest text-emerald-400 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all border border-emerald-500/20">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">layers</span>
+</button>
+</div>
+</main>
+</body></html>

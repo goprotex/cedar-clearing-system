@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cedar Hack | Asset Intel Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e6e1df",
+                        "on-surface-variant": "#e2bfb0",
+                        "surface-tint": "#ffb693",
+                        "outline-variant": "#5a4136",
+                        "tertiary": "#00e639",
+                        "surface-container": "#211f1e",
+                        "surface-bright": "#3b3937",
+                        "tertiary-fixed": "#72ff70",
+                        "secondary-fixed": "#ffdbcc",
+                        "surface": "#141312",
+                        "secondary-fixed-dim": "#e2bfb1",
+                        "primary": "#ffb693",
+                        "on-tertiary-container": "#003a07",
+                        "secondary-container": "#5a4137",
+                        "on-tertiary-fixed": "#002203",
+                        "on-primary": "#561f00",
+                        "on-surface": "#e6e1df",
+                        "primary-fixed": "#ffdbcc",
+                        "surface-container-high": "#2b2a28",
+                        "error": "#ffb4ab",
+                        "primary-fixed-dim": "#ffb693",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-container-highest": "#363433",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#00530e",
+                        "outline": "#a98a7d",
+                        "on-background": "#e6e1df",
+                        "on-primary-fixed": "#351000",
+                        "background": "#141312",
+                        "on-secondary-fixed-variant": "#5a4137",
+                        "on-secondary-fixed": "#2a170e",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#d0aea0",
+                        "surface-dim": "#141312",
+                        "secondary": "#e2bfb1",
+                        "tertiary-container": "#00b129",
+                        "error-container": "#93000a",
+                        "on-secondary": "#412b22",
+                        "on-tertiary": "#003907",
+                        "surface-variant": "#363433",
+                        "surface-container-lowest": "#0f0e0d",
+                        "on-primary-container": "#572000",
+                        "tertiary-fixed-dim": "#00e639",
+                        "inverse-on-surface": "#32302f",
+                        "inverse-primary": "#a04100",
+                        "primary-container": "#ff6b00",
+                        "surface-container-low": "#1d1b1a"
+                    },
+                    "borderRadius": {
+                        "none": "0px",
+                        "sm": "0px",
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #141312; color: #e6e1df; }
+        .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        .font-label { font-family: 'Space Grotesk', sans-serif; }
+        .glass-panel {
+            background-color: rgba(54, 52, 51, 0.4);
+            backdrop-filter: blur(20px);
+        }
+        .notch-clip {
+            clip-path: polygon(0 0, 95% 0, 100% 15%, 100% 100%, 0 100%);
+        }
+        .scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 230, 57, 0.05) 50.5%);
+            background-size: 100% 4px;
+        }
+        .ghost-border {
+            border: 1px solid rgba(169, 138, 125, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+<div class="relative flex h-auto min-h-screen w-full flex-row bg-surface overflow-x-hidden">
+<!-- Sidebar (Integrated from Shared Logic) -->
+<aside class="flex w-64 flex-col border-r border-outline-variant bg-surface-container-lowest h-screen sticky top-0">
+<div class="p-6 flex flex-col gap-8 h-full">
+<div class="flex flex-col">
+<h1 class="font-headline text-primary text-xl font-bold tracking-tighter uppercase">Cedar Hack</h1>
+<p class="font-label text-outline text-[10px] tracking-widest uppercase opacity-70">Wasteland Tech v1.04</p>
+</div>
+<nav class="flex flex-col gap-2">
+<div class="flex items-center gap-3 px-4 py-3 bg-primary-container text-on-primary notch-clip cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">mobile_layout</span>
+<p class="font-label text-sm font-bold uppercase tracking-wide">Dashboard</p>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface hover:bg-surface-container-high cursor-pointer transition-colors">
+<span class="material-symbols-outlined">map</span>
+<p class="font-label text-sm font-medium uppercase tracking-wide">Fleet Map</p>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface hover:bg-surface-container-high cursor-pointer transition-colors">
+<span class="material-symbols-outlined">swords</span>
+<p class="font-label text-sm font-medium uppercase tracking-wide">Maintenance</p>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface hover:bg-surface-container-high cursor-pointer transition-colors">
+<span class="material-symbols-outlined">multiline_chart</span>
+<p class="font-label text-sm font-medium uppercase tracking-wide">Telemetry</p>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface hover:bg-surface-container-high cursor-pointer transition-colors">
+<span class="material-symbols-outlined">files</span>
+<p class="font-label text-sm font-medium uppercase tracking-wide">Reports</p>
+</div>
+</nav>
+<div class="mt-auto pt-6 border-t border-outline-variant">
+<div class="flex items-center gap-3 px-2">
+<div class="size-10 bg-surface-container-highest flex items-center justify-center border border-outline-variant">
+<img alt="user avatar" class="size-8" data-alt="minimalist silhouette of a tactical operative wearing a visor and headset on a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgR0RZTj84RIgPUo8lxj5nC3jV5M8ZwxmAeXrYRb6X84vLlMGGjZRG4fDBQyZYM8M-U1Q4hEhHHt18g4gJc6QmtbcuQu1PLuBWNLoQmgTI_yPe9nGnkqU_XwObTzKb7tiuafPWUwYaCeklndFDTgOV3z3BFVd2t9gRrSeRGNS0AvxMBm5dalOv70VPKvqyBMDR0rYjYaA2YsBHYtY9t5OdrtZrgZu5-z5pZfQ4acC_RiqoGAlDoOY1ghScb1x-W-TR3Xcqq2KUCJQ"/>
+</div>
+<div>
+<p class="font-label text-xs font-bold uppercase">OP_REEDER</p>
+<p class="font-label text-[9px] text-tertiary uppercase tracking-tighter">__SCANNING_ACTIVE</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col min-h-screen">
+<!-- Top Nav (Integrated from Shared Logic) -->
+<header class="flex items-center justify-between px-8 py-4 border-b border-outline-variant bg-surface-container-low">
+<div class="flex items-center gap-6">
+<h2 class="font-headline text-on-surface text-lg font-bold tracking-tight uppercase">Asset_Intel_Matrix</h2>
+<div class="flex gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-highest ghost-border">
+<span class="size-2 bg-tertiary rounded-full"></span>
+<span class="font-label text-[10px] uppercase font-bold text-tertiary">Grid_Online</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-highest ghost-border">
+<span class="size-2 bg-primary rounded-full animate-pulse"></span>
+<span class="font-label text-[10px] uppercase font-bold text-primary">Live_Feed</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-sm">search</span>
+<input class="bg-surface-container-lowest border border-outline-variant text-on-surface font-label text-xs py-2 pl-9 pr-4 w-64 focus:border-tertiary focus:ring-0" placeholder="QUERY_SYSTEM..." type="text"/>
+</div>
+<button class="p-2 border border-outline-variant hover:bg-surface-container-high text-on-surface">
+<span class="material-symbols-outlined text-sm">doorbell</span>
+</button>
+<button class="p-2 border border-outline-variant hover:bg-surface-container-high text-on-surface">
+<span class="material-symbols-outlined text-sm">search_gear</span>
+</button>
+</div>
+</header>
+<div class="p-8 grid grid-cols-12 gap-6 overflow-y-auto">
+<!-- COLUMN 1: Fleet & Stats -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<!-- Health Metrics Gauges -->
+<section class="bg-surface-container-low p-5 ghost-border relative overflow-hidden">
+<div class="scanline absolute inset-0 opacity-20 pointer-events-none"></div>
+<h3 class="font-headline text-xs font-bold uppercase tracking-widest text-outline mb-6">__HEALTH_METRICS</h3>
+<div class="flex justify-around items-center">
+<div class="flex flex-col items-center gap-2">
+<div class="relative size-24 flex items-center justify-center">
+<svg class="size-full -rotate-90">
+<circle class="text-surface-container-highest" cx="48" cy="48" fill="none" r="40" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-tertiary" cx="48" cy="48" fill="none" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="30" stroke-width="6"></circle>
+</svg>
+<span class="absolute font-headline text-xl font-bold text-tertiary">92%</span>
+</div>
+<span class="font-label text-[10px] uppercase font-bold text-outline">Fleet Efficiency</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="relative size-24 flex items-center justify-center">
+<svg class="size-full -rotate-90">
+<circle class="text-surface-container-highest" cx="48" cy="48" fill="none" r="40" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-primary" cx="48" cy="48" fill="none" r="40" stroke="currentColor" stroke-dasharray="251.2" stroke-dashoffset="60" stroke-width="6"></circle>
+</svg>
+<span class="absolute font-headline text-xl font-bold text-primary">78%</span>
+</div>
+<span class="font-label text-[10px] uppercase font-bold text-outline">Uptime Target</span>
+</div>
+</div>
+</section>
+<!-- Fleet Overview List -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h3 class="font-headline text-xs font-bold uppercase tracking-widest text-outline">__FLEET_STATUS</h3>
+<span class="font-label text-[9px] text-tertiary uppercase">[ 04 UNITS_ACTIVE ]</span>
+</div>
+<div class="grid gap-3">
+<div class="bg-surface-container-high p-4 flex justify-between items-center ghost-border border-l-4 border-l-tertiary">
+<div>
+<p class="font-headline text-sm font-bold uppercase">Mulcher A-1</p>
+<p class="font-label text-[10px] text-outline uppercase tracking-tight">Location: Sector 7G (Prime)</p>
+</div>
+<div class="text-right">
+<p class="font-label text-[10px] font-bold text-tertiary uppercase">ACTIVE</p>
+<p class="font-label text-[9px] text-outline opacity-60">88% Fuel</p>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 flex justify-between items-center border border-outline-variant opacity-80">
+<div>
+<p class="font-headline text-sm font-bold uppercase">Excavator B-4</p>
+<p class="font-label text-[10px] text-outline uppercase tracking-tight">Location: Base Depot</p>
+</div>
+<div class="text-right">
+<p class="font-label text-[10px] font-bold text-primary uppercase">MAINT_REQ</p>
+<p class="font-label text-[9px] text-outline opacity-60">Engine_Check</p>
+</div>
+</div>
+<div class="bg-surface-container-high p-4 flex justify-between items-center ghost-border border-l-4 border-l-tertiary">
+<div>
+<p class="font-headline text-sm font-bold uppercase">Hauler C-9</p>
+<p class="font-label text-[10px] text-outline uppercase tracking-tight">Location: Ridge Line 02</p>
+</div>
+<div class="text-right">
+<p class="font-label text-[10px] font-bold text-tertiary uppercase">TRANSIT</p>
+<p class="font-label text-[9px] text-outline opacity-60">Full Load</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Map Widget -->
+<section class="bg-surface-container-low p-2 ghost-border aspect-square relative overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center opacity-40 grayscale contrast-125" data-alt="top-down satellite topographic map of a desert wasteland with grid overlays and digital scanning lines" data-location="Wasteland Outpost" style="background-image: url('https://placeholder.pics/svg/300');"></div>
+<div class="absolute inset-0 bg-gradient-to-b from-surface/80 via-transparent to-surface/80"></div>
+<div class="relative z-10 p-3 h-full flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-label text-[10px] bg-surface/80 px-2 py-1 ghost-border text-tertiary font-bold">LOC_SENSORS: ACTIVE</span>
+<span class="font-label text-[10px] bg-surface/80 px-2 py-1 ghost-border">Z-COORD: 422.09</span>
+</div>
+<div class="flex gap-2">
+<div class="size-2 bg-tertiary absolute top-1/3 left-1/4 shadow-[0_0_8px_rgba(0,230,57,0.8)]"></div>
+<div class="size-2 bg-tertiary absolute bottom-1/4 right-1/3 shadow-[0_0_8px_rgba(0,230,57,0.8)]"></div>
+<div class="size-2 bg-primary absolute top-1/2 right-1/4 animate-ping"></div>
+</div>
+<button class="w-full py-2 bg-surface-container-highest text-on-surface font-label text-[10px] uppercase font-bold border border-outline-variant hover:bg-primary hover:text-on-primary transition-all">Expand_Tactical_Map</button>
+</div>
+</section>
+</div>
+<!-- COLUMN 2: Focused Asset Telemetry -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
+<!-- Main Telemetry Detail -->
+<section class="bg-surface-container-lowest border border-outline-variant relative">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="size-12 bg-primary-container flex items-center justify-center notch-clip">
+<span class="material-symbols-outlined text-on-primary" style="font-variation-settings: 'FILL' 1;">construction</span>
+</div>
+<div>
+<h2 class="font-headline text-2xl font-bold uppercase tracking-tight">Mulcher A-1 <span class="text-primary opacity-50">/ UNIT_ID: X492</span></h2>
+<p class="font-label text-xs text-outline uppercase font-medium">Real-time Telemetry Stream: <span class="text-tertiary">ENCRYPTED_LIVE</span></p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-label text-[10px] text-outline uppercase">Uptime_Record</p>
+<p class="font-headline text-xl font-bold">1,242.4 <span class="text-xs text-outline">HRS</span></p>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-0 border-b border-outline-variant">
+<div class="p-6 border-r border-outline-variant">
+<p class="font-label text-[10px] text-outline uppercase mb-1">Engine RPM</p>
+<div class="flex items-end gap-2">
+<span class="font-headline text-3xl font-bold">2,450</span>
+<span class="font-label text-[10px] text-tertiary mb-1">NOMINAL</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 mt-4">
+<div class="bg-tertiary h-full w-[72%]"></div>
+</div>
+</div>
+<div class="p-6 border-r border-outline-variant">
+<p class="font-label text-[10px] text-outline uppercase mb-1">Hydraulic Temp</p>
+<div class="flex items-end gap-2">
+<span class="font-headline text-3xl font-bold text-primary">82°C</span>
+<span class="font-label text-[10px] text-primary mb-1">WARM</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 mt-4">
+<div class="bg-primary h-full w-[82%]"></div>
+</div>
+</div>
+<div class="p-6 border-r border-outline-variant">
+<p class="font-label text-[10px] text-outline uppercase mb-1">Fuel Level</p>
+<div class="flex items-end gap-2">
+<span class="font-headline text-3xl font-bold text-primary">88%</span>
+<span class="font-label text-[10px] text-outline mb-1">LITERS</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 mt-4">
+<div class="bg-primary h-full w-[88%] shadow-[0_0_10px_rgba(255,107,0,0.5)]"></div>
+</div>
+</div>
+<div class="p-6">
+<p class="font-label text-[10px] text-outline uppercase mb-1">Service Due</p>
+<div class="flex items-end gap-2">
+<span class="font-headline text-3xl font-bold">58</span>
+<span class="font-label text-[10px] text-outline mb-1">HRS LEFT</span>
+</div>
+<div class="w-full bg-surface-container-high h-1 mt-4">
+<div class="bg-on-surface-variant h-full w-[20%]"></div>
+</div>
+</div>
+</div>
+<div class="p-6 bg-surface-container-low flex flex-col md:flex-row gap-8">
+<div class="flex-1 space-y-4">
+<h4 class="font-headline text-xs font-bold uppercase text-outline">Active_Sensors</h4>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-3 bg-surface-container-highest border border-outline-variant/30">
+<p class="font-label text-[9px] text-outline uppercase">Cutter Head Vibration</p>
+<p class="font-headline text-sm text-tertiary">0.02 mm/s</p>
+</div>
+<div class="p-3 bg-surface-container-highest border border-outline-variant/30">
+<p class="font-label text-[9px] text-outline uppercase">Oil Pressure</p>
+<p class="font-headline text-sm text-tertiary">65 PSI</p>
+</div>
+<div class="p-3 bg-surface-container-highest border border-outline-variant/30">
+<p class="font-label text-[9px] text-outline uppercase">Coolant Flow</p>
+<p class="font-headline text-sm text-tertiary">14 GPM</p>
+</div>
+<div class="p-3 bg-surface-container-highest border border-outline-variant/30">
+<p class="font-label text-[9px] text-outline uppercase">Battery Voltage</p>
+<p class="font-headline text-sm text-tertiary">24.2 V</p>
+</div>
+</div>
+</div>
+<div class="w-full md:w-64">
+<div class="p-4 bg-surface/50 border border-primary/20 relative">
+<div class="absolute top-0 right-0 p-1 bg-primary text-on-primary font-label text-[8px] uppercase">Alert_Zone</div>
+<p class="font-label text-[10px] text-primary uppercase font-bold mb-2">Internal Diagnostics</p>
+<p class="text-[11px] leading-tight text-on-surface-variant mb-4">Core temperature rising slightly in sub-processor 04. Recommend auxiliary cooling cycle at end of shift.</p>
+<button class="w-full py-2 bg-primary-container text-on-primary font-headline text-xs font-bold uppercase notch-clip">INITIATE_COOLING</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Maintenance Log & Terminal -->
+<section class="bg-surface-container-high border border-outline-variant flex flex-col h-[400px]">
+<div class="p-4 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-headline text-xs font-bold uppercase tracking-widest">__MAINTENANCE_LEDGER</h3>
+<span class="font-label text-[9px] text-outline uppercase font-bold">Log_ID: 88-ALPHA-01</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4 font-label text-xs">
+<div class="flex gap-4">
+<span class="text-tertiary font-bold">[14:22:01]</span>
+<span class="text-on-surface">SYSTEM_CHECK: Hydraulic pressure normalized in Sector 7G operations.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-primary font-bold">[12:45:55]</span>
+<span class="text-on-surface">WARN: Filter obstruction detected in Mulcher A-1. Bypass active.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline font-bold">[09:30:12]</span>
+<span class="text-on-surface">LOG: Shift operator REEDER initiated startup sequence for unit B-4.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-tertiary font-bold">[08:00:00]</span>
+<span class="text-on-surface">RECAP: Daily fleet readiness at 94.2%. 1 unit in depot for service.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-outline font-bold">[YESTERDAY]</span>
+<span class="text-on-surface-variant opacity-60">MAINT: Oil swap completed on unit C-9. Next service in 250 hours.</span>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest border-t border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="font-headline text-tertiary font-bold">&gt;</span>
+<input class="flex-1 bg-transparent border-none text-tertiary font-label text-xs focus:ring-0 placeholder:text-outline/30 uppercase" placeholder="APPEND_NOTE..." type="text"/>
+<button class="px-4 py-1 bg-tertiary text-on-tertiary font-headline text-[10px] font-bold uppercase">COMMIT</button>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</body></html>

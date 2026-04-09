@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SCRAP_VALLEY_OS | Survival Console</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary": "#8b4513",
+                    "danger": "#b91c1c",
+                    "rust": "#92400e",
+                    "dust": "#d1d5db",
+                    "waste": "#1c1917",
+                    "terminal": "#4ade80",
+                    "background": "#0c0a09"
+            },
+            "fontFamily": {
+                    "headline": ["Chakra Petch", "sans-serif"],
+                    "mono": ["JetBrains Mono", "monospace"]
+            }
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-dust font-mono selection:bg-rust/50;
+                background-image: 
+                    radial-gradient(circle at 50% 50%, rgba(20, 20, 20, 0.4) 0%, rgba(0, 0, 0, 0.9) 100%),
+                    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15) 0px, rgba(0, 0, 0, 0.15) 1px, transparent 1px, transparent 2px);
+                background-size: 100% 100%, 100% 3px;
+            }
+        }
+        .distressed-border {
+            border: 1px solid #44403c;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .distressed-border::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, transparent 95%, rgba(146, 64, 14, 0.2) 100%);
+            pointer-events: none;
+        }
+        .hud-scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.05);
+            position: absolute;
+            top: 0;
+            z-index: 10;
+        }
+        .grit-texture {
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+        }
+        .rust-glow {
+            box-shadow: 0 0 20px rgba(146, 64, 14, 0.1);
+        }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+<div class="fixed inset-0 grit-texture pointer-events-none z-50"></div>
+<header class="border-b-2 border-rust/40 bg-stone-900/90 flex flex-wrap justify-between items-center px-4 py-2 w-full z-50 sticky top-0">
+<div class="flex items-center gap-6">
+<div class="bg-rust p-1 px-3 skew-x-[-12deg]">
+<h1 class="text-xl font-bold tracking-[0.2em] text-white font-headline uppercase italic">Scrap_Valley_v4.2</h1>
+</div>
+<div class="hidden md:flex items-center bg-black/50 border border-stone-700 px-3 py-1">
+<span class="text-[10px] text-danger font-bold mr-2">[SYS_LINK: ACTIVE]</span>
+<span class="text-[10px] text-stone-500">FREQ: 142.09MHz</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="text-right hidden sm:block">
+<p class="text-[10px] font-bold text-dust/60 uppercase">Scavenge Lead</p>
+<p class="text-xs text-rust font-bold">OPERATOR_VOID</p>
+</div>
+<div class="w-10 h-10 border-2 border-rust bg-stone-800 flex items-center justify-center overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover grayscale contrast-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByJWBfcPNT6bEBUo-ocFfFPLTvPo8tB3H3kemJJXH9l2hc6UMTn0mzgfWN9s0Z1dSgM8Z0fh3NSozMzVz62PtqAXup351E5fupLMMY6m_XJ5zPX9PUuhW5SbOrvWnhJEWTfLbV962041rOLUIsCm6PfGMReNOZiSrpxVVTaUEXpLjBu56uIs8XNhnGGDg4S3KczS4JLMnhGX7HxkARqCPrx5r3TvAdec1yg8zZNKBjxiLEgbqT9O0RS7-bP9RjpS6kFk4J-R-Rqrc"/>
+</div>
+</div>
+</header>
+<div class="flex min-h-screen">
+<aside class="w-20 md:w-64 border-r border-stone-800 bg-black/40 backdrop-blur-sm hidden sm:flex flex-col pt-8">
+<nav class="flex-1 space-y-2 px-2">
+<a class="group border border-rust/50 bg-rust/10 p-3 flex items-center gap-4 transition-all hover:bg-rust/20" href="#">
+<span class="material-symbols-outlined text-rust group-hover:text-white" data-icon="radio">radio</span>
+<span class="text-xs font-bold uppercase hidden md:inline">Signal Tower</span>
+</a>
+<a class="group border border-stone-800 p-3 flex items-center gap-4 transition-all hover:border-dust/30" href="#">
+<span class="material-symbols-outlined text-stone-600 group-hover:text-dust" data-icon="map">map</span>
+<span class="text-xs font-bold uppercase hidden md:inline">Dead Zone Map</span>
+</a>
+<a class="group border border-stone-800 p-3 flex items-center gap-4 transition-all hover:border-dust/30" href="#">
+<span class="material-symbols-outlined text-stone-600 group-hover:text-dust" data-icon="inventory_2">inventory_2</span>
+<span class="text-xs font-bold uppercase hidden md:inline">Resource Scavenge</span>
+</a>
+<a class="group border border-danger/30 p-3 flex items-center gap-4 transition-all hover:bg-danger/10" href="#">
+<span class="material-symbols-outlined text-danger" data-icon="warning">warning</span>
+<span class="text-xs font-bold uppercase hidden md:inline text-danger">Incident Log</span>
+</a>
+</nav>
+<div class="p-4 mt-auto">
+<div class="p-3 bg-stone-900 border-t-2 border-rust text-[9px] uppercase leading-tight">
+<p class="text-stone-500">Rad Level</p>
+<p class="text-terminal font-bold">0.02 mSv/h - SAFE</p>
+</div>
+</div>
+</aside>
+<main class="flex-1 p-4 md:p-8 space-y-8">
+<div class="flex flex-col lg:flex-row justify-between items-start gap-4">
+<div class="relative">
+<h2 class="text-5xl md:text-7xl font-bold font-headline text-stone-300 uppercase tracking-tighter leading-none">
+                        WASTE<span class="text-rust italic">LAND</span>_01
+                    </h2>
+<div class="h-1 w-32 bg-rust mt-2"></div>
+</div>
+<div class="grid grid-cols-2 gap-2 w-full lg:w-auto">
+<div class="distressed-border bg-stone-900/50 p-3">
+<p class="text-[9px] text-stone-500 uppercase">Sector Status</p>
+<p class="text-sm font-bold text-danger uppercase italic">High Volatility</p>
+</div>
+<div class="distressed-border bg-stone-900/50 p-3">
+<p class="text-[9px] text-stone-500 uppercase">External Temp</p>
+<p class="text-sm font-bold text-dust uppercase">42°C / Arid</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+<div class="md:col-span-8 distressed-border bg-stone-950 min-h-[400px] relative overflow-hidden flex flex-col">
+<div class="absolute inset-0 grayscale opacity-20 hover:opacity-40 transition-opacity duration-1000" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBBR5A9fm9A7PTCyaPlzEKUoelCeZvN9Chuqj-Apme2L8EZmJhqJvDhIZTC14ESKg0E8A7gN-TjqjDTWmN0htODNt_OOjyilwKN5LRsPKLGH0Kah_CBu_IYrRsfPT8d0UvbjR4f7U4ZyMSE8uGKK53rso5e5AF84IeOwj302-EVdf1xbAHGI7nRRQuWcmU9DL0HqAs-QbPfBdCcgwSaY977NQpWhEbucdy8IFPxF01rOxY4L11wDBrVHW0YAur9ez7ra80KDivqU4k'); background-size: cover; background-position: center;"></div>
+<div class="relative p-6 flex-1 flex flex-col">
+<div class="flex justify-between items-start mb-auto">
+<div>
+<h3 class="font-headline text-2xl font-bold text-stone-400 uppercase italic">Active Scavenge Units</h3>
+<p class="text-[10px] text-terminal font-mono mt-1">&gt; SYNC_ESTABLISHED: 03_MOBILE_UNITS</p>
+</div>
+<div class="flex gap-2">
+<span class="bg-rust/20 text-rust border border-rust text-[10px] px-2 py-0.5 font-bold uppercase">Patrol Mode</span>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+<div class="bg-black/60 border-l-2 border-terminal p-3 backdrop-blur-md">
+<p class="text-[9px] text-terminal/60 font-bold">SCRAP_DOG-01</p>
+<div class="flex justify-between items-end mt-1">
+<span class="text-lg font-headline font-bold text-terminal tracking-tight">HARVESTING</span>
+<span class="text-[10px] text-stone-500">POS: 7.21 / 4.88</span>
+</div>
+</div>
+<div class="bg-black/60 border-l-2 border-rust p-3 backdrop-blur-md">
+<p class="text-[9px] text-rust/60 font-bold">HEAVY_LIFT-04</p>
+<div class="flex justify-between items-end mt-1">
+<span class="text-lg font-headline font-bold text-rust tracking-tight">LOW_FUEL</span>
+<span class="text-[10px] text-stone-500">POS: 8.44 / 2.11</span>
+</div>
+</div>
+<div class="bg-black/20 border-l-2 border-stone-700 p-3 backdrop-blur-md border border-stone-800/50">
+<p class="text-[9px] text-stone-600 font-bold">SCOUT_EYE-09</p>
+<div class="flex justify-between items-end mt-1">
+<span class="text-lg font-headline font-bold text-stone-600 tracking-tight italic">OFFLINE</span>
+<span class="text-[10px] text-stone-700">POS: UNKNOWN</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md:col-span-4 distressed-border bg-stone-900 p-6 flex flex-col items-center justify-between">
+<div class="w-full text-left">
+<h3 class="font-headline text-xl font-bold text-dust uppercase border-b border-stone-800 pb-2">Resource Quota</h3>
+<p class="text-[10px] text-stone-500 mt-2 font-mono uppercase tracking-widest">Cycle: DUST_STORM_S3</p>
+</div>
+<div class="relative py-4">
+<svg class="w-40 h-40 transform -rotate-90">
+<circle class="text-stone-800" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-rust" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="439.6" stroke-dashoffset="120" stroke-linecap="butt" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<p class="text-4xl font-headline font-bold text-rust">72%</p>
+<p class="text-[9px] text-stone-500 uppercase font-bold">Filled</p>
+</div>
+</div>
+<div class="w-full space-y-2 mt-4">
+<div class="flex justify-between text-[10px] font-bold">
+<span class="text-stone-500">IRON_SCRAP</span>
+<span class="text-terminal">1,402kg</span>
+</div>
+<div class="w-full bg-stone-800 h-1.5 overflow-hidden">
+<div class="bg-rust h-full w-[72%] shadow-[0_0_8px_rgba(146,64,14,0.5)]"></div>
+</div>
+<div class="flex justify-between text-[10px] font-bold pt-1">
+<span class="text-stone-500">WATER_LITERS</span>
+<span class="text-danger">48/200L [CRIT]</span>
+</div>
+</div>
+</div>
+<div class="md:col-span-7 distressed-border bg-black/60 p-6 flex flex-col h-[320px]">
+<div class="flex justify-between items-center mb-4 border-b border-danger/30 pb-2">
+<h3 class="font-headline text-lg font-bold text-danger uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="report">report</span>
+                            INCIDENT_LOG_EXT
+                        </h3>
+<span class="text-[10px] text-stone-600 italic">AUTO_SAVE: ON</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 font-mono text-xs pr-2 custom-scrollbar">
+<div class="p-2 border border-danger/20 bg-danger/5 text-danger/80">
+<p class="font-bold flex justify-between uppercase">
+<span>[WARN] Perimeter Breach Sector C</span>
+<span class="text-[10px]">19:42:01</span>
+</p>
+<p class="text-[10px] mt-1 opacity-70">Detection: Motion sensor 12B. Non-human signature. Auto-turrets engaged (Warning shot).</p>
+</div>
+<div class="p-2 border border-stone-800 bg-stone-900/40 text-stone-400">
+<p class="font-bold flex justify-between uppercase">
+<span>[INFO] Scavenge Batch Complete</span>
+<span class="text-[10px]">18:15:33</span>
+</p>
+<p class="text-[10px] mt-1 opacity-70">Unit_Dog-01 returned with 42kg copper piping. Integrity check: 98%.</p>
+</div>
+<div class="p-2 border border-rust/30 bg-rust/5 text-rust/80">
+<p class="font-bold flex justify-between uppercase">
+<span>[CRIT] Engine Seizure Unit_B-04</span>
+<span class="text-[10px]">17:01:12</span>
+</p>
+<p class="text-[10px] mt-1 opacity-70">Sand ingestion in intake valve. Immediate maintenance required. Unit immobilized.</p>
+</div>
+</div>
+</div>
+<div class="md:col-span-5 distressed-border bg-stone-900 p-6 relative overflow-hidden h-[320px]">
+<div class="absolute inset-0 opacity-10 grayscale invert pointer-events-none" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB7sBGzZK2vlUEfrDoDeRzgXMYphYyqXvSU8oHMZtq5k0iAnfd7pHdHba5Vygidv0HuYsjZfVouWQAhWGa5nddNkePyYW7YqzpK7zz-oBSjrBrSspvaP03ctHivrvrpCSquuEy19eroZ4GQcxte17SthaCsRiIvq_DDc9wloLovmPNOMruHvk3KVNsLMmZa-XtOW1H6IPYyCPmktSiBVTVUEpLM50wc2T8FJ6zC0TeI9HcKguifSwWeVlQNeIWc3IZehiIA9zub30c'); background-size: cover;"></div>
+<div class="relative z-10 flex flex-col h-full">
+<h3 class="font-headline text-lg font-bold text-stone-300 uppercase mb-4">Crawler_Dynamics</h3>
+<div class="grid grid-cols-2 gap-4 mb-6">
+<div class="bg-black/40 border border-stone-800 p-2">
+<p class="text-[9px] text-stone-500 uppercase">Oil Pressure</p>
+<p class="text-xl font-bold font-headline text-rust italic">LOW</p>
+</div>
+<div class="bg-black/40 border border-stone-800 p-2">
+<p class="text-[9px] text-stone-500 uppercase">Core Heat</p>
+<p class="text-xl font-bold font-headline text-danger">92%</p>
+</div>
+</div>
+<div class="mt-auto bg-stone-950/80 p-3 border border-stone-700">
+<p class="text-[10px] font-bold text-rust uppercase flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-sm" data-icon="construction">construction</span>
+                                REPAIR_TASK_QUEUED
+                            </p>
+<p class="text-[10px] text-stone-400 italic">Replace timing belt on Unit_A-01. Est. repair time: 4h. Safety rating: D-</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<nav class="sm:hidden fixed bottom-0 left-0 right-0 bg-danger text-white px-4 py-2 flex justify-between items-center z-50">
+<span class="text-[10px] font-bold uppercase italic animate-pulse">Radiation Spike Detected</span>
+<button class="bg-black/20 text-[10px] px-3 py-1 font-bold uppercase border border-white/20">Shields On</button>
+</nav>
+<button class="fixed bottom-8 right-8 w-20 h-20 bg-rust border-4 border-stone-900 text-white shadow-2xl flex items-center justify-center group z-50 rust-glow overflow-hidden">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
+<span class="material-symbols-outlined text-4xl group-hover:scale-125 transition-transform" data-icon="skull">skull</span>
+<div class="absolute -top-1 right-0 text-[8px] font-bold bg-white text-black px-1 uppercase leading-none">Scavenge</div>
+</button>
+
+</body></html>

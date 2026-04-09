@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TERRA_CLEAR_v1.0 | PROJECT_CALENDAR</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-container": "#007117",
+                        "secondary": "#ecffe3",
+                        "outline": "#a98a7d",
+                        "surface": "#131313",
+                        "on-tertiary": "#2f3131",
+                        "tertiary": "#c6c6c7",
+                        "on-primary-container": "#572000",
+                        "outline-variant": "#5a4136",
+                        "surface-container-highest": "#353534",
+                        "primary-container": "#ff6b00",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-tint": "#ffb693",
+                        "background": "#131313",
+                        "on-secondary-fixed": "#002203",
+                        "on-tertiary-container": "#2f3132",
+                        "secondary-fixed-dim": "#00e639",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "on-surface-variant": "#e2bfb0",
+                        "on-background": "#e5e2e1",
+                        "surface-variant": "#353534",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-primary-fixed": "#351000",
+                        "on-primary": "#561f00",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#313030",
+                        "surface-dim": "#131313",
+                        "secondary-fixed": "#72ff70",
+                        "primary-fixed": "#ffdbcc",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "error": "#ffb4ab",
+                        "tertiary-container": "#989999",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container": "#201f1f",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "primary": "#ffb693",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-secondary": "#003907",
+                        "primary-fixed-dim": "#ffb693",
+                        "surface-container-low": "#1c1b1b",
+                        "inverse-primary": "#a04100",
+                        "surface-bright": "#3a3939",
+                        "secondary-container": "#13ff43"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #131313; color: #e5e2e1; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .sharp-edge { border-radius: 0px !important; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #ff6b00; }
+    </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full border-b-2 border-outline bg-[#131313] z-50 flex justify-between items-center h-16 px-6 shadow-[0_0_40px_rgba(255,107,0,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold text-orange-500 tracking-[0.2em] font-['Space_Grotesk'] uppercase">TERRA_CLEAR_v1.0</span>
+<nav class="hidden md:flex gap-6 font-['Space_Grotesk'] tracking-tighter uppercase text-sm font-bold">
+<a class="text-neutral-400 hover:bg-white hover:text-black transition-all duration-75 px-2 py-1" href="#">SQUAD_COMMS</a>
+<a class="text-orange-400 border-b-2 border-orange-500 px-2 py-1" href="#">ZONE_MAP</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-high px-4 py-1 flex items-center gap-2 border border-outline-variant">
+<span class="material-symbols-outlined text-primary text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs uppercase tracking-widest w-48" placeholder="QUERY_LOGS..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-orange-500 transition-all duration-75 active:scale-95 hover:bg-white hover:text-black p-1">sensors</button>
+<button class="material-symbols-outlined text-orange-500 transition-all duration-75 active:scale-95 hover:bg-white hover:text-black p-1">terminal</button>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r-2 border-outline bg-[#131313] flex flex-col pt-20 pb-8 z-40">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-black font-bold">person</span>
+</div>
+<div>
+<div class="text-orange-500 font-black text-xs tracking-tighter uppercase">SECTOR_7_OPS</div>
+<div class="text-[10px] text-secondary-container font-bold uppercase">STATUS: STABLE</div>
+</div>
+</div>
+<div class="text-[10px] text-neutral-500 font-mono">ID: COMMANDER_ID_042</div>
+</div>
+<nav class="flex-1 flex flex-col px-2 gap-1 font-['Space_Grotesk'] text-sm font-bold uppercase">
+<a class="flex items-center gap-4 px-4 py-3 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">precision_manufacturing</span> OPERATIONS
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">group</span> CLIENT_DB
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 bg-orange-600 text-black border-l-4 border-secondary-container transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">local_shipping</span> FLEET_LOGS
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">build</span> SCAV_TECH
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all active:translate-x-1" href="#">
+<span class="material-symbols-outlined">settings</span> SYSTEM_ROOT
+            </a>
+</nav>
+<div class="px-2 mt-auto">
+<a class="flex items-center gap-4 px-4 py-3 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all uppercase text-sm font-bold" href="#">
+<span class="material-symbols-outlined">power_settings_new</span> LOG_OFF
+            </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 h-screen flex">
+<!-- Left Sidebar: Pending Estimates -->
+<section class="w-80 border-r border-outline-variant bg-surface-container-low flex flex-col">
+<div class="p-4 border-b border-outline-variant bg-surface-container flex justify-between items-center">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">PENDING_ESTIMATES</h2>
+<span class="bg-primary-container text-black text-[10px] px-2 font-bold">08</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<!-- Estimate Card 1 -->
+<div class="border border-outline-variant p-3 hover:border-primary cursor-pointer transition-colors bg-surface">
+<div class="flex justify-between text-[10px] font-bold text-neutral-500 mb-2">
+<span>REQ_ID: #8821</span>
+<span class="text-secondary-container">VERIFIED</span>
+</div>
+<div class="text-sm font-bold text-on-surface uppercase mb-1">RAD_ZONE_B4 CLEARANCE</div>
+<div class="text-[10px] text-neutral-400 mb-3">EST. MASS: 4.2 TONS</div>
+<div class="flex gap-2">
+<div class="bg-surface-container-highest flex-1 h-1"></div>
+<div class="bg-surface-container-highest flex-1 h-1"></div>
+<div class="bg-surface-container-highest flex-1 h-1"></div>
+</div>
+</div>
+<!-- Estimate Card 2 -->
+<div class="border border-outline-variant p-3 hover:border-primary cursor-pointer transition-colors bg-surface">
+<div class="flex justify-between text-[10px] font-bold text-neutral-500 mb-2">
+<span>REQ_ID: #8825</span>
+<span class="text-error">HIGH_PRIORITY</span>
+</div>
+<div class="text-sm font-bold text-on-surface uppercase mb-1">SCRAP_RECOVERY_A1</div>
+<div class="text-[10px] text-neutral-400 mb-3">EST. MASS: 12.8 TONS</div>
+<div class="flex gap-2">
+<div class="bg-primary flex-1 h-1"></div>
+<div class="bg-primary flex-1 h-1"></div>
+<div class="bg-surface-container-highest flex-1 h-1"></div>
+</div>
+</div>
+<!-- Estimate Card 3 -->
+<div class="border border-outline-variant p-3 hover:border-primary cursor-pointer transition-colors bg-surface opacity-60">
+<div class="flex justify-between text-[10px] font-bold text-neutral-500 mb-2">
+<span>REQ_ID: #8830</span>
+<span>SCAN_PENDING</span>
+</div>
+<div class="text-sm font-bold text-on-surface uppercase mb-1">DOME_RUIN_EXCAVATION</div>
+<div class="text-[10px] text-neutral-400 mb-3">EST. MASS: UNKNOWN</div>
+</div>
+</div>
+</section>
+<!-- Center: Calendar Grid -->
+<section class="flex-1 flex flex-col bg-surface">
+<!-- Calendar Header -->
+<div class="p-6 border-b border-outline-variant flex justify-between items-end">
+<div>
+<div class="text-primary text-xs font-bold uppercase tracking-[0.3em] mb-1">OPERATIONAL_SCHEDULE</div>
+<h1 class="text-4xl font-black uppercase font-headline leading-none">OCTOBER_2077</h1>
+</div>
+<div class="flex gap-1">
+<button class="bg-surface-container-highest p-2 border border-outline-variant hover:bg-primary hover:text-black transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="bg-surface-container-highest p-2 border border-outline-variant hover:bg-primary hover:text-black transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Grid Layout -->
+<div class="flex-1 overflow-hidden grid grid-cols-7 grid-rows-[auto_1fr_1fr_1fr_1fr_1fr] p-px bg-outline-variant">
+<!-- Days labels -->
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-neutral-500 uppercase">MON</div>
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-neutral-500 uppercase">TUE</div>
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-neutral-500 uppercase">WED</div>
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-neutral-500 uppercase">THU</div>
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-neutral-500 uppercase">FRI</div>
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-orange-500 uppercase">SAT</div>
+<div class="bg-surface-container text-[10px] font-black text-center py-2 text-orange-500 uppercase">SUN</div>
+<!-- Calendar Cells (Simplified) -->
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant opacity-20">26</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant opacity-20">27</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant opacity-20">28</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant opacity-20">29</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant opacity-20">30</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant p-2">01</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant p-2">02</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">03</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant relative group cursor-pointer">
+<span class="text-xs">04</span>
+<div class="absolute inset-x-1 top-6 bg-primary-container text-black text-[9px] font-bold p-1 border-l-4 border-secondary-container shadow-lg">
+                        SQUAD_7_ALPHA: RECOVERY
+                    </div>
+</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">05</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant bg-surface-container-high border-2 border-primary z-10 shadow-[0_0_20px_rgba(255,107,0,0.15)]">
+<div class="flex justify-between items-center">
+<span class="text-xs text-primary font-bold">06</span>
+<span class="material-symbols-outlined text-[10px]" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="bg-secondary-container text-black text-[9px] font-bold px-1 py-0.5">ACTIVE: EXEC_ID_299</div>
+<div class="bg-surface-variant text-on-surface-variant text-[8px] font-bold px-1">STANDBY: FLEET_04</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">07</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">08</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">09</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">10</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">11</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">12</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant relative">
+<span class="text-xs">13</span>
+<div class="absolute inset-x-1 top-6 bg-error text-black text-[9px] font-bold p-1">WARNING: STORM_SURGE</div>
+</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">14</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">15</div>
+<div class="bg-surface-container-lowest p-2 border-r border-b border-outline-variant">16</div>
+<!-- Padding for other rows -->
+<script>
+                    const main = document.querySelector('section.flex-1.grid');
+                    for (let i = 17; i <= 31; i++) {
+                        const cell = document.createElement('div');
+                        cell.className = "bg-surface-container-lowest p-2 border-r border-b border-outline-variant text-xs";
+                        cell.innerText = i < 10 ? `0${i}` : i;
+                        document.currentScript.parentElement.appendChild(cell);
+                    }
+                </script>
+</div>
+</section>
+<!-- Right Sidebar: Selected Execution -->
+<section class="w-96 border-l border-outline-variant bg-surface-container flex flex-col">
+<div class="p-4 border-b border-outline-variant bg-surface-container-highest">
+<div class="text-[10px] font-black text-secondary-container mb-1 tracking-tighter">EXECUTION_DETAILS // ID_299</div>
+<h2 class="text-lg font-black uppercase text-on-surface">RAD_ZONE_B4 CLEARANCE</h2>
+</div>
+<div class="flex-1 overflow-y-auto">
+<!-- Map Visual -->
+<div class="h-48 bg-surface-container-lowest border-b border-outline-variant relative group overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="Satellite thermal scan of a post-apocalyptic industrial zone with heat signatures in orange and green digital overlays" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbnfsADRRGUZXzvb0adouZYR72wiviPBrBEyImiabiO4k1TVBW7Fnh3YFdAlRyn9wnkvuXnAyzhSssa9cZIWPnOrdoJpQdXZjyVKExpySNbQmfYYSjJw04iFOpk0BRCRYw0kwEor-MeU5GFlxPD8nWnWg_OH307qUx-QMqZStCP5PHV3PJltgqgRwF91iJ0QWZCSt3WgvJ_L4yS2TJi1XXm4-SMDTxirfnZxCNxecjjHeSs66_IyEt_MoyW90v4y_92-9q2xHpuX8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-[#131313] to-transparent"></div>
+<div class="absolute top-2 right-2 flex gap-1">
+<span class="bg-black/80 text-secondary-container text-[8px] px-2 py-1 border border-secondary-container">LIVE_FEED</span>
+</div>
+</div>
+<div class="p-6 space-y-6">
+<!-- Progress Blocks -->
+<div class="space-y-2">
+<div class="flex justify-between text-[10px] font-bold uppercase">
+<span>CLEARANCE_PROGRESS</span>
+<span class="text-secondary-container">64%</span>
+</div>
+<div class="flex gap-1 h-3">
+<div class="flex-1 bg-secondary-container"></div>
+<div class="flex-1 bg-secondary-container"></div>
+<div class="flex-1 bg-secondary-container"></div>
+<div class="flex-1 bg-secondary-container"></div>
+<div class="flex-1 bg-secondary-container"></div>
+<div class="flex-1 bg-surface-container-highest"></div>
+<div class="flex-1 bg-surface-container-highest"></div>
+<div class="flex-1 bg-surface-container-highest"></div>
+</div>
+</div>
+<!-- Meta Data -->
+<div class="grid grid-cols-2 gap-4">
+<div class="border-l-2 border-outline px-3 py-1">
+<div class="text-[8px] text-neutral-500 uppercase font-black">ASSIGNED_UNIT</div>
+<div class="text-xs font-bold text-on-surface">ALPHA_DOG_4</div>
+</div>
+<div class="border-l-2 border-outline px-3 py-1">
+<div class="text-[8px] text-neutral-500 uppercase font-black">EST_TIME_REMAIN</div>
+<div class="text-xs font-bold text-on-surface">14:22:00</div>
+</div>
+</div>
+<!-- Log Stream -->
+<div class="space-y-2">
+<div class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">TELEMETRY_LOG</div>
+<div class="bg-black p-3 border border-outline-variant font-mono text-[9px] space-y-1">
+<div class="text-secondary-container">[14:02] INITIALIZING_SWEEP... SUCCESS</div>
+<div class="text-on-surface">[14:05] OBJECT_DETECTED: SCRAP_METAL_TYPE_B</div>
+<div class="text-on-surface">[14:09] CRANE_ENGAGED. LIFTING_CARGO...</div>
+<div class="text-primary">[14:12] RADIATION_FLARE_DETECTED: NOMINAL</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-4 space-y-2">
+<button class="w-full bg-primary-container text-black font-black uppercase text-xs py-3 sharp-edge hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">rocket_launch</span> DEPLOY_DRONE_SUPPORT
+                        </button>
+<button class="w-full border-2 border-outline text-on-surface font-black uppercase text-xs py-3 sharp-edge hover:bg-white hover:text-black transition-all active:scale-95">
+                            ABORT_OPERATION
+                        </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- FAB: Contextual to Fleet Logs/Schedule -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-primary-container text-black shadow-[0_0_30px_rgba(255,107,0,0.4)] flex items-center justify-center hover:bg-white hover:scale-105 active:scale-90 transition-all z-50 border-2 border-black">
+<span class="material-symbols-outlined text-3xl font-black">add</span>
+</button>
+</body></html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TERRA_CLEAR_v1.0 | JOB MONITORING</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-surface": "#e5e2e1",
+                        "on-secondary-container": "#007117",
+                        "secondary": "#ecffe3",
+                        "outline": "#a98a7d",
+                        "surface": "#131313",
+                        "on-tertiary": "#2f3131",
+                        "tertiary": "#c6c6c7",
+                        "on-primary-container": "#572000",
+                        "outline-variant": "#5a4136",
+                        "surface-container-highest": "#353534",
+                        "primary-container": "#ff6b00",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-tint": "#ffb693",
+                        "background": "#131313",
+                        "on-secondary-fixed": "#002203",
+                        "on-tertiary-container": "#2f3132",
+                        "secondary-fixed-dim": "#00e639",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "on-surface-variant": "#e2bfb0",
+                        "on-background": "#e5e2e1",
+                        "surface-variant": "#353534",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-primary-fixed": "#351000",
+                        "on-primary": "#561f00",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#313030",
+                        "surface-dim": "#131313",
+                        "secondary-fixed": "#72ff70",
+                        "primary-fixed": "#ffdbcc",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "error": "#ffb4ab",
+                        "tertiary-container": "#989999",
+                        "inverse-surface": "#e5e2e1",
+                        "surface-container": "#201f1f",
+                        "error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "primary": "#ffb693",
+                        "surface-container-high": "#2a2a2a",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-secondary": "#003907",
+                        "primary-fixed-dim": "#ffb693",
+                        "surface-container-low": "#1c1b1b",
+                        "inverse-primary": "#a04100",
+                        "surface-bright": "#3a3939",
+                        "secondary-container": "#13ff43"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #131313;
+            color: #e5e2e1;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .terminal-grid {
+            background-image: radial-gradient(rgba(255, 107, 0, 0.05) 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+        .crt-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="terminal-grid overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full border-b-2 border-[#A98A7D] bg-[#131313] shadow-[0_0_40px_rgba(255,107,0,0.1)] z-50 transition-all duration-75 flex justify-between items-center h-16 px-6">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold text-orange-500 tracking-[0.2em] font-['Space_Grotesk'] uppercase">TERRA_CLEAR_v1.0</span>
+<nav class="hidden md:flex gap-6">
+<a class="font-['Space_Grotesk'] tracking-tighter uppercase text-neutral-400 hover:bg-white hover:text-black px-2 py-1 transition-all" href="#">SQUAD_COMMS</a>
+<a class="font-['Space_Grotesk'] tracking-tighter uppercase text-orange-400 border-b-2 border-orange-500 px-2 py-1 transition-all" href="#">ZONE_MAP</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-orange-500 cursor-pointer hover:bg-white hover:text-black p-2 active:scale-95 transition-all" data-icon="sensors">sensors</span>
+<span class="material-symbols-outlined text-orange-500 cursor-pointer hover:bg-white hover:text-black p-2 active:scale-95 transition-all" data-icon="terminal">terminal</span>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r-2 border-[#A98A7D] bg-[#131313] z-40 hidden md:flex flex-col pt-20 pb-8">
+<div class="px-6 mb-8 border-l-4 border-orange-500">
+<h2 class="text-orange-500 font-black font-['Space_Grotesk'] uppercase text-lg">SECTOR_7_OPS</h2>
+<p class="text-neutral-500 text-xs font-bold uppercase tracking-widest">STATUS: STABLE</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-4 px-6 py-4 bg-orange-600 text-black border-l-4 border-emerald-400 active:translate-x-1 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span class="font-['Space_Grotesk'] text-sm font-bold uppercase">OPERATIONS</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-['Space_Grotesk'] text-sm font-bold uppercase">CLIENT_DB</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+<span class="font-['Space_Grotesk'] text-sm font-bold uppercase">FLEET_LOGS</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="build">build</span>
+<span class="font-['Space_Grotesk'] text-sm font-bold uppercase">SCAV_TECH</span>
+</div>
+<div class="flex items-center gap-4 px-6 py-4 text-neutral-500 hover:text-orange-300 hover:bg-neutral-800 transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Space_Grotesk'] text-sm font-bold uppercase">SYSTEM_ROOT</span>
+</div>
+</nav>
+<div class="mt-auto px-6 pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-4 py-4 text-neutral-500 hover:text-error hover:bg-neutral-800 transition-all cursor-pointer uppercase text-xs font-bold">
+<span class="material-symbols-outlined" data-icon="power_settings_new">power_settings_new</span>
+<span>LOG_OFF</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-0 md:ml-64 pt-16 h-screen flex flex-col overflow-hidden">
+<!-- Top Telemetry Bar -->
+<div class="flex flex-wrap items-center bg-surface-container-low border-b border-outline-variant px-6 py-2 gap-8">
+<div class="flex flex-col">
+<span class="text-[10px] text-neutral-500 font-bold uppercase tracking-tighter">UNIT_ID</span>
+<span class="text-sm font-bold text-on-surface">MULCHER_BETA_09</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-neutral-500 font-bold uppercase tracking-tighter">LAT_COORD</span>
+<span class="text-sm font-bold text-secondary-fixed-dim">45.892° N</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-neutral-500 font-bold uppercase tracking-tighter">LON_COORD</span>
+<span class="text-sm font-bold text-secondary-fixed-dim">122.341° W</span>
+</div>
+<div class="ml-auto flex items-center gap-4">
+<div class="flex items-center gap-2 bg-secondary-container/10 border border-secondary-container/30 px-3 py-1">
+<span class="w-2 h-2 bg-secondary-container"></span>
+<span class="text-[10px] text-secondary-container font-black">LINK_ACTIVE</span>
+</div>
+<button class="bg-primary-container text-black font-black uppercase text-xs px-4 py-1.5 hover:bg-white transition-colors">INITIATE_PURGE</button>
+</div>
+</div>
+<!-- Dashboard Layout -->
+<div class="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
+<!-- Left Panel: Map & Navigation -->
+<div class="col-span-12 lg:col-span-8 border-r-2 border-outline-variant flex flex-col relative">
+<div class="absolute inset-0 z-0 bg-neutral-900 opacity-20" data-alt="satellite view of a dense evergreen forest with visible clear-cutting paths and industrial machinery patterns from above" data-location="Pacific Northwest Forest" style="background-image: url('https://placeholder.pics/svg/300'); background-size: cover; background-position: center;"></div>
+<!-- HUD Overlay Elements -->
+<div class="relative z-10 p-6 flex flex-col h-full pointer-events-none">
+<div class="flex justify-between items-start pointer-events-auto">
+<div class="bg-surface/80 backdrop-blur-md p-4 border-2 border-outline w-64">
+<h3 class="text-xs font-black text-orange-500 mb-4 border-b border-outline-variant pb-2">TARGET_VECTORS</h3>
+<div class="space-y-3">
+<div class="flex justify-between">
+<span class="text-[10px] text-neutral-400 uppercase">Sector 7A</span>
+<span class="text-[10px] text-secondary-fixed uppercase">Clear</span>
+</div>
+<div class="flex justify-between">
+<span class="text-[10px] text-neutral-400 uppercase">Sector 7B</span>
+<span class="text-[10px] text-primary-container uppercase">Processing</span>
+</div>
+<div class="w-full bg-neutral-800 h-1 mt-2">
+<div class="bg-primary-container h-full w-[65%]"></div>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="bg-surface/80 border-2 border-outline p-2">
+<span class="material-symbols-outlined text-on-surface" data-icon="add">add</span>
+</div>
+<div class="bg-surface/80 border-2 border-outline p-2">
+<span class="material-symbols-outlined text-on-surface" data-icon="remove">remove</span>
+</div>
+<div class="bg-surface/80 border-2 border-outline p-2">
+<span class="material-symbols-outlined text-orange-500" data-icon="my_location" style="font-variation-settings: 'FILL' 1;">my_location</span>
+</div>
+</div>
+</div>
+<div class="mt-auto flex justify-center pointer-events-auto">
+<div class="bg-surface-container-highest border-2 border-outline-variant flex divide-x divide-outline-variant">
+<button class="px-6 py-2 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">TOPO_VIEW</button>
+<button class="px-6 py-2 text-xs font-bold text-white bg-primary-container/20 uppercase">SATELLITE_FEED</button>
+<button class="px-6 py-2 text-xs font-bold text-neutral-400 hover:text-white uppercase transition-colors">THERMAL_MAP</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Panel: Engine & Logs -->
+<div class="col-span-12 lg:col-span-4 flex flex-col bg-surface overflow-y-auto">
+<!-- Engine Feed Section -->
+<div class="p-6 border-b-2 border-outline-variant">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-sm font-black text-orange-500 uppercase tracking-widest">DRIVETRAIN_TELEMETRY</h2>
+<span class="text-[10px] text-neutral-500">REFRESH_RATE: 20ms</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<!-- Stat Card -->
+<div class="bg-surface-container-low p-4 border border-outline-variant relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-secondary-container"></div>
+<span class="text-[10px] text-neutral-500 uppercase font-bold">RPM_CORE</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="text-2xl font-bold text-on-surface">2450</span>
+<span class="text-[10px] text-neutral-400">NOMINAL</span>
+</div>
+<div class="mt-4 flex gap-1 h-4">
+<div class="bg-secondary-container w-full opacity-30"></div>
+<div class="bg-secondary-container w-full opacity-60"></div>
+<div class="bg-secondary-container w-full"></div>
+<div class="bg-neutral-800 w-full"></div>
+<div class="bg-neutral-800 w-full"></div>
+</div>
+</div>
+<!-- Stat Card -->
+<div class="bg-surface-container-low p-4 border border-outline-variant relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>
+<span class="text-[10px] text-neutral-500 uppercase font-bold">CORE_TEMP</span>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="text-2xl font-bold text-on-surface">88°C</span>
+<span class="text-[10px] text-primary-container">HIGH_LOAD</span>
+</div>
+<div class="mt-4 flex gap-1 h-4">
+<div class="bg-primary-container w-full"></div>
+<div class="bg-primary-container w-full"></div>
+<div class="bg-primary-container w-full"></div>
+<div class="bg-primary-container w-full opacity-50"></div>
+<div class="bg-neutral-800 w-full"></div>
+</div>
+</div>
+</div>
+<div class="mt-6 bg-surface-container-highest p-4 border border-outline relative">
+<span class="text-[10px] text-neutral-400 uppercase block mb-3">HYDRAULIC_PRESSURE_WAVEFORM</span>
+<div class="h-16 flex items-end gap-1">
+<div class="bg-secondary-container w-full h-[60%]"></div>
+<div class="bg-secondary-container w-full h-[65%]"></div>
+<div class="bg-secondary-container w-full h-[75%]"></div>
+<div class="bg-primary-container w-full h-[90%]"></div>
+<div class="bg-secondary-container w-full h-[80%]"></div>
+<div class="bg-secondary-container w-full h-[70%]"></div>
+<div class="bg-secondary-container w-full h-[65%]"></div>
+<div class="bg-secondary-container w-full h-[60%]"></div>
+<div class="bg-secondary-container w-full h-[55%]"></div>
+<div class="bg-secondary-container w-full h-[60%]"></div>
+</div>
+</div>
+</div>
+<!-- Event Log Section -->
+<div class="flex-1 p-6 flex flex-col overflow-hidden">
+<div class="flex justify-between items-center mb-4">
+<h2 class="text-sm font-black text-orange-500 uppercase tracking-widest">EVENT_STREAM_LOG</h2>
+<span class="material-symbols-outlined text-neutral-500 text-sm" data-icon="filter_list">filter_list</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-px font-mono text-[11px]">
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-transparent transition-colors">
+<span class="text-neutral-500">[14:32:01]</span>
+<span class="text-secondary-fixed ml-2">SYSTEM:</span>
+<span class="text-neutral-300 ml-2">Autopilot synchronization complete with Mulcher_B_09.</span>
+</div>
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-primary-container bg-primary-container/5">
+<span class="text-neutral-500">[14:31:45]</span>
+<span class="text-primary-container ml-2">WARNING:</span>
+<span class="text-neutral-300 ml-2">High density biomass detected in Sector 7B. Adjusting torque.</span>
+</div>
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-transparent">
+<span class="text-neutral-500">[14:30:12]</span>
+<span class="text-on-surface-variant ml-2">NAV:</span>
+<span class="text-neutral-300 ml-2">Waypoint Zulu-09 reached. Pivoting 45 degrees East.</span>
+</div>
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-secondary-container bg-secondary-container/5">
+<span class="text-neutral-500">[14:28:55]</span>
+<span class="text-secondary-container ml-2">DATA:</span>
+<span class="text-neutral-300 ml-2">Fuel efficiency increased by 12% in current gear.</span>
+</div>
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-transparent">
+<span class="text-neutral-500">[14:25:33]</span>
+<span class="text-secondary-fixed ml-2">SYSTEM:</span>
+<span class="text-neutral-300 ml-2">Sub-routine "Clean_Sweep" initialized successfully.</span>
+</div>
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-error-container bg-error-container/10">
+<span class="text-neutral-500">[14:22:10]</span>
+<span class="text-error ml-2">CRITICAL:</span>
+<span class="text-neutral-300 ml-2">Sensor interference detected from unidentified signal source.</span>
+</div>
+<div class="py-2 px-3 hover:bg-neutral-800 border-l-2 border-transparent">
+<span class="text-neutral-500">[14:20:00]</span>
+<span class="text-secondary-fixed ml-2">SYSTEM:</span>
+<span class="text-neutral-300 ml-2">Operator command received: "Maintain_Perimeter".</span>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant flex gap-2">
+<input class="flex-1 bg-surface-container-highest border-none focus:ring-1 focus:ring-primary-container text-xs text-on-surface placeholder:text-neutral-600 uppercase font-black px-4 h-10" placeholder="CMD_OVERRIDE..." type="text"/>
+<button class="bg-outline text-black px-4 h-10">
+<span class="material-symbols-outlined" data-icon="send">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- CRT Overlay for Aesthetic -->
+<div class="fixed inset-0 crt-overlay z-[100] pointer-events-none opacity-50"></div>
+</body></html>

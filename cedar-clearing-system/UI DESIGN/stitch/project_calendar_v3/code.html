@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SCRAP_VALLEY_OS | PROJECT_CALENDAR</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#8b4513",
+                        "danger": "#b91c1c",
+                        "rust": "#92400e",
+                        "dust": "#d1d5db",
+                        "waste": "#1c1917",
+                        "terminal": "#4ade80",
+                        "background": "#0c0a09",
+                        "surface": "#131110",
+                        "outline": "#44403c"
+                    },
+                    "fontFamily": {
+                        "headline": ["Chakra Petch", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"],
+                        "body": ["JetBrains Mono", "monospace"]
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply bg-background text-dust font-mono selection:bg-rust/50;
+                background-image: 
+                    radial-gradient(circle at 50% 50%, rgba(20, 20, 20, 0.4) 0%, rgba(0, 0, 0, 0.9) 100%),
+                    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15) 0px, rgba(0, 0, 0, 0.15) 1px, transparent 1px, transparent 2px);
+                background-size: 100% 100%, 100% 3px;
+            }
+        }
+        .distressed-border {
+            border: 1px solid #44403c;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .distressed-border::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, transparent 95%, rgba(146, 64, 14, 0.2) 100%);
+            pointer-events: none;
+        }
+        .grit-texture {
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0c0a09; }
+        ::-webkit-scrollbar-thumb { background: #92400e; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<div class="fixed inset-0 grit-texture pointer-events-none z-50"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full border-b-2 border-rust/40 bg-stone-900/90 backdrop-blur-md z-50 flex justify-between items-center h-16 px-6">
+<div class="flex items-center gap-8">
+<div class="bg-rust p-1 px-3 skew-x-[-12deg]">
+<span class="text-xl font-bold tracking-[0.2em] text-white font-headline uppercase italic">SCRAP_VALLEY_v4.2</span>
+</div>
+<nav class="hidden md:flex gap-6 text-[10px] font-bold uppercase tracking-widest">
+<a class="text-stone-500 hover:text-rust transition-colors" href="#">SIGNAL_TOWER</a>
+<a class="text-rust border-b border-rust" href="#">DEAD_ZONE_MAP</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-black/50 border border-stone-700 px-4 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-rust text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-[10px] uppercase tracking-widest w-48 text-dust placeholder-stone-600" placeholder="QUERY_LOGS..." type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="material-symbols-outlined text-stone-500 hover:text-rust transition-colors p-1">radio</button>
+<button class="material-symbols-outlined text-stone-500 hover:text-rust transition-colors p-1">terminal</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r border-stone-800 bg-black/40 backdrop-blur-sm flex flex-col pt-20 pb-8 z-40">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 border-2 border-rust bg-stone-800 flex items-center justify-center overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover grayscale contrast-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByJWBfcPNT6bEBUo-ocFfFPLTvPo8tB3H3kemJJXH9l2hc6UMTn0mzgfWN9s0Z1dSgM8Z0fh3NSozMzVz62PtqAXup351E5fupLMMY6m_XJ5zPX9PUuhW5SbOrvWnhJEWTfLbV962041rOLUIsCm6PfGMReNOZiSrpxVVTaUEXpLjBu56uIs8XNhnGGDg4S3KczS4JLMnhGX7HxkARqCPrx5r3TvAdec1yg8zZNKBjxiLEgbqT9O0RS7-bP9RjpS6kFk4J-R-Rqrc"/>
+</div>
+<div>
+<div class="text-rust font-bold text-[10px] uppercase">OPERATOR_VOID</div>
+<div class="text-[9px] text-terminal font-bold uppercase italic">STATUS: STABLE</div>
+</div>
+</div>
+<div class="text-[9px] text-stone-500 font-mono">SYS_LINK: ACTIVE</div>
+</div>
+<nav class="flex-1 flex flex-col px-2 gap-1 text-[11px] font-bold uppercase">
+<a class="flex items-center gap-4 px-4 py-3 text-stone-500 hover:text-dust hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined text-lg">radio</span> SIGNAL_TOWER
+        </a>
+<a class="flex items-center gap-4 px-4 py-3 text-stone-500 hover:text-dust hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined text-lg">map</span> DEAD_ZONE_MAP
+        </a>
+<a class="flex items-center gap-4 px-4 py-3 bg-rust/10 text-rust border border-rust/50 transition-all" href="#">
+<span class="material-symbols-outlined text-lg">inventory_2</span> RESOURCE_SCAV
+        </a>
+<a class="flex items-center gap-4 px-4 py-3 text-danger hover:bg-danger/5 transition-all" href="#">
+<span class="material-symbols-outlined text-lg">warning</span> INCIDENT_LOG
+        </a>
+</nav>
+<div class="px-2 mt-auto">
+<div class="p-3 bg-stone-900 border-t-2 border-rust text-[9px] uppercase mb-4">
+<p class="text-stone-500">Rad Level</p>
+<p class="text-terminal font-bold">0.02 mSv/h - SAFE</p>
+</div>
+<a class="flex items-center gap-4 px-4 py-3 text-stone-500 hover:text-rust transition-all uppercase text-[10px] font-bold" href="#">
+<span class="material-symbols-outlined text-lg">power_settings_new</span> DISCONNECT
+        </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 h-screen flex">
+<!-- Left Sidebar: Pending Estimates -->
+<section class="w-80 border-r border-stone-800 bg-stone-950/50 flex flex-col">
+<div class="p-4 border-b border-stone-800 bg-stone-900 flex justify-between items-center">
+<h2 class="text-[10px] font-bold uppercase tracking-widest text-rust">PENDING_SCAV_ESTIMATES</h2>
+<span class="bg-rust text-white text-[10px] px-2 py-0.5 font-bold italic">08</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<!-- Estimate Card 1 -->
+<div class="distressed-border bg-stone-900/40 p-3 hover:bg-stone-900/60 cursor-pointer transition-colors group">
+<div class="flex justify-between text-[9px] font-bold text-stone-500 mb-2">
+<span>REQ_ID: #8821</span>
+<span class="text-terminal">VERIFIED</span>
+</div>
+<div class="text-xs font-bold text-dust uppercase mb-1">RAD_ZONE_B4_CLEARANCE</div>
+<div class="text-[9px] text-stone-500 mb-3">EST. MASS: 4.2 TONS</div>
+<div class="flex gap-1 h-1">
+<div class="bg-rust/20 flex-1"></div>
+<div class="bg-rust/20 flex-1"></div>
+<div class="bg-rust/20 flex-1"></div>
+</div>
+</div>
+<!-- Estimate Card 2 -->
+<div class="distressed-border bg-stone-900/40 p-3 hover:bg-stone-900/60 cursor-pointer transition-colors">
+<div class="flex justify-between text-[9px] font-bold text-stone-500 mb-2">
+<span>REQ_ID: #8825</span>
+<span class="text-danger">HIGH_VOLATILITY</span>
+</div>
+<div class="text-xs font-bold text-dust uppercase mb-1">SCRAP_RECOVERY_A1</div>
+<div class="text-[9px] text-stone-500 mb-3">EST. MASS: 12.8 TONS</div>
+<div class="flex gap-1 h-1">
+<div class="bg-rust flex-1"></div>
+<div class="bg-rust flex-1"></div>
+<div class="bg-rust/20 flex-1"></div>
+</div>
+</div>
+<!-- Estimate Card 3 -->
+<div class="distressed-border bg-stone-900/40 p-3 opacity-60">
+<div class="flex justify-between text-[9px] font-bold text-stone-500 mb-2">
+<span>REQ_ID: #8830</span>
+<span>SCAN_PENDING</span>
+</div>
+<div class="text-xs font-bold text-dust uppercase mb-1">DOME_RUIN_EXCAVATION</div>
+<div class="text-[9px] text-stone-500 mb-3">EST. MASS: UNKNOWN</div>
+</div>
+</div>
+</section>
+<!-- Center: Calendar Grid -->
+<section class="flex-1 flex flex-col bg-background relative overflow-hidden">
+<div class="absolute inset-0 grit-texture opacity-5 pointer-events-none"></div>
+<!-- Calendar Header -->
+<div class="p-6 border-b border-stone-800 flex justify-between items-end bg-stone-900/30">
+<div>
+<div class="text-rust text-[10px] font-bold uppercase tracking-[0.4em] mb-1">OPERATIONAL_SCHEDULE</div>
+<h1 class="text-5xl font-bold uppercase font-headline text-stone-300 italic tracking-tighter leading-none">OCTOBER<span class="text-rust">_2077</span></h1>
+</div>
+<div class="flex gap-2">
+<button class="bg-stone-800 p-2 border border-stone-700 hover:border-rust transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="bg-stone-800 p-2 border border-stone-700 hover:border-rust transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Grid Layout -->
+<div class="flex-1 overflow-hidden grid grid-cols-7 grid-rows-[auto_1fr_1fr_1fr_1fr_1fr] bg-stone-800/40 gap-px">
+<!-- Days labels -->
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-stone-500 uppercase tracking-widest border-b border-stone-800">MON</div>
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-stone-500 uppercase tracking-widest border-b border-stone-800">TUE</div>
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-stone-500 uppercase tracking-widest border-b border-stone-800">WED</div>
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-stone-500 uppercase tracking-widest border-b border-stone-800">THU</div>
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-stone-500 uppercase tracking-widest border-b border-stone-800">FRI</div>
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-rust uppercase tracking-widest border-b border-stone-800">SAT</div>
+<div class="bg-stone-900 text-[9px] font-bold text-center py-3 text-rust uppercase tracking-widest border-b border-stone-800">SUN</div>
+<!-- Calendar Cells (Simplified for rugged look) -->
+<div class="bg-stone-950/40 p-2 opacity-20 text-[10px]">26</div>
+<div class="bg-stone-950/40 p-2 opacity-20 text-[10px]">27</div>
+<div class="bg-stone-950/40 p-2 opacity-20 text-[10px]">28</div>
+<div class="bg-stone-950/40 p-2 opacity-20 text-[10px]">29</div>
+<div class="bg-stone-950/40 p-2 opacity-20 text-[10px]">30</div>
+<div class="bg-stone-950/80 p-2 text-[10px] text-stone-500">01</div>
+<div class="bg-stone-950/80 p-2 text-[10px] text-stone-500">02</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">03</div>
+<div class="bg-stone-950/80 p-2 relative group cursor-pointer border border-transparent hover:border-rust/30">
+<span class="text-[10px]">04</span>
+<div class="absolute inset-x-1 top-6 bg-rust/90 text-white text-[8px] font-bold p-1 italic border-l-2 border-terminal">
+                    SQUAD_7_ALPHA: RECOVERY
+                </div>
+</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">05</div>
+<div class="bg-stone-900/90 p-2 border-2 border-rust z-10 shadow-[0_0_20px_rgba(146,64,14,0.15)] distressed-border">
+<div class="flex justify-between items-center">
+<span class="text-[10px] text-rust font-bold">06</span>
+<span class="material-symbols-outlined text-[10px] text-terminal" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="bg-terminal/20 text-terminal text-[8px] font-bold px-1 py-0.5 border border-terminal/30">ACTIVE: EXEC_ID_299</div>
+<div class="bg-stone-800 text-stone-500 text-[7px] font-bold px-1">STANDBY: FLEET_04</div>
+</div>
+</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">07</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">08</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">09</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">10</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">11</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">12</div>
+<div class="bg-stone-950/80 p-2 relative">
+<span class="text-[10px]">13</span>
+<div class="absolute inset-x-1 top-6 bg-danger/80 text-white text-[8px] font-bold p-1 italic border-l-2 border-white">
+                    WARNING: STORM_SURGE
+                </div>
+</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">14</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">15</div>
+<div class="bg-stone-950/80 p-2 text-[10px]">16</div>
+<!-- Dynamic cell injection preserved as request logic -->
+<script>
+                const mainGrid = document.currentScript.parentElement;
+                for (let i = 17; i <= 31; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = "bg-stone-950/80 p-2 text-[10px] text-stone-400";
+                    cell.innerText = i < 10 ? `0${i}` : i;
+                    mainGrid.appendChild(cell);
+                }
+            </script>
+</div>
+</section>
+<!-- Right Sidebar: Selected Execution -->
+<section class="w-96 border-l border-stone-800 bg-stone-900/80 flex flex-col">
+<div class="p-4 border-b border-stone-800 bg-stone-950/80">
+<div class="text-[9px] font-bold text-rust mb-1 tracking-widest uppercase italic">EXECUTION_DETAILS // ID_299</div>
+<h2 class="text-xl font-bold uppercase text-stone-200 font-headline italic">RAD_ZONE_B4 CLEARANCE</h2>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- Map Visual -->
+<div class="h-48 bg-stone-950 border-b border-stone-800 relative group overflow-hidden">
+<img class="w-full h-full object-cover grayscale contrast-150 opacity-40 group-hover:opacity-60 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbnfsADRRGUZXzvb0adouZYR72wiviPBrBEyImiabiO4k1TVBW7Fnh3YFdAlRyn9wnkvuXnAyzhSssa9cZIWPnOrdoJpQdXZjyVKExpySNbQmfYYSjJw04iFOpk0BRCRYw0kwEor-MeU5GFlxPD8nWnWg_OH307qUx-QMqZStCP5PHV3PJltgqgRwF91iJ0QWZCSt3WgvJ_L4yS2TJi1XXm4-SMDTxirfnZxCNxecjjHeSs66_IyEt_MoyW90v4y_92-9q2xHpuX8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-60"></div>
+<div class="absolute top-2 right-2 flex gap-1">
+<span class="bg-black/80 text-terminal text-[8px] px-2 py-0.5 border border-terminal/40 font-bold uppercase">LIVE_TELEMETRY</span>
+</div>
+</div>
+<div class="p-6 space-y-6">
+<!-- Progress Blocks -->
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-bold uppercase">
+<span class="text-stone-500">CLEARANCE_PROGRESS</span>
+<span class="text-terminal">64%</span>
+</div>
+<div class="flex gap-1 h-2">
+<div class="flex-1 bg-rust"></div>
+<div class="flex-1 bg-rust"></div>
+<div class="flex-1 bg-rust"></div>
+<div class="flex-1 bg-rust"></div>
+<div class="flex-1 bg-rust"></div>
+<div class="flex-1 bg-stone-800"></div>
+<div class="flex-1 bg-stone-800"></div>
+<div class="flex-1 bg-stone-800"></div>
+</div>
+</div>
+<!-- Meta Data -->
+<div class="grid grid-cols-2 gap-4">
+<div class="border-l-2 border-rust bg-stone-950/50 px-3 py-2">
+<div class="text-[8px] text-stone-600 uppercase font-bold">ASSIGNED_UNIT</div>
+<div class="text-[11px] font-bold text-stone-300">ALPHA_DOG_4</div>
+</div>
+<div class="border-l-2 border-stone-600 bg-stone-950/50 px-3 py-2">
+<div class="text-[8px] text-stone-600 uppercase font-bold">EST_REMAIN</div>
+<div class="text-[11px] font-bold text-stone-300">14:22:00</div>
+</div>
+</div>
+<!-- Log Stream -->
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<div class="text-[9px] font-bold text-stone-500 uppercase tracking-widest">TELEMETRY_STREAM</div>
+<span class="text-[8px] text-stone-700 italic">AUTO_SAVE: ON</span>
+</div>
+<div class="bg-black/60 p-3 border border-stone-800 font-mono text-[9px] space-y-1">
+<div class="text-terminal">[14:02] INITIALIZING_SWEEP... SUCCESS</div>
+<div class="text-stone-400">[14:05] OBJECT_DETECTED: SCRAP_METAL_B</div>
+<div class="text-stone-400">[14:09] CRANE_ENGAGED. LIFTING...</div>
+<div class="text-rust">[14:12] RADIATION_FLARE: NOMINAL</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-4 space-y-2">
+<button class="w-full bg-rust text-white font-bold uppercase text-xs py-3 skew-x-[-4deg] border border-rust hover:bg-white hover:text-rust transition-all flex items-center justify-center gap-2 group">
+<span class="material-symbols-outlined text-sm group-hover:scale-110">rocket_launch</span> DEPLOY_DRONE_SUPPORT
+                    </button>
+<button class="w-full border border-stone-700 text-stone-500 font-bold uppercase text-[10px] py-3 hover:border-danger hover:text-danger transition-all">
+                        ABORT_OPERATION
+                    </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- FAB -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-rust border-4 border-stone-900 text-white shadow-2xl flex items-center justify-center group z-50 transition-transform hover:scale-105 active:scale-95 overflow-hidden">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
+<span class="material-symbols-outlined text-3xl font-bold group-hover:rotate-90 transition-transform">add</span>
+</button>
+</body></html>

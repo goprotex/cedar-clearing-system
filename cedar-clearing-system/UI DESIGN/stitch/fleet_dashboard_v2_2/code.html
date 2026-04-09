@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --rusted-brown: #a65d37;
+            --muted-rust: #7a462d;
+            --sickly-green: #9fb84e;
+            --faded-green: #687933;
+            --deep-black: #0a0a0a;
+            --industrial-gray: #4a4542;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Oxanium', monospace;
+            background-color: var(--deep-black);
+            color: #d1cbc8;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(166, 93, 55, 0.02), rgba(159, 184, 78, 0.01), rgba(166, 93, 55, 0.02));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .glow-rust { box-shadow: 0 0 15px rgba(166, 93, 55, 0.3); }
+        .sepia-filter { filter: sepia(0.8) contrast(1.2) brightness(0.8) grayscale(0.2); }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#a65d37",
+                        "primary-container": "#7a462d",
+                        "secondary": "#9fb84e",
+                        "secondary-container": "#687933",
+                        "background": "#0a0a0a",
+                        "surface": "#121110",
+                        "surface-container-low": "#181716",
+                        "surface-container-highest": "#2d2a28",
+                        "on-surface": "#d1cbc8",
+                        "outline": "#5a534e",
+                        "outline-variant": "#3d3835",
+                        "error": "#9e3a3a"
+                    },
+                    "fontFamily": {
+                        "headline": ["Oxanium", "monospace"],
+                        "body": ["Oxanium", "monospace"],
+                        "label": ["Oxanium", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-container selection:text-white">
+<div class="crt-overlay"></div>
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#0d0d0c] border-b-2 border-outline-variant border-solid shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-primary tracking-wider uppercase">WASTELAND_CRM_V1.0</span>
+<div class="hidden md:flex gap-6 ml-12">
+<span class="uppercase tracking-tighter font-bold text-on-surface hover:bg-primary hover:text-black transition-colors duration-100 cursor-pointer px-2">FREQ_88.1</span>
+<span class="uppercase tracking-tighter font-bold text-secondary border-b-2 border-secondary px-2">SIG_STRENGTH_MAX</span>
+<span class="uppercase tracking-tighter font-bold text-on-surface hover:bg-primary hover:text-black transition-colors duration-100 cursor-pointer px-2">BATT_98%</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary/70 cursor-pointer hover:bg-primary hover:text-black p-1 transition-colors">settings_input_antenna</span>
+<span class="material-symbols-outlined text-primary/70 cursor-pointer hover:bg-primary hover:text-black p-1 transition-colors">bolt</span>
+<span class="material-symbols-outlined text-primary/70 cursor-pointer hover:bg-primary hover:text-black p-1 transition-colors">security</span>
+</div>
+</nav>
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 flex flex-col z-40 bg-[#0d0d0c] border-r-2 border-outline-variant border-solid">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 bg-surface-container-highest border border-outline flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<div class="text-primary font-black text-xs uppercase">SECTOR_7_OPS</div>
+<div class="text-on-surface opacity-50 text-[10px] uppercase">STATUS: STABLE</div>
+</div>
+</div>
+</div>
+<nav class="flex-grow py-4">
+<div class="flex items-center gap-3 px-6 py-3 bg-primary-container text-white font-black text-xs uppercase cursor-pointer transition-transform active:translate-x-1">
+<span class="material-symbols-outlined">radar</span>
+<span>Signal Tower</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-on-surface opacity-70 text-xs uppercase cursor-pointer hover:bg-surface-container-highest hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">map</span>
+<span>Dead Zone Map</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-on-surface opacity-70 text-xs uppercase cursor-pointer hover:bg-surface-container-highest hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Resource Scavenge</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-on-surface opacity-70 text-xs uppercase cursor-pointer hover:bg-surface-container-highest hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">history_edu</span>
+<span>Incident Log</span>
+</div>
+</nav>
+<div class="p-4 mt-auto space-y-2 border-t border-outline-variant">
+<button class="w-full bg-primary-container/80 text-white font-bold text-xs py-3 uppercase tracking-widest hover:bg-primary transition-colors duration-100">INITIATE_SWEEP</button>
+<div class="flex justify-between px-2 pt-2">
+<div class="flex items-center gap-2 text-on-surface opacity-50 text-[10px] font-bold uppercase cursor-pointer hover:text-primary hover:opacity-100">
+<span class="material-symbols-outlined text-sm">terminal</span>
+                TERMINAL
+            </div>
+<div class="flex items-center gap-2 text-on-surface opacity-50 text-[10px] font-bold uppercase cursor-pointer hover:text-error hover:opacity-100">
+<span class="material-symbols-outlined text-sm">power_settings_new</span>
+                LOGOUT
+            </div>
+</div>
+</div>
+</aside>
+<main class="ml-64 mt-16 p-8 min-h-screen">
+<header class="mb-10 flex justify-between items-end">
+<div>
+<h1 class="text-5xl font-black uppercase tracking-tighter text-on-surface">CEDAR_HACK_FLEET</h1>
+<p class="text-primary font-bold tracking-[0.3em] uppercase text-xs mt-2">Precision Control Interface // Unit ID: CH-9900</p>
+</div>
+<div class="text-right">
+<div class="text-secondary font-mono text-sm">[ SYSTEM_STATUS: OPERATIONAL ]</div>
+<div class="text-outline text-xs mt-1">Uptime: 142:55:09:12</div>
+</div>
+</header>
+<div class="grid grid-cols-12 gap-6">
+<div class="col-span-12 md:col-span-4 bg-surface-container-low border-2 border-outline-variant p-6 relative overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">RESOURCE QUOTA</h2>
+<span class="material-symbols-outlined text-primary text-sm">analytics</span>
+</div>
+<div class="flex flex-col items-center justify-center py-4">
+<div class="relative w-48 h-48">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-highest" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502.6" stroke-dashoffset="125.6" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-4xl font-black text-on-surface">75%</span>
+<span class="text-[10px] font-bold text-outline uppercase tracking-tighter">Harvest Target</span>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-2 gap-8 w-full text-center">
+<div>
+<div class="text-xs text-outline uppercase font-bold">Processed</div>
+<div class="text-lg font-black text-secondary">1,402kg</div>
+</div>
+<div>
+<div class="text-xs text-outline uppercase font-bold">Remaining</div>
+<div class="text-lg font-black text-error opacity-80">465kg</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-8 bg-surface-container-low border-2 border-outline-variant p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">ACTIVE SCAVENGE UNITS</h2>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-secondary text-black text-[10px] font-bold">ACTIVE: 04</span>
+<span class="px-2 py-1 bg-error text-white text-[10px] font-bold">ALERT: 01</span>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-4 bg-[#1a1918] hover:bg-surface-container-highest transition-colors border-l-4 border-secondary">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary" data-weight="fill">robot_2</span>
+<div>
+<div class="text-sm font-bold uppercase tracking-tight">Crawler-Alpha_01</div>
+<div class="text-[10px] text-outline font-mono">COORD: 34.002 / -118.243</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[10px] text-outline uppercase font-bold">Battery</div>
+<div class="text-sm font-black text-secondary">88%</div>
+</div>
+<span class="px-3 py-1 bg-secondary/10 border border-secondary/50 text-secondary text-[10px] font-black uppercase">HARVESTING</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-[#1a1918] hover:bg-surface-container-highest transition-colors border-l-4 border-secondary">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary" data-weight="fill">robot_2</span>
+<div>
+<div class="text-sm font-bold uppercase tracking-tight">Crawler-Beta_04</div>
+<div class="text-[10px] text-outline font-mono">COORD: 34.015 / -118.256</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[10px] text-outline uppercase font-bold">Battery</div>
+<div class="text-sm font-black text-secondary">62%</div>
+</div>
+<span class="px-3 py-1 bg-secondary/10 border border-secondary/50 text-secondary text-[10px] font-black uppercase">HARVESTING</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-[#1a1918] hover:bg-surface-container-highest transition-colors border-l-4 border-error/50">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-error/80" data-weight="fill">robot_2</span>
+<div>
+<div class="text-sm font-bold uppercase tracking-tight">Crawler-Gamma_09</div>
+<div class="text-[10px] text-outline font-mono">COORD: 33.992 / -118.210</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[10px] text-outline uppercase font-bold">Battery</div>
+<div class="text-sm font-black text-error/80">12%</div>
+</div>
+<span class="px-3 py-1 bg-error/10 border border-error/50 text-error/80 text-[10px] font-black uppercase">LOW_FUEL</span>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-7 bg-surface-container-low border-2 border-outline-variant p-6">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary mb-6">CRAWLER_DYNAMICS (CH-01)</h2>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-4 bg-background border border-outline-variant">
+<div class="text-[10px] text-outline font-bold uppercase mb-2">Traction Control</div>
+<div class="flex items-end gap-1 h-12">
+<div class="flex-1 bg-secondary-container h-[40%]"></div>
+<div class="flex-1 bg-secondary-container h-[60%]"></div>
+<div class="flex-1 bg-secondary-container h-[85%]"></div>
+<div class="flex-1 bg-secondary-container h-[70%]"></div>
+<div class="flex-1 bg-primary-container h-[95%]"></div>
+</div>
+<div class="mt-2 text-right text-xs font-black">9.5 G/s</div>
+</div>
+<div class="p-4 bg-background border border-outline-variant">
+<div class="text-[10px] text-outline font-bold uppercase mb-2">Hull Integrity</div>
+<div class="flex items-center justify-between h-12">
+<span class="text-2xl font-black text-secondary">98.4%</span>
+<span class="material-symbols-outlined text-outline">verified_user</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 mt-2">
+<div class="bg-secondary h-full w-[98%]"></div>
+</div>
+</div>
+<div class="p-4 bg-background border border-outline-variant col-span-2 relative">
+<div class="text-[10px] text-outline font-bold uppercase mb-4">Lidar Feed (Sector 7-A)</div>
+<div class="h-48 bg-surface-container-highest flex items-center justify-center border border-outline-variant relative overflow-hidden">
+<img alt="Corroded industrial machinery in a desolate landscape" class="w-full h-full object-cover sepia-filter opacity-60" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwogzKeNZLZAWe_3QRY611nf-zzp6B8g2LqkMTKQf-gftH8-A6iM_be4VHJWxGTCYWKHCytOQ9lsiNXmKGMHOpJGdLIilugzRxUP777CxM-oQlVovbtWdcDXENyXbbrCW0AnpaxsgZiJdxfgGiQaHinOxzCyTUyjhqrcVvoIUjq36klLTF-6VRiXivTwW5TDPsnrffVcX4ehtVcPBAqizHnVBfS9O7sYGOPOnu8MZa2TuBwU_HEXxKo4F8pWfJFIf_D3RxZbJrcLQ"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent"></div>
+<div class="absolute inset-0 border-[20px] border-transparent border-t-primary/10 border-l-primary/10 pointer-events-none"></div>
+<div class="absolute top-2 right-2 flex items-center gap-1 text-primary text-[8px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span> REC
+                        </div>
+<div class="absolute bottom-2 left-2 text-on-surface font-mono text-[10px] bg-black/50 px-2 py-1">
+                            ELEV: 12.4m // THREAT: NEGATIVE
+                        </div>
+<div class="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[length:100%_4px]"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-5 bg-surface-container-low border-2 border-outline-variant p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-black uppercase tracking-widest text-primary">INCIDENT_LOG_EXT</h2>
+<span class="text-[10px] font-mono text-outline">v2.4.0_LIVE</span>
+</div>
+<div class="space-y-4 font-mono text-xs overflow-y-auto max-h-[440px] pr-2">
+<div class="border-b border-outline-variant pb-2">
+<span class="text-secondary">[INFO]</span> <span class="text-outline">T-12:44:02</span>
+<p class="mt-1 text-on-surface opacity-90">Unit Alpha_01 reporting transition to Sector 7-C.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-primary">[WARN]</span> <span class="text-outline">T-12:43:55</span>
+<p class="mt-1 text-on-surface opacity-90">Unit Gamma_09 fuel reserves below 15%. Recommend immediate extraction sequence.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-secondary">[INFO]</span> <span class="text-outline">T-12:40:12</span>
+<p class="mt-1 text-on-surface opacity-90">Signal strength optimized via Signal Tower 04. 12ms latency achieved.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-error opacity-80">[CRIT]</span> <span class="text-outline">T-12:35:10</span>
+<p class="mt-1 text-on-surface opacity-90">Scavenge Unit Delta_02 signal lost in 'The Dead Zone'. Initiating ping sweep.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-secondary">[INFO]</span> <span class="text-outline">T-12:30:00</span>
+<p class="mt-1 text-on-surface opacity-90">Daily quota update: 75% complete. 5 hours remaining in operation window.</p>
+</div>
+<div class="border-b border-outline-variant pb-2">
+<span class="text-primary">[WARN]</span> <span class="text-outline">T-12:15:22</span>
+<p class="mt-1 text-on-surface opacity-90">Ambient radiation spike detected in grid coordinate 88-FF.</p>
+</div>
+</div>
+</div>
+</div>
+<footer class="mt-12 flex justify-between items-center border-t border-outline-variant pt-6">
+<div class="flex gap-12">
+<div>
+<div class="text-[10px] font-bold text-outline uppercase tracking-widest">NETWORK</div>
+<div class="text-sm font-black text-secondary">ESTABLISHED</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-outline uppercase tracking-widest">ENCRYPTION</div>
+<div class="text-sm font-black text-secondary">AES_256_ACTIVE</div>
+</div>
+<div>
+<div class="text-[10px] font-bold text-outline uppercase tracking-widest">LATENCY</div>
+<div class="text-sm font-black text-on-surface">0.02ms</div>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2 border-2 border-outline-variant text-outline font-bold text-xs uppercase hover:bg-surface-container-highest hover:text-on-surface transition-all">SYSTEM_REPORT</button>
+<button class="px-6 py-2 bg-primary-container text-white font-black text-xs uppercase tracking-tighter glow-rust hover:bg-primary transition-colors">EMERGENCY_RECALL</button>
+</div>
+</footer>
+</main>
+<div class="fixed bottom-8 right-8 z-50">
+<button class="w-16 h-16 bg-primary text-black shadow-[0_0_20px_rgba(166,93,55,0.4)] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform group">
+<span class="material-symbols-outlined text-3xl font-black">add</span>
+<div class="absolute right-20 bg-background border-2 border-primary px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+<span class="text-primary font-black text-xs">NEW_SCAVENGE_OP</span>
+</div>
+</button>
+</div>
+
+</body></html>

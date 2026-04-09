@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CEDAR_TECH Scheduler | FORESTER_OS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Space+Grotesk:wght@300;400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        .glass-panel {
+            background: rgba(50, 54, 50, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .hud-corner {
+            position: relative;
+        }
+        .hud-corner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 8px;
+            border-top: 2px solid #b8cbbb;
+            border-left: 2px solid #b8cbbb;
+        }
+        .hud-corner::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            border-bottom: 2px solid #b8cbbb;
+            border-right: 2px solid #b8cbbb;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111411;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #323632;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e1e3de",
+                        "tertiary-fixed": "#ffd9dc",
+                        "secondary-container": "#50462f",
+                        "tertiary-container": "#533538",
+                        "on-tertiary-fixed": "#2d1417",
+                        "on-surface-variant": "#c0c9bf",
+                        "on-error": "#690005",
+                        "tertiary": "#e7bcbf",
+                        "primary-container": "#304135",
+                        "primary-fixed-dim": "#b8cbbb",
+                        "outline-variant": "#404941",
+                        "surface-container-high": "#272b27",
+                        "primary": "#b8cbbb",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#0c0f0c",
+                        "surface-container-highest": "#323632",
+                        "on-secondary-container": "#c2b496",
+                        "on-primary-fixed": "#0f1f15",
+                        "on-primary-fixed-variant": "#3a4b3e",
+                        "primary-fixed": "#d4e7d7",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#50462f",
+                        "surface-bright": "#373a36",
+                        "inverse-on-surface": "#2e312e",
+                        "background": "#111411",
+                        "on-primary": "#243429",
+                        "surface-container": "#1d201d",
+                        "on-surface": "#e1e3de",
+                        "inverse-primary": "#516355",
+                        "surface-container-low": "#191c19",
+                        "surface-variant": "#323632",
+                        "surface-dim": "#111411",
+                        "outline": "#8a938a",
+                        "on-primary-container": "#9aad9d",
+                        "secondary": "#d4c5a7",
+                        "on-tertiary-fixed-variant": "#5e3e41",
+                        "surface-tint": "#b8cbbb",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e1e3de",
+                        "secondary-fixed": "#f1e1c2",
+                        "secondary-fixed-dim": "#d4c5a7",
+                        "on-secondary": "#382f1a",
+                        "surface": "#111411",
+                        "on-tertiary-container": "#c79ea1",
+                        "on-tertiary": "#45292c",
+                        "on-secondary-fixed": "#221b07",
+                        "tertiary-fixed-dim": "#e7bcbf"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- Top Navigation Anchor -->
+<header class="bg-[#101415]/60 backdrop-blur-md fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-6 h-16 w-full shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="text-xl font-light tracking-[0.2em] text-primary uppercase font-headline">CEDAR_TECH</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex gap-8 items-center font-headline text-sm tracking-widest uppercase">
+<a class="text-slate-500 hover:bg-primary-container/20 transition-colors px-3 py-1 rounded" href="#">Telemetry</a>
+<a class="text-slate-500 hover:bg-primary-container/20 transition-colors px-3 py-1 rounded" href="#">Projects</a>
+<a class="text-primary border-b-2 border-primary px-3 py-1" href="#">Scheduler</a>
+<a class="text-slate-500 hover:bg-primary-container/20 transition-colors px-3 py-1 rounded" href="#">Fleet</a>
+</div>
+<div class="flex gap-4 items-center">
+<span class="material-symbols-outlined text-slate-500 cursor-pointer hover:text-primary transition-colors">notifications</span>
+<span class="material-symbols-outlined text-slate-500 cursor-pointer hover:text-primary transition-colors">settings</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline/30">
+<img alt="Operator profile avatar" data-alt="professional male operator avatar in tech environment with cinematic lighting and soft bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUoxhUpe37vHsd7xsxs3cR2UOj06Q5rzM_kKpmg30_xedAszJ_vXWIr_O4BeNGuM4LJ_Hf24Db3wTsoSlZEL4CBTksWbY_fdJrto690GpU-4lFyWvbza7J7SwMoRFv5M4nwcabv8BpNUOKU2Ytldtop4IEmevaNLKtWm-nHx-fMVRbQCZbj0rhWl28jUOR16EkXPeCAnrqMWQT6r0B0Id6UaSaysEcSUhB5QZoGn-sfYHcy9IXerYCFfYGhSwXzUmNdatAO0Yyw9w"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Sidebar Navigation -->
+<nav class="hidden md:flex bg-[#101415] h-screen w-64 fixed left-0 top-0 overflow-y-auto flex-col py-8 z-40">
+<div class="px-6 mb-8">
+<div class="text-lg font-bold text-primary font-headline">FORESTER_OS</div>
+<div class="text-[10px] text-outline font-label tracking-widest uppercase">v4.2.0-STABLE</div>
+</div>
+<div class="flex-grow space-y-1">
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 font-label text-sm tracking-widest uppercase hover:bg-primary-container/10 transition-all" href="#">
+<span class="material-symbols-outlined">query_stats</span> Telemetry
+            </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 font-label text-sm tracking-widest uppercase hover:bg-primary-container/10 transition-all" href="#">
+<span class="material-symbols-outlined">precision_manufacturing</span> Projects
+            </a>
+<a class="bg-primary-container/10 text-primary border-l-4 border-primary px-6 py-3 flex items-center gap-3 font-label text-sm tracking-widest uppercase" href="#">
+<span class="material-symbols-outlined">calendar_view_day</span> Scheduler
+            </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 font-label text-sm tracking-widest uppercase hover:bg-primary-container/10 transition-all" href="#">
+<span class="material-symbols-outlined">badge</span> Clients
+            </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 font-label text-sm tracking-widest uppercase hover:bg-primary-container/10 transition-all" href="#">
+<span class="material-symbols-outlined">construction</span> Fleet
+            </a>
+</div>
+<div class="px-6 mt-auto space-y-4">
+<button class="w-full bg-gradient-to-r from-primary-container to-primary/40 text-on-primary py-3 rounded-lg font-headline font-bold text-xs tracking-widest uppercase shadow-lg shadow-primary/5 active:scale-95 duration-150">
+                Initiate Job
+            </button>
+<div class="pt-6 border-t border-outline/10 space-y-1">
+<a class="text-slate-400 py-2 flex items-center gap-3 font-label text-[10px] tracking-widest uppercase hover:text-primary" href="#">
+<span class="material-symbols-outlined !text-lg">help_center</span> Support
+                </a>
+<a class="text-slate-400 py-2 flex items-center gap-3 font-label text-[10px] tracking-widest uppercase hover:text-primary" href="#">
+<span class="material-symbols-outlined !text-lg">terminal</span> Logs
+                </a>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="md:pl-64 pt-16 h-screen flex">
+<!-- Left Side: Pending Estimates Sidebar -->
+<aside class="w-72 bg-surface-container-low p-6 flex flex-col gap-6 overflow-y-auto hidden lg:flex">
+<div>
+<h3 class="font-headline text-lg font-light tracking-tight text-on-surface mb-1">Pending Estimates</h3>
+<p class="text-[10px] font-label text-outline uppercase tracking-widest">DRAG TO TIMELINE</p>
+</div>
+<div class="space-y-4">
+<!-- Estimate Card 1 -->
+<div class="p-4 bg-surface-container-highest border-l-2 border-primary/40 hover:border-primary transition-colors cursor-grab active:cursor-grabbing group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[9px] font-label text-primary uppercase tracking-widest">Est #8812</span>
+<span class="material-symbols-outlined !text-sm text-outline group-hover:text-primary">drag_indicator</span>
+</div>
+<div class="text-sm font-semibold mb-1">Pine Valley Clearing</div>
+<div class="text-[11px] text-outline mb-3">4.2 Acres • Heavy Brush</div>
+<div class="flex items-center gap-2 text-[10px] font-label text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">person</span>
+                        Marcus Thorne
+                    </div>
+</div>
+<!-- Estimate Card 2 -->
+<div class="p-4 bg-surface-container-highest border-l-2 border-primary/40 hover:border-primary transition-colors cursor-grab active:cursor-grabbing group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[9px] font-label text-primary uppercase tracking-widest">Est #8814</span>
+<span class="material-symbols-outlined !text-sm text-outline group-hover:text-primary">drag_indicator</span>
+</div>
+<div class="text-sm font-semibold mb-1">Oak Ridge Access</div>
+<div class="text-[11px] text-outline mb-3">1.5 Acres • Forestry Mulching</div>
+<div class="flex items-center gap-2 text-[10px] font-label text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">person</span>
+                        Sarah Jenkins
+                    </div>
+</div>
+<!-- Estimate Card 3 -->
+<div class="p-4 bg-surface-container-highest border-l-2 border-primary/40 hover:border-primary transition-colors cursor-grab active:cursor-grabbing group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[9px] font-label text-primary uppercase tracking-widest">Est #8815</span>
+<span class="material-symbols-outlined !text-sm text-outline group-hover:text-primary">drag_indicator</span>
+</div>
+<div class="text-sm font-semibold mb-1">Riverbed Site Prep</div>
+<div class="text-[11px] text-outline mb-3">8.0 Acres • Grading</div>
+<div class="flex items-center gap-2 text-[10px] font-label text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">person</span>
+                        Daniel Craig
+                    </div>
+</div>
+</div>
+</aside>
+<!-- Center: Calendar Grid -->
+<section class="flex-grow flex flex-col p-6 overflow-hidden">
+<div class="flex justify-between items-end mb-8">
+<div>
+<h1 class="font-headline text-4xl font-light tracking-tighter text-on-surface leading-none">OCTOBER 2024</h1>
+<div class="flex gap-4 mt-4 font-label text-[10px] tracking-widest uppercase text-outline">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span> Active Operations</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-secondary"></span> Maintenance</span>
+</div>
+</div>
+<div class="flex gap-px bg-surface-container-highest rounded p-1">
+<button class="px-4 py-1.5 text-[10px] font-label tracking-widest uppercase bg-surface-container-low text-on-surface rounded">Month</button>
+<button class="px-4 py-1.5 text-[10px] font-label tracking-widest uppercase text-outline hover:text-on-surface transition-colors">Week</button>
+</div>
+</div>
+<!-- Calendar Container -->
+<div class="flex-grow grid grid-cols-7 grid-rows-5 gap-px bg-outline-variant/20 rounded overflow-hidden relative">
+<!-- Day Labels -->
+<div class="absolute top-0 left-0 w-full grid grid-cols-7 border-b border-outline-variant/10 bg-surface-container-low z-10">
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">MON</div>
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">TUE</div>
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">WED</div>
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">THU</div>
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">FRI</div>
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">SAT</div>
+<div class="py-2 text-center text-[10px] font-label tracking-widest text-outline">SUN</div>
+</div>
+<!-- Calendar Cells (Simplified representation for layout) -->
+<!-- First row empty slots -->
+<div class="bg-surface-container-low h-full p-2 pt-10"></div>
+<!-- Oct 1 -->
+<div class="bg-surface-container-low h-full p-2 pt-10 group hover:bg-surface-container-highest transition-colors">
+<span class="text-xs font-headline text-outline group-hover:text-primary">01</span>
+</div>
+<!-- Oct 2 with Job -->
+<div class="bg-surface-container-low h-full p-2 pt-10 relative group">
+<span class="text-xs font-headline text-outline">02</span>
+<div class="mt-2 p-2 bg-primary/20 border-l-2 border-primary rounded-sm shadow-[0_0_15px_rgba(184,203,187,0.1)] cursor-pointer">
+<div class="text-[10px] font-bold text-primary truncate">HILLSIDE_EXCAV</div>
+<div class="text-[8px] text-primary/70">8:00 AM</div>
+</div>
+</div>
+<!-- Oct 3-4 with Multiday Job -->
+<div class="bg-surface-container-low h-full p-2 pt-10 relative">
+<span class="text-xs font-headline text-outline">03</span>
+<div class="absolute top-16 left-2 right-[-100%] z-20 h-8 bg-primary/30 border-t border-b border-primary/50 flex items-center px-3 shadow-[0_0_20px_rgba(184,203,187,0.2)]">
+<div class="text-[10px] font-bold text-on-primary-container tracking-wider truncate">VALLEY_CLEAR_PHASE_1</div>
+</div>
+</div>
+<div class="bg-surface-container-low h-full p-2 pt-10"><span class="text-xs font-headline text-outline">04</span></div>
+<div class="bg-surface-container-low h-full p-2 pt-10"><span class="text-xs font-headline text-outline">05</span></div>
+<div class="bg-surface-container-low h-full p-2 pt-10"><span class="text-xs font-headline text-outline">06</span></div>
+<!-- Rest of the grid filled with empty styled cells -->
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">07</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">08</span></div>
+<div class="bg-surface-container-low h-full p-2 relative">
+<span class="text-xs font-headline text-outline">09</span>
+<div class="mt-2 p-2 bg-secondary/20 border-l-2 border-secondary rounded-sm">
+<div class="text-[10px] font-bold text-secondary truncate">UNIT_X4_MAINT</div>
+</div>
+</div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">10</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">11</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">12</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">13</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">14</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">15</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">16</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline text-primary font-bold">17</span></div>
+<div class="bg-surface-container-low h-full p-2 relative">
+<span class="text-xs font-headline text-outline">18</span>
+<div class="mt-2 p-2 bg-primary border-l-2 border-on-primary-container rounded-sm">
+<div class="text-[10px] font-bold text-on-primary truncate">NORTH_PROJECT</div>
+</div>
+</div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">19</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">20</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">21</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">22</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">23</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">24</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">25</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">26</span></div>
+<div class="bg-surface-container-low h-full p-2 group hover:bg-surface-container-highest transition-colors"><span class="text-xs font-headline text-outline">27</span></div>
+</div>
+</section>
+<!-- Right Side: Job Details Panel -->
+<aside class="w-80 bg-[#191C1E] flex flex-col hidden xl:flex border-l border-outline-variant/10">
+<!-- HUD Header Section -->
+<div class="p-8 glass-panel hud-corner m-4 border border-outline-variant/20">
+<div class="text-[10px] font-label text-primary uppercase tracking-widest mb-4">Selected_Execution</div>
+<h2 class="font-headline text-2xl font-light leading-tight mb-2">VALLEY_CLEAR PHASE_1</h2>
+<div class="flex items-center gap-2 text-xs text-outline font-label uppercase tracking-wider mb-6">
+<span class="material-symbols-outlined !text-sm text-primary" style="font-variation-settings: 'FILL' 1;">circle</span>
+                    Operational Status: Active
+                </div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-3 bg-surface-container-lowest">
+<div class="text-[9px] text-outline uppercase font-label">Completion</div>
+<div class="text-lg font-headline text-primary">64%</div>
+</div>
+<div class="p-3 bg-surface-container-lowest">
+<div class="text-[9px] text-outline uppercase font-label">ETA</div>
+<div class="text-lg font-headline text-primary">2.5D</div>
+</div>
+</div>
+</div>
+<!-- Detail List -->
+<div class="flex-grow p-6 space-y-8 overflow-y-auto">
+<section>
+<h4 class="text-[10px] font-label text-outline uppercase tracking-[0.2em] mb-4">Client Identification</h4>
+<div class="flex items-center gap-4">
+<img alt="Client portrait" class="w-10 h-10 rounded-full border border-primary/20" data-alt="close up headshot of a female business client in professional attire with neutral lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-FNSr9LYIElIpRhVPUxLCt7bbv-CGpqXUpemOTat_SYUFdo6k2kZ3INHcb_zea3-D7-PFTBEgA9RxNna3RIn2npg0ZkwP1K4bGDlH3tFvZiyY_Hn7dDFa9P_Q5pp4ee6Dc08r-qKJtw5_ww_jcuzshcN2ioNIdaHBfDfuvAOyF2-3_gAeLasRzIYv8m2Ij2pQwGXQjIy3KUZrcMNiVK2-h6Q4-LlNw39mbHf-UI16dms_3ca0lLlyI8-yl5Cc9SfVKPh6BcY0THY"/>
+<div>
+<div class="text-sm font-bold">Artemis Land Dev Group</div>
+<div class="text-xs text-outline">Representative: Elena Vance</div>
+</div>
+</div>
+</section>
+<section>
+<h4 class="text-[10px] font-label text-outline uppercase tracking-[0.2em] mb-4">Deployment Location</h4>
+<div class="rounded-lg overflow-hidden h-32 relative mb-3 border border-outline-variant/20">
+<img alt="Job site location" class="w-full h-full object-cover grayscale brightness-50" data-alt="aerial satellite view of a forestry clearing site in a remote mountain region with green and brown textures" data-location="Blue Ridge Mountains" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoyb6GPXKkqNyvj5vc1iolXqcAbM13iUPLSmxoyYlrhcuLrEWzGpBpp6LGzgsp2Bq3Uk4fmOm2QrVjdVwLC0H5XsewzUmqmbYIwlFOgEDmIlMI4fckIGWDtjt_M4RAbOkjjhbh1vhv_16EqtHCA6mnMp5od6zy_IKRXsdITOEhhbmSSqQS4v4H9d8fsbUfS-4nuLBVVAcuxQjihfor08OK5RP7B7LVmgS3HiMO8f_Og6LYCwAxxme1ro2b_FNufudg4Cxj4eREHWQ"/>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary scale-150" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+</div>
+<div class="text-xs text-on-surface-variant font-label leading-relaxed">
+                        Sector 7-G, Blue Ridge Highlands<br/>
+                        35.5951° N, 82.5515° W
+                    </div>
+</section>
+<section>
+<h4 class="text-[10px] font-label text-outline uppercase tracking-[0.2em] mb-4">Assigned Assets</h4>
+<div class="space-y-2">
+<div class="flex justify-between items-center p-2 bg-surface-container-lowest hover:bg-surface-container-high transition-colors">
+<span class="text-xs font-label">UNIT_X4_MULCHER</span>
+<span class="text-[10px] text-primary uppercase font-bold">Online</span>
+</div>
+<div class="flex justify-between items-center p-2 bg-surface-container-lowest hover:bg-surface-container-high transition-colors">
+<span class="text-xs font-label">HAUL_TRUCK_09</span>
+<span class="text-[10px] text-outline uppercase font-bold">Standby</span>
+</div>
+<div class="flex justify-between items-center p-2 bg-surface-container-lowest hover:bg-surface-container-high transition-colors">
+<span class="text-xs font-label">GEO_DRONE_B</span>
+<span class="text-[10px] text-primary uppercase font-bold">In_Flight</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Panel Footer Actions -->
+<div class="p-6 border-t border-outline-variant/10 bg-surface-container-lowest">
+<button class="w-full py-4 border border-primary/20 text-primary font-headline text-xs tracking-widest uppercase hover:bg-primary/5 transition-all mb-3">
+                    Modify Schedule
+                </button>
+<button class="w-full py-2 text-[10px] text-error font-label tracking-widest uppercase opacity-60 hover:opacity-100 transition-opacity">
+                    De-Authorize Project
+                </button>
+</div>
+</aside>
+</main>
+<!-- Mobile View: Bottom Navigation (Suppressed per rule because this is high-level shell, but keeping for mobile context) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#101415]/90 backdrop-blur-md flex justify-around items-center px-4 z-50 border-t border-outline-variant/10">
+<span class="material-symbols-outlined text-outline">query_stats</span>
+<span class="material-symbols-outlined text-outline">precision_manufacturing</span>
+<span class="material-symbols-outlined text-primary">calendar_view_day</span>
+<span class="material-symbols-outlined text-outline">badge</span>
+<span class="material-symbols-outlined text-outline">construction</span>
+</nav>
+</body></html>

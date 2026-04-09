@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>UNIT_ID: X492 - TELEMETRY_HUD</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#c6c6c7",
+                        "primary-fixed": "#ffdbcc",
+                        "background": "#131313",
+                        "surface-dim": "#131313",
+                        "on-surface": "#e5e2e1",
+                        "primary": "#ffb693",
+                        "primary-fixed-dim": "#ffb693",
+                        "error": "#ffb4ab",
+                        "secondary-container": "#13ff43",
+                        "inverse-primary": "#a04100",
+                        "surface-tint": "#ffb693",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "secondary-fixed-dim": "#00e639",
+                        "on-secondary-fixed": "#002203",
+                        "outline": "#a98a7d",
+                        "inverse-on-surface": "#313030",
+                        "on-primary": "#561f00",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#007117",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "surface-container-low": "#1c1b1b",
+                        "surface": "#131313",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "on-secondary": "#003907",
+                        "on-primary-container": "#572000",
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "on-primary-fixed": "#351000",
+                        "on-tertiary-container": "#2f3132",
+                        "primary-container": "#ff6b00",
+                        "inverse-surface": "#e5e2e1",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "secondary-fixed": "#72ff70",
+                        "on-surface-variant": "#e2bfb0",
+                        "surface-container": "#201f1f",
+                        "surface-container-high": "#2a2a2a",
+                        "secondary": "#ecffe3",
+                        "outline-variant": "#5a4136",
+                        "surface-variant": "#353534",
+                        "tertiary-fixed": "#e2e2e2",
+                        "tertiary-container": "#989999",
+                        "surface-container-highest": "#353534",
+                        "surface-bright": "#3a3939",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-tertiary": "#2f3131"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .scanning-line {
+            background: linear-gradient(to bottom, transparent, #13ff4322, transparent);
+            height: 100px;
+            width: 100%;
+            position: absolute;
+            top: -100px;
+            animation: scan 4s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: -100px; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-container selection:text-background min-h-screen overflow-hidden flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-[#131313] text-[#FFB693] font-['Space_Grotesk'] uppercase tracking-tighter docked full-width top-0 border-b-2 border-[#A98A7D] flex justify-between items-center w-full px-6 py-4 z-[100]">
+<div class="text-2xl font-black text-[#FF6B00] tracking-widest">CEDAR_HACK_v1.0</div>
+<nav class="hidden md:flex gap-8 items-center">
+<span class="text-[#FFB693] font-bold cursor-default">TELEMETRY</span>
+<span class="text-[#E5E2E1] cursor-pointer hover:bg-[#FF6B00] hover:text-[#131313] px-2 py-1 transition-none">ANALYTICS</span>
+<span class="text-[#E5E2E1] cursor-pointer hover:bg-[#FF6B00] hover:text-[#131313] px-2 py-1 transition-none">LOGS</span>
+<span class="text-[#E5E2E1] cursor-pointer hover:bg-[#FF6B00] hover:text-[#131313] px-2 py-1 transition-none">NETWORK</span>
+</nav>
+<div class="flex items-center gap-4">
+<div class="flex items-center bg-surface-container border border-outline px-3 py-1 gap-2">
+<span class="material-symbols-outlined text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs p-0 w-32 placeholder:text-outline-variant" placeholder="X492_SEARCH" type="text"/>
+</div>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary-container">notifications_active</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary-container">settings_input_component</span>
+<div class="w-8 h-8 bg-surface-container border border-primary-container p-0.5">
+<img alt="OPERATOR_ID_0421" class="w-full h-full object-cover" data-alt="close-up gritty portrait of a heavy machine operator with tactical headset and digital reflection in glasses" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbUMlpkv9dTfYkeTY_pJvyl6DvnqZXQWrTUNih5RHT8UnEJTJNDHHnjJOVugbNlkFXKWpLDKTYtbzdL5CytEzAhKeLU2zcoUXhN8yaOjJDzn9PE61rKrYfTM9hI3ea9qLncMwDjA5puBBEJeAeqZFO4lJfp9wPS7KjIBqgO7g7vWZk4YASuTVTfvd8_biVia8ZCugNFSvCh8XVR8VpvJxkPCJJVE-smk7SYpezfIpqVfqa27sD7k6vZR4QSYKM7GmVsp7-rxI-UX8"/>
+</div>
+</div>
+</header>
+<main class="flex-1 flex flex-row overflow-hidden pt-1">
+<!-- Sidebar: Vitals & Health -->
+<aside class="w-80 flex flex-col border-r-2 border-outline bg-surface-container-lowest overflow-y-auto">
+<!-- HUD Header -->
+<div class="p-4 bg-primary-container text-background font-black tracking-widest flex justify-between items-center">
+<span>UNIT_ID: X492</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<!-- Live Vitals Section -->
+<section class="p-4 space-y-6 border-b border-outline-variant">
+<h3 class="text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
+<span class="w-2 h-2 bg-primary animate-pulse"></span> LIVE_VITALS
+                </h3>
+<div class="space-y-4">
+<!-- Gauge: Fuel Burn -->
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-outline">
+<span>FUEL_BURN_RATE</span>
+<span class="text-on-surface">12.4 GAL/HR</span>
+</div>
+<div class="h-2 bg-surface-container-high border border-outline-variant relative overflow-hidden">
+<div class="h-full bg-primary-container w-[65%]"></div>
+</div>
+</div>
+<!-- Gauge: Hydraulic Pressure -->
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-outline">
+<span>HYDRAULIC_PSI</span>
+<span class="text-secondary-container">3840 PSI</span>
+</div>
+<div class="h-2 bg-surface-container-high border border-outline-variant relative overflow-hidden">
+<div class="h-full bg-secondary-container w-[82%]"></div>
+</div>
+</div>
+<!-- Gauge: Engine RPM -->
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-outline">
+<span>ENGINE_RPM</span>
+<span class="text-on-surface">2,250</span>
+</div>
+<div class="h-2 bg-surface-container-high border border-outline-variant relative overflow-hidden">
+<div class="h-full bg-on-surface w-[45%]"></div>
+</div>
+</div>
+<!-- Gauge: Core Temp -->
+<div class="space-y-1">
+<div class="flex justify-between text-[10px] text-outline">
+<span>CORE_TEMP</span>
+<span class="text-error">214°F</span>
+</div>
+<div class="h-2 bg-surface-container-high border border-outline-variant relative overflow-hidden">
+<div class="h-full bg-error w-[88%]"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Mechanical Health Section -->
+<section class="p-4 space-y-4 bg-surface-container-low">
+<h3 class="text-xs font-bold text-secondary-container tracking-widest uppercase flex items-center gap-2">
+<span class="w-2 h-2 bg-secondary-container"></span> MECHANICAL_HEALTH
+                </h3>
+<!-- Fault Codes -->
+<div class="border border-outline-variant p-2 bg-surface-container-lowest">
+<div class="text-[9px] text-outline-variant uppercase font-bold mb-2">ACTIVE_FAULT_CODES</div>
+<div class="flex items-center gap-2 text-error text-[11px] border-l-2 border-error pl-2 py-1 bg-error/10">
+<span class="material-symbols-outlined text-xs">warning</span>
+<span>F-042: SENSOR_LIFT_DELAY</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface text-[11px] mt-1 pl-2 py-1">
+<span class="material-symbols-outlined text-xs text-outline">info</span>
+<span>SYSTEM_IDLE: NOMINAL</span>
+</div>
+</div>
+<!-- Next Service -->
+<div class="grid grid-cols-2 gap-2">
+<div class="border border-outline-variant p-3">
+<div class="text-[9px] text-outline uppercase font-bold">TOTAL_HOURS</div>
+<div class="text-xl font-black text-on-surface mt-1 tracking-tight">1,248.6</div>
+</div>
+<div class="border border-outline-variant p-3 bg-primary-container/5">
+<div class="text-[9px] text-primary uppercase font-bold">SERVICE_DUE</div>
+<div class="text-xl font-black text-primary mt-1 tracking-tight">IN_14.2h</div>
+</div>
+</div>
+</section>
+<!-- Machine Visualizer Card -->
+<div class="mt-auto p-4 border-t border-outline-variant bg-surface-container-highest">
+<div class="aspect-video bg-background border border-outline relative overflow-hidden">
+<img alt="Barko Mulcher" class="w-full h-full object-cover grayscale brightness-50 contrast-125" data-alt="industrial heavy-duty barko mulcher machine in a dark warehouse with cinematic high-contrast lighting and orange accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2cZQeEkCbYSq5JdVw01dpQwJqbuJzPWZERpkYPa-1ormKCzz6O3NaAV5FgKy4Xs1YunwF_m1R2kUmUR_LzvHhnfTsee_fPOOTBDD93qQOoNi-JXYSJuKuYTq_Q2HwJ3OqAk-8Y_-8DjGNhPA1kDVH24wH8YeLUGXgXNMusTUkyUiMFRQHPPH6JNu8918LMYOtAvLdpEpII5pDTv-bDsi-bWkeCtFlrpg19oSH1-I5ttvwp_n4qoKtVlK6vGb4EdyfG0RwAwunIyI"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-60"></div>
+<div class="absolute bottom-2 left-2 flex gap-1">
+<div class="w-2 h-2 bg-secondary-container animate-pulse"></div>
+<div class="text-[8px] text-secondary-container font-black uppercase">CHASSIS_STABLE</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content: Map and Bottom Panel -->
+<div class="flex-1 flex flex-col">
+<!-- GPS Track Map -->
+<div class="flex-1 relative bg-surface-container-lowest">
+<div class="absolute inset-0 bg-[#080808]" data-location="Northwoods Forest, USA" style="">
+<!-- Simulated Satellite Base -->
+<img alt="Satellite Map" class="w-full h-full object-cover opacity-40" data-alt="aerial top-down satellite view of a dense forest with a cleared machinery path, dark moody tones, industrial green path overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDycgkDIYnjYC_VsdiT8pDDSyE9e8vZ2ppIWSMMghBY4PotcPeOatUx7Wz23dYwqOSML5dWFzO0MPW_gs6DNm2ynKR8xY6G9DFtRU7ICvm4RcGevKbZBc2_n6UVmFkjp5b1eq9Vh8eVvxkwmeHmsCvZLewSMsL40jPKcKkFw0DytMQCeGdUUHBNlDN3gvYrOUzTeybm-JGFgqUwkSpquKEtZauBnNp_nNpzOt8QZD9h9KDOS4IoB9pPaQG5q6gGF_0esIKsINptqY"/>
+<!-- SVG Overlay for GPS Path -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-80" viewbox="0 0 1000 1000">
+<path d="M 200,800 L 250,750 L 300,720 L 350,730 L 400,680 L 450,650 L 480,600 L 520,580 L 580,550 L 650,520 L 700,480" fill="none" stroke="#13ff43" stroke-linecap="square" stroke-linejoin="bevel" stroke-width="24" style="filter: drop-shadow(0 0 10px #13ff4355); opacity: 0.6;"></path>
+<circle class="animate-ping" cx="700" cy="480" fill="#ff6b00" r="8"></circle>
+<circle cx="700" cy="480" fill="#ff6b00" r="4"></circle>
+</svg>
+</div>
+<!-- Map HUD Elements -->
+<div class="absolute top-4 left-4 p-4 bg-background/80 backdrop-blur-md border border-outline border-l-4 border-l-primary-container z-10">
+<div class="text-[10px] text-primary font-black mb-1 uppercase tracking-widest">LIVE_COORDINATES</div>
+<div class="text-lg font-bold text-on-surface leading-tight">46.8131° N<br/>92.1077° W</div>
+<div class="mt-2 text-[9px] text-outline uppercase font-bold border-t border-outline-variant pt-2">HEADING: 312° NW</div>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
+<button class="w-10 h-10 bg-background border border-outline text-on-surface flex items-center justify-center hover:bg-primary-container hover:text-background transition-none">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="w-10 h-10 bg-background border border-outline text-on-surface flex items-center justify-center hover:bg-primary-container hover:text-background transition-none">
+<span class="material-symbols-outlined">remove</span>
+</button>
+<button class="w-10 h-10 bg-background border border-outline text-on-surface flex items-center justify-center hover:bg-primary-container hover:text-background transition-none">
+<span class="material-symbols-outlined">layers</span>
+</button>
+</div>
+<div class="absolute bottom-4 right-4 p-3 bg-surface-container-highest border border-outline text-[10px] font-bold z-10">
+<div class="flex items-center gap-2 mb-1">
+<span class="w-3 h-1.5 bg-secondary-container"></span>
+<span class="text-on-surface uppercase">AREA_CLEARED_TODAY: 12.4 ACRES</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-1.5 bg-outline"></span>
+<span class="text-outline uppercase">PLANNED_BOUNDARY</span>
+</div>
+</div>
+<div class="scanning-line"></div>
+</div>
+<!-- Bottom Panel: Efficiency Chart -->
+<footer class="h-64 border-t-2 border-outline bg-surface-container-lowest p-6 flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<div class="space-y-1">
+<h2 class="text-xl font-black text-on-surface tracking-tighter uppercase">SWATH_EFFICIENCY_METRIC</h2>
+<p class="text-[10px] text-outline font-bold uppercase tracking-widest">REAL-TIME COMPARISON: AREA CLEARED VS ENGINE HOURS</p>
+</div>
+<div class="flex gap-4">
+<div class="text-right">
+<div class="text-[9px] text-outline font-bold">AVG_EFFICIENCY</div>
+<div class="text-2xl font-black text-secondary-container">94.2%</div>
+</div>
+<div class="text-right">
+<div class="text-[9px] text-outline font-bold">REMAINING_EST</div>
+<div class="text-2xl font-black text-primary">02:44:15</div>
+</div>
+</div>
+</div>
+<!-- Efficiency Chart Simulation -->
+<div class="flex-1 flex items-end gap-1 px-4 py-2 border border-outline-variant bg-background">
+<div class="h-[20%] w-full bg-secondary-container/20 border-t border-secondary-container"></div>
+<div class="h-[35%] w-full bg-secondary-container/20 border-t border-secondary-container"></div>
+<div class="h-[32%] w-full bg-secondary-container/20 border-t border-secondary-container"></div>
+<div class="h-[45%] w-full bg-secondary-container/20 border-t border-secondary-container"></div>
+<div class="h-[60%] w-full bg-secondary-container/40 border-t border-secondary-container"></div>
+<div class="h-[55%] w-full bg-secondary-container/20 border-t border-secondary-container"></div>
+<div class="h-[75%] w-full bg-secondary-container/60 border-t border-secondary-container"></div>
+<div class="h-[68%] w-full bg-secondary-container/20 border-t border-secondary-container"></div>
+<div class="h-[80%] w-full bg-secondary-container/70 border-t border-secondary-container"></div>
+<div class="h-[85%] w-full bg-secondary-container border-t border-secondary-container"></div>
+<div class="h-[78%] w-full bg-secondary-container border-t border-secondary-container"></div>
+<div class="h-[92%] w-full bg-secondary-container border-t-2 border-secondary-container"></div>
+<div class="h-[88%] w-full bg-secondary-container border-t border-secondary-container"></div>
+<div class="h-[95%] w-full bg-secondary-container border-t-2 border-secondary-container"></div>
+<div class="h-[100%] w-full bg-secondary-container border-t-4 border-secondary-container"></div>
+<!-- Reference Line -->
+<div class="absolute left-10 right-10 bottom-32 h-[1px] bg-primary border-t border-dashed border-primary opacity-30 pointer-events-none"></div>
+<span class="absolute right-12 bottom-32 text-[8px] text-primary font-bold uppercase">OPTIMAL_TARGET</span>
+</div>
+</footer>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-[#131313] border-t-2 border-[#A98A7D] shadow-[0_-4px_40px_rgba(255,107,0,0.1)] h-16">
+<div class="flex flex-col items-center justify-center bg-[#FF6B00] text-[#131313] p-2 h-full w-full cursor-pointer transition-all duration-75 active:scale-95">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">sensors</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">TELEMETRY</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#E5E2E1] p-2 h-full w-full cursor-pointer hover:bg-[#353534] transition-all duration-75 active:scale-95">
+<span class="material-symbols-outlined text-2xl">bar_chart_4_bars</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">ANALYTICS</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#E5E2E1] p-2 h-full w-full cursor-pointer hover:bg-[#353534] transition-all duration-75 active:scale-95">
+<span class="material-symbols-outlined text-2xl">construction</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">LOGS</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#E5E2E1] p-2 h-full w-full cursor-pointer hover:bg-[#353534] transition-all duration-75 active:scale-95">
+<span class="material-symbols-outlined text-2xl">hub</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase mt-1">NETWORK</span>
+</div>
+</nav>
+<!-- UI Interaction Overlays -->
+<div class="fixed top-24 right-0 w-2 h-48 bg-primary-container/20 border-l border-primary-container animate-pulse"></div>
+<div class="fixed bottom-24 left-0 w-1 h-32 bg-secondary-container/20 border-r border-secondary-container"></div>
+</body></html>

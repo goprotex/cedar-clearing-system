@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HEAVY_MECH_OS_V4 - POST_OP_ANALYTICS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #131313;
+            color: #E5E2E1;
+            overflow: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scanline {
+            background: linear-gradient(to bottom, rgba(19, 255, 67, 0) 50%, rgba(19, 255, 67, 0.05) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1c1b1b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353534;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-container": "#572000",
+                        "surface-container-lowest": "#0e0e0e",
+                        "surface-container-low": "#1c1b1b",
+                        "primary-container": "#ff6b00",
+                        "inverse-on-surface": "#313030",
+                        "inverse-primary": "#a04100",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "on-secondary-container": "#007117",
+                        "surface-dim": "#131313",
+                        "on-error": "#690005",
+                        "on-secondary-fixed": "#002203",
+                        "on-secondary-fixed-variant": "#00530e",
+                        "surface-variant": "#353534",
+                        "on-tertiary": "#2f3131",
+                        "on-secondary": "#003907",
+                        "error-container": "#93000a",
+                        "tertiary-container": "#989999",
+                        "secondary": "#ecffe3",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "surface-container-highest": "#353534",
+                        "primary-fixed-dim": "#ffb693",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed": "#ffdbcc",
+                        "error": "#ffb4ab",
+                        "background": "#131313",
+                        "on-primary-fixed": "#351000",
+                        "outline": "#a98a7d",
+                        "on-background": "#e5e2e1",
+                        "tertiary": "#c6c6c7",
+                        "surface-container": "#201f1f",
+                        "surface-bright": "#3a3939",
+                        "surface-tint": "#ffb693",
+                        "outline-variant": "#5a4136",
+                        "on-surface-variant": "#e2bfb0",
+                        "inverse-surface": "#e5e2e1",
+                        "on-surface": "#e5e2e1",
+                        "secondary-container": "#13ff43",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-tertiary-container": "#2f3132",
+                        "on-primary": "#561f00",
+                        "primary": "#ffb693",
+                        "tertiary-fixed": "#e2e2e2",
+                        "surface": "#131313",
+                        "secondary-fixed": "#72ff70",
+                        "secondary-fixed-dim": "#00e639"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "0px"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface select-none">
+<header class="fixed top-0 w-full border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center h-16 px-6 z-50">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-bold text-[#FFB693] font-['Space_Grotesk'] uppercase tracking-tight">HEAVY_MECH_OS_V4</span>
+<div class="h-4 w-[2px] bg-[#353534]"></div>
+<span class="font-['Space_Grotesk'] text-xs text-[#E5E2E1] opacity-60 tracking-[0.2em]">POST_OP_ANALYTICS_HUB</span>
+</div>
+<div class="flex items-center space-x-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#FFB693] text-sm" data-icon="history">history</span>
+<span class="text-xs font-bold font-['Space_Grotesk'] uppercase">SESSION_RECAP_2024.10.14</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#13FF43] text-sm" data-icon="cloud_done">cloud_done</span>
+<span class="text-xs font-bold font-['Space_Grotesk'] uppercase">DATA_SYNC_COMPLETE</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#FFB693] text-sm" data-icon="download">download</span>
+<span class="text-xs font-bold font-['Space_Grotesk'] uppercase">EXPORT_LOGS</span>
+</div>
+</div>
+</header>
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-24 border-r-2 border-[#353534] bg-[#131313] flex flex-col items-center py-4 space-y-2 z-40">
+<div class="mb-4 flex flex-col items-center text-center">
+<div class="w-12 h-12 bg-[#353534] flex items-center justify-center border border-[#FFB693] mb-1">
+<span class="material-symbols-outlined text-[#FFB693]" data-icon="person">person</span>
+</div>
+<span class="font-['Space_Grotesk'] text-[8px] font-bold uppercase text-[#FFB693]">ANALYST_082</span>
+</div>
+<nav class="w-full flex flex-col items-center flex-1">
+<button class="text-[#E5E2E1] w-full py-4 flex flex-col items-center justify-center opacity-70 hover:bg-[#353534] transition-colors">
+<span class="material-symbols-outlined mb-1" data-icon="explore">explore</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">OVERVIEW</span>
+</button>
+<button class="bg-[#FF6B00] text-black w-full py-4 flex flex-col items-center justify-center border-l-4 border-[#13FF43]">
+<span class="material-symbols-outlined mb-1" data-icon="analytics" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">PERFORMANCE</span>
+</button>
+<button class="text-[#E5E2E1] w-full py-4 flex flex-col items-center justify-center opacity-70 hover:bg-[#353534] transition-colors">
+<span class="material-symbols-outlined mb-1" data-icon="query_stats">query_stats</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">METRICS</span>
+</button>
+<button class="text-[#E5E2E1] w-full py-4 flex flex-col items-center justify-center opacity-70 hover:bg-[#353534] transition-colors">
+<span class="material-symbols-outlined mb-1" data-icon="folder_zip">folder_zip</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">ARCHIVE</span>
+</button>
+</nav>
+<div class="mt-auto w-full">
+<button class="text-[#E5E2E1] w-full py-4 flex flex-col items-center justify-center opacity-70 hover:bg-[#353534] transition-colors border-t border-[#353534]">
+<span class="material-symbols-outlined mb-1" data-icon="settings">settings</span>
+<span class="font-['Space_Grotesk'] text-[10px] font-bold uppercase">ADMIN</span>
+</button>
+<button class="w-full bg-[#353534] text-white py-4 font-bold text-[10px] uppercase tracking-tighter">EXIT_HUB</button>
+</div>
+</aside>
+<main class="ml-24 mt-16 h-[calc(100vh-64px)] grid grid-cols-12 overflow-hidden relative">
+<section class="col-span-8 flex flex-col bg-surface-container-lowest border-r-2 border-[#353534] overflow-y-auto">
+<div class="grid grid-cols-2 border-b-2 border-[#353534] h-[300px]">
+<div class="relative border-r-2 border-[#353534] overflow-hidden group">
+<div class="absolute top-2 left-2 z-10 bg-black/80 border border-[#353534] px-2 py-1 text-[8px] font-bold text-[#FFB693]">OPERATIONAL_FOOTPRINT</div>
+<div class="w-full h-full bg-[#0e0e0e] relative">
+<div class="absolute inset-0" style="background-image: linear-gradient(to right, #2a2a2a 1px, transparent 1px), linear-gradient(to bottom, #2a2a2a 1px, transparent 1px); background-size: 30px 30px;"></div>
+<svg class="absolute inset-0 w-full h-full opacity-40">
+<polyline fill="none" points="50,250 120,240 180,200 220,210 300,150 380,180" stroke="#13FF43" stroke-width="12"></polyline>
+</svg>
+<div class="absolute top-[180px] left-[380px] w-4 h-4 bg-[#FF6B00] rotate-45 border border-white"></div>
+</div>
+<div class="scanline absolute inset-0"></div>
+</div>
+<div class="p-6 flex flex-col">
+<h3 class="text-[#FFB693] text-xs font-bold uppercase mb-4 tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">summarize</span> EFFICIENCY_RECAP
+                </h3>
+<div class="space-y-3">
+<div class="flex justify-between border-b border-[#353534] pb-2">
+<span class="text-[10px] opacity-60 uppercase">TOTAL_AREA_CLEARED</span>
+<span class="text-sm font-bold">12.42 ACRES</span>
+</div>
+<div class="flex justify-between border-b border-[#353534] pb-2">
+<span class="text-[10px] opacity-60 uppercase">OPERATIONAL_WINDOW</span>
+<span class="text-sm font-bold">06:45:12</span>
+</div>
+<div class="flex justify-between border-b border-[#353534] pb-2">
+<span class="text-[10px] opacity-60 uppercase">IDLE_TIME_RATIO</span>
+<span class="text-sm font-bold text-[#FFB693]">12.4%</span>
+</div>
+<div class="flex justify-between border-b border-[#353534] pb-2">
+<span class="text-[10px] opacity-60 uppercase">WORK_DENSITY_AVG</span>
+<span class="text-sm font-bold">HIGH</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-b-2 border-[#353534]">
+<h2 class="text-[#FFB693] font-bold uppercase tracking-widest text-sm mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span>
+                HISTORICAL_VITALS_TIMELINE
+            </h2>
+<div class="grid grid-cols-2 gap-6">
+<div class="bg-black border border-[#353534] p-4">
+<div class="flex justify-between items-center mb-4">
+<span class="text-[10px] text-[#FFB693] font-bold uppercase">AVG_FUEL_CONSUMPTION (L/HR)</span>
+<span class="text-xs font-bold">42.8 L/H</span>
+</div>
+<div class="h-24 w-full flex items-end gap-1">
+<div class="bg-[#FFB693]/20 w-full h-[40%]"></div>
+<div class="bg-[#FFB693]/40 w-full h-[60%]"></div>
+<div class="bg-[#FFB693]/60 w-full h-[55%]"></div>
+<div class="bg-[#FFB693]/80 w-full h-[85%]"></div>
+<div class="bg-[#FFB693] w-full h-[70%]"></div>
+<div class="bg-[#FFB693]/80 w-full h-[90%]"></div>
+<div class="bg-[#FFB693]/60 w-full h-[45%]"></div>
+<div class="bg-[#FF6B00] w-full h-[30%]"></div>
+</div>
+</div>
+<div class="bg-black border border-[#353534] p-4">
+<div class="flex justify-between items-center mb-4">
+<span class="text-[10px] text-[#13FF43] font-bold uppercase">TOTAL_OPERATING_CYCLES</span>
+<span class="text-xs font-bold">1,248</span>
+</div>
+<div class="h-24 w-full flex items-end gap-1">
+<div class="bg-[#13FF43]/20 w-full h-[20%]"></div>
+<div class="bg-[#13FF43]/40 w-full h-[30%]"></div>
+<div class="bg-[#13FF43]/60 w-full h-[50%]"></div>
+<div class="bg-[#13FF43]/80 w-full h-[45%]"></div>
+<div class="bg-[#13FF43] w-full h-[65%]"></div>
+<div class="bg-[#13FF43]/80 w-full h-[75%]"></div>
+<div class="bg-[#13FF43]/60 w-full h-[85%]"></div>
+<div class="bg-[#13FF43] w-full h-[95%]"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 flex-1">
+<h2 class="text-[#FFB693] font-bold uppercase tracking-widest text-sm mb-4">ENGINEERING_EVENTS_TABLE</h2>
+<table class="w-full text-left text-[10px]">
+<thead>
+<tr class="border-b-2 border-[#353534] uppercase opacity-60">
+<th class="pb-2">TIMESTAMP</th>
+<th class="pb-2">EVENT_TYPE</th>
+<th class="pb-2">DATA_VALUE</th>
+<th class="pb-2">STATUS</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#353534]">
+<tr>
+<td class="py-3 font-mono">14:15:02</td>
+<td class="py-3">HYDRAULIC_TEMP_PEAK</td>
+<td class="py-3">212°F</td>
+<td class="py-3 text-[#FF6B00]">WARNING</td>
+</tr>
+<tr>
+<td class="py-3 font-mono">13:42:15</td>
+<td class="py-3">CUTTER_HEAD_ENGAGED</td>
+<td class="py-3">2200 RPM</td>
+<td class="py-3 text-[#13FF43]">NOMINAL</td>
+</tr>
+<tr>
+<td class="py-3 font-mono">13:10:55</td>
+<td class="py-3">PRESSURE_RELEASE_VLV</td>
+<td class="py-3">3000 PSI</td>
+<td class="py-3 text-[#13FF43]">NOMINAL</td>
+</tr>
+<tr>
+<td class="py-3 font-mono">12:30:22</td>
+<td class="py-3">FUEL_LEVEL_LOW</td>
+<td class="py-3">15%</td>
+<td class="py-3 text-[#93000a]">CRITICAL</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section class="col-span-4 bg-surface-container-low flex flex-col border-l-2 border-[#353534] relative">
+<div class="p-6 border-b-2 border-[#353534] bg-black/20">
+<h2 class="text-[#FFB693] font-bold uppercase tracking-widest text-sm flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+                MISSION_LOG_SUMMARY
+            </h2>
+<p class="text-[10px] opacity-50 uppercase leading-tight">Consolidated report of field activities and automated sector reports.</p>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-4">
+<div class="p-3 bg-black border-l-4 border-[#13FF43] border border-[#353534]">
+<div class="flex justify-between text-[9px] font-bold mb-1">
+<span class="text-[#13FF43]">TASK_COMPLETED: SECTOR_B</span>
+<span class="opacity-40">14:35</span>
+</div>
+<p class="text-[11px] opacity-80 uppercase">All designated cedar density cleared. Terrain verification complete.</p>
+</div>
+<div class="p-3 bg-black border-l-4 border-[#FF6B00] border border-[#353534]">
+<div class="flex justify-between text-[9px] font-bold mb-1">
+<span class="text-[#FF6B00]">HAZARD_LOGGED: ROCK_SHELF</span>
+<span class="opacity-40">14:12</span>
+</div>
+<p class="text-[11px] opacity-80 uppercase">Detected limestone obstruction at Grid 30.26N. Machine bypass initiated.</p>
+</div>
+<div class="p-3 bg-[#353534]/20 border-l-4 border-[#FFB693] border border-[#353534]">
+<div class="flex justify-between text-[9px] font-bold mb-1">
+<span class="text-[#FFB693]">OPERATOR_REPORT: UNIT_01</span>
+<span class="opacity-40">13:45</span>
+</div>
+<p class="text-[11px] italic opacity-80 uppercase font-medium">"North quadrant brush is significantly denser than satellite scans suggested. Fuel burn increased by 15%."</p>
+</div>
+<div class="p-3 bg-black border-l-4 border-[#13FF43] border border-[#353534]">
+<div class="flex justify-between text-[9px] font-bold mb-1">
+<span class="text-[#13FF43]">REFUEL_COMPLETE</span>
+<span class="opacity-40">12:55</span>
+</div>
+<p class="text-[11px] opacity-80 uppercase">Mobile unit 04 transfer finished. 450L added to primary reserve.</p>
+</div>
+<div class="p-3 bg-black border-l-4 border-[#13FF43] border border-[#353534]">
+<div class="flex justify-between text-[9px] font-bold mb-1">
+<span class="text-[#13FF43]">TASK_COMPLETED: SECTOR_A</span>
+<span class="opacity-40">10:20</span>
+</div>
+<p class="text-[11px] opacity-80 uppercase">Initial perimeter sweep finalized. Efficiency rating: 94%.</p>
+</div>
+</div>
+<div class="mt-auto border-t-2 border-[#353534] p-4 bg-black flex justify-between items-center">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold uppercase text-[#FFB693]">DATA_ARCHIVE_SERVICES</span>
+<span class="text-[8px] opacity-40">V4.8.1-BUILD_2901</span>
+</div>
+<div class="flex gap-2">
+<button class="bg-[#353534] p-2 hover:bg-[#FFB693] hover:text-black transition-colors">
+<span class="material-symbols-outlined text-xs" data-icon="print">print</span>
+</button>
+<button class="bg-[#353534] p-2 hover:bg-[#FFB693] hover:text-black transition-colors">
+<span class="material-symbols-outlined text-xs" data-icon="share">share</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<div class="fixed bottom-8 right-[34.5%] z-50">
+<button class="bg-[#FF6B00] text-black w-16 h-16 flex items-center justify-center shadow-[0_0_40px_rgba(255,107,0,0.2)] hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl" data-icon="filter_alt" style="font-variation-settings: 'FILL' 1;">filter_alt</span>
+</button>
+</div>
+
+</body></html>

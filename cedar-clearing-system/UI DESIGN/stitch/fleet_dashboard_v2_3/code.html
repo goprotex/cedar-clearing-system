@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&amp;family=Archivo+Narrow:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #00EAFF;--secondary: #CCFF00;--background: #0A0C0E;--surface: #14181B;
+            --outline: #2D363D;
+            --font-title: 'Archivo Narrow', sans-serif;
+            --font-data: 'Roboto Mono', monospace;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: var(--font-data);
+            background-color: var(--background);
+            color: #E0E4E6;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        h1, h2, h3, .nav-item, .btn-text {
+            font-family: var(--font-title);
+            text-transform: uppercase;
+        }
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(0, 234, 255, 0.02), rgba(204, 255, 0, 0.01), rgba(0, 234, 255, 0.02));
+            background-size: 100% 3px, 4px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .glow-blue { box-shadow: 0 0 15px rgba(0, 234, 255, 0.3); }
+        .glow-yellow { box-shadow: 0 0 15px rgba(204, 255, 0, 0.3); }
+        .schematic-bg {
+            background: 
+                linear-gradient(45deg, transparent 49%, var(--primary) 50%, transparent 51%) 0 0 / 20px 20px,
+                linear-gradient(-45deg, transparent 49%, var(--secondary) 50%, transparent 51%) 0 0 / 40px 40px,
+                var(--surface);
+            opacity: 0.15;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#00EAFF",
+                        "secondary": "#CCFF00",
+                        "background": "#0A0C0E",
+                        "surface": "#14181B",
+                        "outline": "#2D363D",
+                        "on-surface": "#E0E4E6",
+                        "error": "#FF3B3B"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary selection:text-black">
+<div class="crt-overlay"></div>
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-background border-b border-outline shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-primary tracking-[0.15em] font-['Archivo_Narrow'] uppercase">WASTELAND_CRM_V1.0</span>
+<div class="hidden md:flex gap-6 ml-12">
+<span class="font-bold text-on-surface/50 hover:bg-primary hover:text-black transition-colors px-2 cursor-pointer">FREQ_88.1</span>
+<span class="font-bold text-secondary border-b-2 border-secondary px-2">SIG_STRENGTH_MAX</span>
+<span class="font-bold text-on-surface/50 hover:bg-primary hover:text-black transition-colors px-2 cursor-pointer">BATT_98%</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary/70 cursor-pointer hover:text-primary p-1">settings_input_antenna</span>
+<span class="material-symbols-outlined text-primary/70 cursor-pointer hover:text-primary p-1">bolt</span>
+<span class="material-symbols-outlined text-primary/70 cursor-pointer hover:text-primary p-1">security</span>
+</div>
+</nav>
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 flex flex-col z-40 bg-background border-r border-outline">
+<div class="p-6 border-b border-outline">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 bg-surface border border-outline flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+<div>
+<div class="text-primary font-bold font-['Archivo_Narrow'] text-xs uppercase">SECTOR_7_OPS</div>
+<div class="text-on-surface/40 text-[10px] uppercase">STATUS: STABLE</div>
+</div>
+</div>
+</div>
+<nav class="flex-grow py-4">
+<div class="flex items-center gap-3 px-6 py-3 bg-primary text-black font-bold font-['Archivo_Narrow'] text-xs uppercase cursor-pointer">
+<span class="material-symbols-outlined">radar</span>
+<span>Signal Tower</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-on-surface/50 font-['Archivo_Narrow'] text-xs uppercase cursor-pointer hover:bg-surface hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">map</span>
+<span>Dead Zone Map</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-on-surface/50 font-['Archivo_Narrow'] text-xs uppercase cursor-pointer hover:bg-surface hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Resource Scavenge</span>
+</div>
+<div class="flex items-center gap-3 px-6 py-3 text-on-surface/50 font-['Archivo_Narrow'] text-xs uppercase cursor-pointer hover:bg-surface hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">history_edu</span>
+<span>Incident Log</span>
+</div>
+</nav>
+<div class="p-4 mt-auto space-y-2 border-t border-outline">
+<button class="w-full bg-surface border border-primary text-primary font-bold text-xs py-3 uppercase tracking-widest hover:bg-primary hover:text-black transition-colors">INITIATE_SWEEP</button>
+<div class="flex justify-between px-2 pt-2">
+<div class="flex items-center gap-2 text-on-surface/40 text-[10px] font-bold uppercase cursor-pointer hover:text-primary">
+<span class="material-symbols-outlined text-sm">terminal</span> TERMINAL
+                </div>
+<div class="flex items-center gap-2 text-on-surface/40 text-[10px] font-bold uppercase cursor-pointer hover:text-error">
+<span class="material-symbols-outlined text-sm">power_settings_new</span> LOGOUT
+                </div>
+</div>
+</div>
+</aside>
+<main class="ml-64 mt-16 p-8 min-h-screen">
+<header class="mb-10 flex justify-between items-end">
+<div>
+<h1 class="text-6xl font-black uppercase tracking-tight text-on-surface font-['Archivo_Narrow']">CEDAR_HACK_FLEET</h1>
+<p class="text-primary font-bold tracking-[0.4em] uppercase text-[10px] mt-2 border-l-2 border-primary pl-4">Precision Control Interface // Unit ID: CH-9900</p>
+</div>
+<div class="text-right">
+<div class="text-secondary font-bold text-sm">[ SYSTEM_STATUS: OPERATIONAL ]</div>
+<div class="text-on-surface/40 text-[10px] mt-1">Uptime: 142:55:09:12</div>
+</div>
+</header>
+<div class="grid grid-cols-12 gap-6">
+<div class="col-span-12 md:col-span-4 bg-surface border border-outline p-6 relative overflow-hidden">
+<div class="flex justify-between items-start mb-8">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary font-['Archivo_Narrow']">RESOURCE QUOTA</h2>
+<span class="material-symbols-outlined text-primary text-sm">analytics</span>
+</div>
+<div class="flex flex-col items-center justify-center py-4">
+<div class="relative w-48 h-48">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-background" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="14"></circle>
+<circle class="text-primary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502.6" stroke-dashoffset="125.6" stroke-width="14"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-5xl font-bold text-on-surface font-['Archivo_Narrow']">75%</span>
+<span class="text-[9px] font-bold text-on-surface/40 uppercase tracking-widest">Harvest Target</span>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-2 gap-8 w-full text-center">
+<div>
+<div class="text-[10px] text-on-surface/40 uppercase font-bold">Processed</div>
+<div class="text-xl font-bold text-secondary">1,402kg</div>
+</div>
+<div>
+<div class="text-[10px] text-on-surface/40 uppercase font-bold">Remaining</div>
+<div class="text-xl font-bold text-error">465kg</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-8 bg-surface border border-outline p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary font-['Archivo_Narrow']">ACTIVE SCAVENGE UNITS</h2>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-secondary text-black text-[9px] font-bold">ACTIVE: 04</span>
+<span class="px-2 py-1 bg-error text-white text-[9px] font-bold">ALERT: 01</span>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between p-4 bg-background/50 border-l-2 border-secondary">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary">robot_2</span>
+<div>
+<div class="text-sm font-bold uppercase font-['Archivo_Narrow']">Crawler-Alpha_01</div>
+<div class="text-[10px] text-on-surface/40">COORD: 34.002 / -118.243</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[9px] text-on-surface/40 uppercase">Battery</div>
+<div class="text-sm font-bold text-secondary">88%</div>
+</div>
+<span class="px-3 py-1 border border-secondary text-secondary text-[9px] font-bold uppercase">HARVESTING</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-background/50 border-l-2 border-secondary">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary">robot_2</span>
+<div>
+<div class="text-sm font-bold uppercase font-['Archivo_Narrow']">Crawler-Beta_04</div>
+<div class="text-[10px] text-on-surface/40">COORD: 34.015 / -118.256</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[9px] text-on-surface/40 uppercase">Battery</div>
+<div class="text-sm font-bold text-secondary">62%</div>
+</div>
+<span class="px-3 py-1 border border-secondary text-secondary text-[9px] font-bold uppercase">HARVESTING</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-background/50 border-l-2 border-error">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-error">robot_2</span>
+<div>
+<div class="text-sm font-bold uppercase font-['Archivo_Narrow']">Crawler-Gamma_09</div>
+<div class="text-[10px] text-on-surface/40">COORD: 33.992 / -118.210</div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-[9px] text-on-surface/40 uppercase">Battery</div>
+<div class="text-sm font-bold text-error">12%</div>
+</div>
+<span class="px-3 py-1 border border-error text-error text-[9px] font-bold uppercase">LOW_FUEL</span>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-7 bg-surface border border-outline p-6">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary mb-6 font-['Archivo_Narrow']">CRAWLER_DYNAMICS (CH-01)</h2>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-4 bg-background border border-outline">
+<div class="text-[9px] text-on-surface/40 font-bold uppercase mb-2">Traction Control</div>
+<div class="flex items-end gap-1 h-12">
+<div class="flex-1 bg-secondary/50 h-[40%]"></div>
+<div class="flex-1 bg-secondary/50 h-[60%]"></div>
+<div class="flex-1 bg-secondary h-[85%]"></div>
+<div class="flex-1 bg-secondary/70 h-[70%]"></div>
+<div class="flex-1 bg-primary h-[95%]"></div>
+</div>
+<div class="mt-2 text-right text-xs font-bold text-primary">9.5 G/s</div>
+</div>
+<div class="p-4 bg-background border border-outline">
+<div class="text-[9px] text-on-surface/40 font-bold uppercase mb-2">Hull Integrity</div>
+<div class="flex items-center justify-between h-12">
+<span class="text-2xl font-bold text-secondary font-['Archivo_Narrow']">98.4%</span>
+<span class="material-symbols-outlined text-on-surface/30">verified_user</span>
+</div>
+<div class="w-full bg-surface h-1 mt-2">
+<div class="bg-secondary h-full w-[98%]"></div>
+</div>
+</div>
+<div class="p-4 bg-background border border-outline col-span-2 relative overflow-hidden">
+<div class="text-[9px] text-on-surface/40 font-bold uppercase mb-4">Lidar Feed (Sector 7-A)</div>
+<div class="h-40 bg-black flex items-center justify-center border border-outline relative overflow-hidden">
+<div class="absolute inset-0 schematic-bg"></div>
+<svg class="absolute inset-0 w-full h-full opacity-60" viewBox="0 0 400 200">
+<path d="M0 150 L50 120 L100 160 L150 100 L200 140 L250 80 L300 130 L350 90 L400 150" fill="none" stroke="var(--primary)" stroke-width="2"></path>
+<path d="M0 170 L80 140 L160 180 L240 130 L320 160 L400 120" fill="none" stroke="var(--secondary)" stroke-width="1"></path>
+<line stroke="var(--outline)" stroke-dasharray="4" x1="0" x2="400" y1="100" y2="100"></line>
+<line stroke="var(--outline)" stroke-dasharray="4" x1="200" x2="200" y1="0" y2="200"></line>
+</svg>
+<div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent"></div>
+<div class="absolute top-2 right-2 flex items-center gap-1 text-primary text-[8px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span> SCANNING
+                            </div>
+<div class="absolute bottom-2 left-2 text-primary font-bold text-[9px]">
+                                ELEV: 12.4m // THREAT: NEGATIVE
+                            </div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-5 bg-surface border border-outline p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xs font-bold uppercase tracking-widest text-primary font-['Archivo_Narrow']">INCIDENT_LOG_EXT</h2>
+<span class="text-[10px] text-on-surface/40">v2.4.0_LIVE</span>
+</div>
+<div class="space-y-4 text-[11px] overflow-y-auto max-h-[400px] pr-2 scrollbar-thin scrollbar-thumb-outline">
+<div class="border-b border-outline pb-2">
+<span class="text-secondary">[INFO]</span> <span class="text-on-surface/40">T-12:44:02</span>
+<p class="mt-1">Unit Alpha_01 reporting transition to Sector 7-C.</p>
+</div>
+<div class="border-b border-outline pb-2">
+<span class="text-primary">[WARN]</span> <span class="text-on-surface/40">T-12:43:55</span>
+<p class="mt-1">Unit Gamma_09 fuel reserves below 15%. Recommend immediate extraction sequence.</p>
+</div>
+<div class="border-b border-outline pb-2">
+<span class="text-secondary">[INFO]</span> <span class="text-on-surface/40">T-12:40:12</span>
+<p class="mt-1">Signal strength optimized via Signal Tower 04. 12ms latency achieved.</p>
+</div>
+<div class="border-b border-outline pb-2">
+<span class="text-error">[CRIT]</span> <span class="text-on-surface/40">T-12:35:10</span>
+<p class="mt-1">Scavenge Unit Delta_02 signal lost in 'The Dead Zone'. Initiating ping sweep.</p>
+</div>
+<div class="border-b border-outline pb-2">
+<span class="text-secondary">[INFO]</span> <span class="text-on-surface/40">T-12:30:00</span>
+<p class="mt-1">Daily quota update: 75% complete. 5 hours remaining in operation window.</p>
+</div>
+</div>
+</div>
+</div>
+<footer class="mt-12 flex justify-between items-center border-t border-outline pt-6">
+<div class="flex gap-12">
+<div>
+<div class="text-[9px] font-bold text-on-surface/40 uppercase tracking-widest">NETWORK</div>
+<div class="text-xs font-bold text-secondary">ESTABLISHED</div>
+</div>
+<div>
+<div class="text-[9px] font-bold text-on-surface/40 uppercase tracking-widest">ENCRYPTION</div>
+<div class="text-xs font-bold text-secondary">AES_256_ACTIVE</div>
+</div>
+<div>
+<div class="text-[9px] font-bold text-on-surface/40 uppercase tracking-widest">LATENCY</div>
+<div class="text-xs font-bold text-on-surface">0.02ms</div>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2 border border-outline text-on-surface/60 font-bold text-[11px] uppercase hover:bg-on-surface hover:text-background transition-all">SYSTEM_REPORT</button>
+<button class="px-6 py-2 bg-primary text-black font-bold text-[11px] uppercase tracking-tighter glow-blue">EMERGENCY_RECALL</button>
+</div>
+</footer>
+</main>
+<div class="fixed bottom-8 right-8 z-50">
+<button class="w-16 h-16 bg-primary text-black glow-blue flex items-center justify-center hover:scale-105 active:scale-95 transition-transform group">
+<span class="material-symbols-outlined text-3xl font-black">add</span>
+<div class="absolute right-20 bg-background border border-primary px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+<span class="text-primary font-bold text-xs uppercase font-['Archivo_Narrow']">NEW_SCAVENGE_OP</span>
+</div>
+</button>
+</div>
+
+</body></html>

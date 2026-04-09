@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CEDAR_HACK_CRM | Operator Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&amp;family=Inter:wght@300;400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary": "#d4c5a7",
+                    "primary-fixed": "#d4e7d7",
+                    "error": "#ffb4ab",
+                    "on-error": "#690005",
+                    "on-secondary-container": "#c2b496",
+                    "background": "#111411",
+                    "surface-tint": "#b8cbbb",
+                    "outline": "#8a938a",
+                    "on-secondary-fixed-variant": "#50462f",
+                    "on-background": "#e1e3de",
+                    "outline-variant": "#404941",
+                    "on-secondary-fixed": "#221b07",
+                    "on-primary-container": "#9aad9d",
+                    "surface-container-low": "#191c19",
+                    "on-tertiary-container": "#c79ea1",
+                    "on-secondary": "#382f1a",
+                    "on-primary-fixed": "#0f1f15",
+                    "inverse-on-surface": "#2e312e",
+                    "tertiary-fixed-dim": "#e7bcbf",
+                    "on-tertiary-fixed": "#2d1417",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#5e3e41",
+                    "surface": "#111411",
+                    "on-surface-variant": "#c0c9bf",
+                    "surface-container": "#1d201d",
+                    "inverse-primary": "#516355",
+                    "inverse-surface": "#e1e3de",
+                    "on-tertiary": "#45292c",
+                    "tertiary": "#e7bcbf",
+                    "secondary-fixed": "#f1e1c2",
+                    "surface-container-high": "#272b27",
+                    "surface-container-highest": "#323632",
+                    "secondary-fixed-dim": "#d4c5a7",
+                    "surface-container-lowest": "#0c0f0c",
+                    "tertiary-container": "#533538",
+                    "surface-bright": "#373a36",
+                    "on-primary-fixed-variant": "#3a4b3e",
+                    "on-surface": "#e1e3de",
+                    "tertiary-fixed": "#ffd9dc",
+                    "secondary-container": "#50462f",
+                    "surface-dim": "#111411",
+                    "primary-container": "#304135",
+                    "on-primary": "#243429",
+                    "on-error-container": "#ffdad6",
+                    "primary-fixed-dim": "#b8cbbb",
+                    "surface-variant": "#323632",
+                    "primary": "#b8cbbb"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(16, 20, 21, 0.6);
+            backdrop-filter: blur(12px);
+        }
+        .hud-corner {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-color: #b8cbbb;
+        }
+        .hud-corner-tl { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; }
+        .hud-corner-tr { top: 0; right: 0; border-top-width: 2px; border-right-width: 2px; }
+        .hud-corner-bl { bottom: 0; left: 0; border-bottom-width: 2px; border-left-width: 2px; }
+        .hud-corner-br { bottom: 0; right: 0; border-bottom-width: 2px; border-right-width: 2px; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30">
+<!-- TopNavBar -->
+<header class="bg-[#101415]/60 backdrop-blur-md flex justify-between items-center px-6 py-3 w-full z-50 fixed top-0">
+<div class="flex items-center gap-8">
+<h1 class="text-xl font-light tracking-tighter text-[#024725] dark:text-emerald-500 font-headline">CEDAR_HACK_CRM</h1>
+<div class="hidden md:flex items-center bg-surface-container-low px-4 py-1.5 rounded-full">
+<span class="material-symbols-outlined text-outline text-sm mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs font-mono uppercase tracking-widest text-on-surface-variant w-48" placeholder="QUERY_RESOURCES..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer" data-icon="settings">settings</span>
+<span class="material-symbols-outlined text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer" data-icon="sensors">sensors</span>
+</div>
+<div class="flex items-center gap-3 pl-6 border-l border-outline-variant/30">
+<div class="text-right">
+<p class="text-[10px] font-bold tracking-widest text-primary uppercase">Chief Forester</p>
+<p class="text-[9px] text-outline font-mono">ID: CF-992</p>
+</div>
+<img alt="Chief Forester Profile" class="w-8 h-8 rounded-full border border-primary/20" data-alt="professional portrait of a high-tech forestry operations manager in a dark studio setting with soft green backlight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByJWBfcPNT6bEBUo-ocFfFPLTvPo8tB3H3kemJJXH9l2hc6UMTn0mzgfWN9s0Z1dSgM8Z0fh3NSozMzVz62PtqAXup351E5fupLMMY6m_XJ5zPX9PUuhW5SbOrvWnhJEWTfLbV962041rOLUIsCm6PfGMReNOZiSrpxVVTaUEXpLjBu56uIs8XNhnGGDg4S3KczS4JLMnhGX7HxkARqCPrx5r3TvAdec1yg8zZNKBjxiLEgbqT9O0RS7-bP9RjpS6kFk4J-R-Rqrc"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="bg-[#191C1E] flex flex-col h-full py-8 fixed left-0 top-0 h-screen w-64 border-r border-[#323537]/20 z-40 hidden md:flex">
+<div class="px-6 mb-10 pt-12">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+<p class="font-black tracking-widest text-emerald-600 font-headline">OPERATOR_042</p>
+</div>
+<p class="text-[10px] text-slate-500 font-mono">Active Session: 4h 12m</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="text-emerald-400 border-l-4 border-emerald-500 bg-emerald-500/5 px-4 py-3 flex items-center gap-4 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span class="text-sm font-medium">Fleet HUD</span>
+</a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-sm font-medium">Terrain Map</span>
+</a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="text-sm font-medium">Analytics</span>
+</a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span class="text-sm font-medium">Mulcher Status</span>
+</a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-[#323537] hover:text-emerald-300 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="text-sm font-medium">Logs</span>
+</a>
+</nav>
+<div class="px-4 mb-6">
+<button class="w-full bg-gradient-to-br from-primary-container to-primary text-on-primary py-3 rounded-lg font-bold text-xs tracking-widest uppercase flex items-center justify-center gap-2 shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined text-lg" data-icon="rocket_launch">rocket_launch</span>
+                DEPLOY UNIT
+            </button>
+</div>
+<div class="mt-auto border-t border-outline-variant/10 pt-4">
+<a class="text-slate-500 px-4 py-2 flex items-center gap-4 hover:text-emerald-300 text-xs" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help">help</span>
+                Support
+            </a>
+<a class="text-slate-500 px-4 py-2 flex items-center gap-4 hover:text-emerald-300 text-xs" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="build">build</span>
+                Diagnostic
+            </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 pt-20 px-6 pb-12 min-h-screen">
+<!-- Dashboard Header -->
+<header class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+<div>
+<p class="text-primary font-mono text-[10px] tracking-[0.2em] mb-2 uppercase">System Overview // Sector 7G</p>
+<h2 class="text-5xl font-light text-on-surface font-headline leading-tight">Fleet <span class="text-primary font-medium">Intelligence</span></h2>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface-container-low px-4 py-2 rounded-lg border-l-2 border-primary">
+<p class="text-[10px] text-outline uppercase font-mono">Current Area</p>
+<p class="text-sm font-bold">NORTHERN_RIDGE_VALLEY</p>
+</div>
+<div class="bg-surface-container-low px-4 py-2 rounded-lg border-l-2 border-secondary">
+<p class="text-[10px] text-outline uppercase font-mono">Environment</p>
+<p class="text-sm font-bold">14°C / 62% HUMIDITY</p>
+</div>
+</div>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 auto-rows-[220px]">
+<!-- Live Fleet Status Card (Large) -->
+<div class="md:col-span-8 md:row-span-2 relative group overflow-hidden rounded-xl bg-surface-container-low">
+<div class="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-luminosity grayscale group-hover:grayscale-0 transition-all duration-700" data-alt="wide shot of misty mountainous terrain covered in dense pine forests during a cloudy morning" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBBR5A9fm9A7PTCyaPlzEKUoelCeZvN9Chuqj-Apme2L8EZmJhqJvDhIZTC14ESKg0E8A7gN-TjqjDTWmN0htODNt_OOjyilwKN5LRsPKLGH0Kah_CBu_IYrRsfPT8d0UvbjR4f7U4ZyMSE8uGKK53rso5e5AF84IeOwj302-EVdf1xbAHGI7nRRQuWcmU9DL0HqAs-QbPfBdCcgwSaY977NQpWhEbucdy8IFPxF01rOxY4L11wDBrVHW0YAur9ez7ra80KDivqU4k')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-transparent"></div>
+<div class="relative h-full p-8 flex flex-col">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-2xl font-headline font-light tracking-wide flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="location_on">location_on</span>
+                                LIVE FLEET STATUS
+                            </h3>
+<p class="text-xs text-outline font-mono mt-1 tracking-widest uppercase">Coordinate Sync Active</p>
+</div>
+<div class="flex gap-2">
+<span class="px-3 py-1 bg-primary/20 text-primary text-[10px] font-bold rounded-full">3 UNITS ONLINE</span>
+<span class="px-3 py-1 bg-surface-container-highest text-outline text-[10px] font-bold rounded-full">2 STANDBY</span>
+</div>
+</div>
+<div class="mt-auto grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Fleet Item -->
+<div class="glass-panel p-4 rounded-lg relative overflow-hidden">
+<div class="hud-corner hud-corner-tl"></div>
+<div class="hud-corner hud-corner-br"></div>
+<p class="text-[9px] font-mono text-primary-fixed mb-1">UNIT_A-01 [MULCHER]</p>
+<div class="flex justify-between items-end">
+<p class="text-xl font-headline font-bold">ACTIVE</p>
+<p class="text-[10px] font-mono text-outline">45.521, -122.678</p>
+</div>
+</div>
+<!-- Fleet Item -->
+<div class="glass-panel p-4 rounded-lg relative overflow-hidden">
+<div class="hud-corner hud-corner-tl"></div>
+<div class="hud-corner hud-corner-br"></div>
+<p class="text-[9px] font-mono text-primary-fixed mb-1">UNIT_B-04 [HAULER]</p>
+<div class="flex justify-between items-end">
+<p class="text-xl font-headline font-bold">ACTIVE</p>
+<p class="text-[10px] font-mono text-outline">45.523, -122.682</p>
+</div>
+</div>
+<!-- Fleet Item -->
+<div class="glass-panel p-4 rounded-lg relative border border-outline-variant/20">
+<p class="text-[9px] font-mono text-outline mb-1">UNIT_X-09 [DRONE]</p>
+<div class="flex justify-between items-end">
+<p class="text-xl font-headline font-bold text-outline-variant">IDLE</p>
+<p class="text-[10px] font-mono text-outline">BASE_STATION_01</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Job Progress Donut Chart Card -->
+<div class="md:col-span-4 md:row-span-2 bg-surface-container p-8 rounded-xl flex flex-col justify-between">
+<div>
+<h3 class="text-xl font-headline font-light tracking-wide flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="incomplete_circle">incomplete_circle</span>
+                        JOB PROGRESS
+                    </h3>
+<p class="text-[10px] text-outline font-mono mt-1 tracking-widest uppercase">Project: CEDAR_SWEEP_24</p>
+</div>
+<div class="relative flex items-center justify-center py-8">
+<!-- SVG Donut Chart -->
+<svg class="w-48 h-48 transform -rotate-90">
+<circle class="text-surface-container-highest" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502.4" stroke-dashoffset="150" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<p class="text-4xl font-headline font-bold">72<span class="text-lg text-primary">%</span></p>
+<p class="text-[10px] font-mono text-outline uppercase tracking-widest">Complete</p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-center text-[11px] font-mono">
+<span class="text-outline">ACRES CLEARED</span>
+<span class="font-bold">142.8 / 200.0</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[72%]"></div>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono">
+<span class="text-outline">TARGET REMOVAL</span>
+<span class="font-bold">8,400 TONS</span>
+</div>
+</div>
+</div>
+<!-- Recent Activity Feed (Wide) -->
+<div class="md:col-span-7 md:row-span-2 bg-surface-container-lowest p-8 rounded-xl flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-xl font-headline font-light tracking-wide flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-fixed" data-icon="history">history</span>
+                        RECENT ACTIVITY
+                    </h3>
+<button class="text-[10px] font-mono text-primary hover:underline uppercase tracking-tighter">Export CSV</button>
+</div>
+<div class="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+<!-- Activity Item -->
+<div class="flex items-start gap-4 p-4 rounded-lg bg-surface-container/50 hover:bg-surface-container transition-colors group">
+<div class="w-1.5 h-10 bg-primary/40 group-hover:bg-primary transition-colors"></div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<p class="text-[11px] font-bold text-on-surface uppercase font-mono">System Calibration Complete</p>
+<p class="text-[9px] text-outline font-mono">14:22:01</p>
+</div>
+<p class="text-xs text-outline-variant mt-1 font-mono">Unit_A-01 blade pitch adjusted to +4.5° for optimal mulching density.</p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex items-start gap-4 p-4 rounded-lg bg-surface-container/50 hover:bg-surface-container transition-colors group">
+<div class="w-1.5 h-10 bg-secondary/40 group-hover:bg-secondary transition-colors"></div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<p class="text-[11px] font-bold text-on-surface uppercase font-mono">Geofence Alert: Sector B</p>
+<p class="text-[9px] text-outline font-mono">13:45:12</p>
+</div>
+<p class="text-xs text-outline-variant mt-1 font-mono">Incursion detected at perimeter E-12. Verification via drone sync recommended.</p>
+</div>
+</div>
+<!-- Activity Item -->
+<div class="flex items-start gap-4 p-4 rounded-lg bg-surface-container/50 hover:bg-surface-container transition-colors group">
+<div class="w-1.5 h-10 bg-primary-fixed/40 group-hover:bg-primary-fixed transition-colors"></div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<p class="text-[11px] font-bold text-on-surface uppercase font-mono">Daily Quota Milestone</p>
+<p class="text-[9px] text-outline font-mono">11:30:00</p>
+</div>
+<p class="text-xs text-outline-variant mt-1 font-mono">75% of scheduled biomass processing complete for the current cycle.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Mulcher Status HUD Component -->
+<div class="md:col-span-5 md:row-span-2 bg-surface-container-high p-6 rounded-xl relative overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center opacity-10 mix-blend-overlay" data-alt="extreme close up of industrial machine gears and mechanical parts with grease and metallic textures" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB7sBGzZK2vlUEfrDoDeRzgXMYphYyqXvSU8oHMZtq5k0iAnfd7pHdHba5Vygidv0HuYsjZfVouWQAhWGa5nddNkePyYW7YqzpK7zz-oBSjrBrSspvaP03ctHivrvrpCSquuEy19eroZ4GQcxte17SthaCsRiIvq_DDc9wloLovmPNOMruHvk3KVNsLMmZa-XtOW1H6IPYyCPmktSiBVTVUEpLM50wc2T8FJ6zC0TeI9HcKguifSwWeVlQNeIWc3IZehiIA9zub30c')"></div>
+<h3 class="text-lg font-headline font-light tracking-wide mb-6 relative z-10 uppercase">Mulcher_01 Dynamics</h3>
+<div class="space-y-6 relative z-10">
+<div class="grid grid-cols-2 gap-4">
+<div class="p-3 bg-background/60 rounded border border-outline-variant/10">
+<p class="text-[9px] text-outline font-mono uppercase mb-1">Rotor RPM</p>
+<p class="text-xl font-bold font-headline">2,450</p>
+<div class="mt-2 w-full bg-white/5 h-1">
+<div class="bg-primary h-full w-[85%] shadow-[0_0_8px_rgba(184,203,187,0.5)]"></div>
+</div>
+</div>
+<div class="p-3 bg-background/60 rounded border border-outline-variant/10">
+<p class="text-[9px] text-outline font-mono uppercase mb-1">Engine Load</p>
+<p class="text-xl font-bold font-headline">68%</p>
+<div class="mt-2 w-full bg-white/5 h-1">
+<div class="bg-secondary h-full w-[68%] shadow-[0_0_8px_rgba(212,197,167,0.5)]"></div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-primary-container/20 border border-primary/20 rounded-lg">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="build_circle">build_circle</span>
+<p class="text-[10px] font-bold font-mono tracking-widest text-primary uppercase">Service Forecast</p>
+</div>
+<p class="text-xs text-on-primary-container">Next maintenance cycle required in <span class="font-bold">48.5 hours</span> of operation. Hydraulic filter replacement scheduled.</p>
+</div>
+<div class="flex justify-between items-center pt-2">
+<div class="flex flex-col">
+<p class="text-[9px] text-outline font-mono uppercase">Fuel Capacity</p>
+<p class="text-sm font-bold">142L / 200L</p>
+</div>
+<div class="flex flex-col text-right">
+<p class="text-[9px] text-outline font-mono uppercase">Oil Temp</p>
+<p class="text-sm font-bold text-error">94°C [HI]</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Mobile Navigation (Suppressed on Web per Rules) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 glass-panel border-t border-outline-variant/10 px-6 py-4 flex justify-between items-center z-50">
+<a class="flex flex-col items-center gap-1 text-emerald-400" href="#">
+<span class="material-symbols-outlined" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span class="text-[9px] font-bold uppercase">HUD</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-[9px] font-bold uppercase">Map</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="text-[9px] font-bold uppercase">Data</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span class="text-[9px] font-bold uppercase">Gear</span>
+</a>
+</nav>
+<!-- Floating Action Button - Only for Primary Action -->
+<button class="fixed bottom-24 md:bottom-8 right-8 w-16 h-16 bg-primary text-on-primary rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center group z-50">
+<span class="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform duration-300" data-icon="add">add</span>
+<div class="absolute right-20 bg-surface-container px-4 py-2 rounded border border-primary/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+<p class="text-[10px] font-bold font-mono tracking-widest uppercase">Create New Mission</p>
+</div>
+</button>
+</body></html>

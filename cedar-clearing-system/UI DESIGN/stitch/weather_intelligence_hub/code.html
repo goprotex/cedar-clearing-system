@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WEATHER INTEL | CEDAR HACK TERMINAL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#ffdbcc",
+                    "secondary": "#ecffe3",
+                    "surface-bright": "#3a3939",
+                    "on-surface": "#e5e2e1",
+                    "on-secondary-fixed": "#002203",
+                    "surface-container-highest": "#353534",
+                    "secondary-container": "#13ff43",
+                    "on-tertiary-container": "#2f3132",
+                    "on-primary-fixed": "#351000",
+                    "on-surface-variant": "#e2bfb0",
+                    "tertiary-container": "#989999",
+                    "on-tertiary-fixed-variant": "#454747",
+                    "inverse-surface": "#e5e2e1",
+                    "on-error": "#690005",
+                    "inverse-on-surface": "#313030",
+                    "outline": "#a98a7d",
+                    "surface-tint": "#ffb693",
+                    "primary-container": "#ff6b00",
+                    "primary": "#ffb693",
+                    "surface-variant": "#353534",
+                    "on-tertiary-fixed": "#1a1c1c",
+                    "on-secondary": "#003907",
+                    "on-primary": "#561f00",
+                    "inverse-primary": "#a04100",
+                    "error-container": "#93000a",
+                    "surface-dim": "#131313",
+                    "surface-container-lowest": "#0e0e0e",
+                    "surface-container-high": "#2a2a2a",
+                    "surface-container": "#201f1f",
+                    "on-background": "#e5e2e1",
+                    "primary-fixed-dim": "#ffb693",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed-dim": "#c6c6c7",
+                    "surface-container-low": "#1c1b1b",
+                    "secondary-fixed": "#72ff70",
+                    "outline-variant": "#5a4136",
+                    "on-secondary-fixed-variant": "#00530e",
+                    "on-primary-container": "#572000",
+                    "on-error-container": "#ffdad6",
+                    "secondary-fixed-dim": "#00e639",
+                    "on-secondary-container": "#007117",
+                    "tertiary-fixed": "#e2e2e2",
+                    "tertiary": "#c6c6c7",
+                    "on-primary-fixed-variant": "#7a3000",
+                    "on-tertiary": "#2f3131",
+                    "surface": "#131313",
+                    "background": "#131313"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #131313; color: #e5e2e1; }
+        .radar-scan {
+            background: conic-gradient(from 0deg, rgba(19, 255, 67, 0.1) 0deg, rgba(19, 255, 67, 0) 90deg);
+        }
+    </style>
+</head>
+<body class="bg-surface overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full border-b-2 border-[#353534] bg-[#131313] z-50 flex justify-between items-center px-6 h-16">
+<div class="text-2xl font-bold text-[#FF6B00] tracking-widest font-['Space_Grotesk'] uppercase tracking-tighter">
+            WEATHER INTEL
+        </div>
+<nav class="hidden md:flex items-center space-x-8">
+<a class="text-[#E5E2E1] font-['Space_Grotesk'] uppercase tracking-tighter hover:bg-[#FF6B00] hover:text-[#131313] transition-colors duration-100 px-2 py-1" href="#">RADAR</a>
+<a class="text-[#E5E2E1] font-['Space_Grotesk'] uppercase tracking-tighter hover:bg-[#FF6B00] hover:text-[#131313] transition-colors duration-100 px-2 py-1" href="#">ALERTS</a>
+<a class="text-[#E5E2E1] font-['Space_Grotesk'] uppercase tracking-tighter hover:bg-[#FF6B00] hover:text-[#131313] transition-colors duration-100 px-2 py-1" href="#">WIND</a>
+<a class="text-[#FFB693] border-b-2 border-[#FF6B00] pb-1 font-['Space_Grotesk'] uppercase tracking-tighter" href="#">FORECAST</a>
+</nav>
+<div class="flex items-center space-x-4">
+<span class="material-symbols-outlined text-[#FFB693] cursor-pointer hover:bg-[#FF6B00] hover:text-[#131313] p-1 transition-colors">settings</span>
+<span class="material-symbols-outlined text-[#FFB693] cursor-pointer hover:bg-[#FF6B00] hover:text-[#131313] p-1 transition-colors">help</span>
+<div class="w-8 h-8 bg-surface-container-highest border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Portrait of a tactical operator in low light with subtle glowing orange interface reflections" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCT79yToDiKybV2xcarocDTir0sGlacz3xifULyWahKj6G06AnTC_bNhuTeWEzDxBjETdRcx7cMqUP4w9CElg5kWjjgWjiImKtsyYbtLFQ-jHklBTUfqrqbvWllvUe6FJmT4Q2InEE7VHolHfFoBHsF55REUI6GBMQO87wsjxP2zp7eBXQNh5004u5RvGj9xJQeDHIwDk1qiheBi5MUt_AbTsp5u7VfdeQyyLNTNJ3l7EewDdVccSHMVHI-R3zt1Cq-b-woab-inr4"/>
+</div>
+</div>
+</header>
+<div class="flex h-screen pt-16">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 border-r-2 border-[#353534] bg-[#131313] flex flex-col py-8 z-40 hidden md:flex">
+<div class="px-6 mb-8">
+<div class="text-[#FF6B00] font-black uppercase text-xs tracking-widest mb-1">STATION_01</div>
+<div class="text-[#E5E2E1] font-['Space_Grotesk'] text-[10px] tracking-tight opacity-70">COORD: 34.05, -118.24</div>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center px-6 py-3 text-[#E5E2E1] border-l-4 border-transparent font-['Space_Grotesk'] text-sm tracking-tight cursor-crosshair hover:bg-[#353534] transition-all">
+<span class="material-symbols-outlined mr-3" data-icon="dashboard">dashboard</span>
+                    DASHBOARD
+                </div>
+<div class="flex items-center px-6 py-3 bg-[#FF6B00] text-[#131313] font-bold border-l-4 border-[#13FF43] font-['Space_Grotesk'] text-sm tracking-tight cursor-crosshair active:translate-x-1">
+<span class="material-symbols-outlined mr-3" data-icon="radar">radar</span>
+                    LIVE RADAR
+                </div>
+<div class="flex items-center px-6 py-3 text-[#E5E2E1] border-l-4 border-transparent font-['Space_Grotesk'] text-sm tracking-tight cursor-crosshair hover:bg-[#353534] transition-all">
+<span class="material-symbols-outlined mr-3" data-icon="rainy">rainy</span>
+                    PRECIPITATION
+                </div>
+<div class="flex items-center px-6 py-3 text-[#E5E2E1] border-l-4 border-transparent font-['Space_Grotesk'] text-sm tracking-tight cursor-crosshair hover:bg-[#353534] transition-all">
+<span class="material-symbols-outlined mr-3" data-icon="air">air</span>
+                    WIND DATA
+                </div>
+<div class="flex items-center px-6 py-3 text-[#E5E2E1] border-l-4 border-transparent font-['Space_Grotesk'] text-sm tracking-tight cursor-crosshair hover:bg-[#353534] transition-all">
+<span class="material-symbols-outlined mr-3" data-icon="history">history</span>
+                    HISTORY
+                </div>
+</nav>
+<div class="px-4 mt-auto">
+<button class="w-full bg-error-container text-on-error-container py-3 font-bold text-xs tracking-tighter border-2 border-error mb-8 hover:bg-error hover:text-on-error transition-colors">
+                    EMERGENCY BROADCAST
+                </button>
+<div class="space-y-1 pb-4">
+<div class="flex items-center px-2 py-2 text-[#E5E2E1] text-[10px] tracking-widest hover:text-[#FFB693] cursor-pointer">
+<span class="material-symbols-outlined text-sm mr-2" data-icon="memory">memory</span> SYSTEMS
+                    </div>
+<div class="flex items-center px-2 py-2 text-[#E5E2E1] text-[10px] tracking-widest hover:text-error cursor-pointer">
+<span class="material-symbols-outlined text-sm mr-2" data-icon="logout">logout</span> LOGOUT
+                    </div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-64 bg-surface p-4 grid grid-cols-12 gap-4 overflow-y-auto">
+<!-- Radar Display Container -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container border-2 border-outline-variant relative overflow-hidden h-[600px]">
+<!-- Radar Header HUD -->
+<div class="absolute top-0 left-0 w-full z-10 bg-surface-dim/80 backdrop-blur-md p-4 border-b border-outline-variant flex justify-between items-center">
+<div>
+<h2 class="text-primary font-bold tracking-widest text-lg">TEXAS_H_COUNTRY_GRID_04</h2>
+<p class="text-[10px] text-outline uppercase">Live Uplink: Active | Sweep Rate: 2.4s | Mode: High-Res Doppler</p>
+</div>
+<div class="flex space-x-2">
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold">SYSTEM_GO</span>
+<span class="px-2 py-1 bg-surface-container-highest text-primary text-[10px] font-bold border border-primary">LIVE_FEED</span>
+</div>
+</div>
+<!-- Simulated Radar Map -->
+<div class="w-full h-full bg-surface-dim relative">
+<img class="w-full h-full object-cover opacity-40 grayscale contrast-125" data-alt="Satellite map of Texas Hill Country with glowing neon green radar precipitation overlays and orange lighting strike markers" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvCxfMd2WBrxaEc0uMFPy5UWJ4tQU1oJEmvPdYE6-M7ddgx70Y6vFG7iS8cPc7Zr2yz9k7txFQU7ndlNnu3m9qG6dojDEER2pX1mpOfB41nzAInImshCXZJdZep1fVR_bfTbVG4ujMHx_y2B0Nay3Avg61PRNc0J9KyvTg4OFuBPWLU-jZqcJAM3kZjwp9LbAROYFgQDNUuAc_fx3_bhLFZt1Pye9Ys2ViFxLCKy8pbKR6Nf1hAa3LeIVys5ANNDu9xFvanBF1bWg"/>
+<!-- Radar Sweep Effect -->
+<div class="absolute inset-0 radar-scan animate-[spin_4s_linear_infinite] origin-center opacity-30 pointer-events-none"></div>
+<!-- Map HUD Elements -->
+<div class="absolute inset-0 pointer-events-none border-[1px] border-outline-variant/20 grid grid-cols-6 grid-rows-6">
+<div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div>
+<div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div>
+<div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div><div class="border border-outline-variant/10"></div>
+</div>
+<!-- Location Markers -->
+<div class="absolute top-1/2 left-1/3 group cursor-crosshair">
+<div class="w-3 h-3 bg-primary border-2 border-surface-dim transform rotate-45"></div>
+<div class="absolute left-4 top-0 bg-surface-container-highest px-2 py-1 border border-outline-variant text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                            CEDAR_HACK_STATION [ACTIVE]
+                        </div>
+</div>
+<div class="absolute top-1/4 right-1/4">
+<span class="material-symbols-outlined text-error text-3xl animate-pulse" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<div class="text-error text-[8px] font-bold uppercase tracking-widest mt-1">Strike Detected</div>
+</div>
+</div>
+<!-- Radar Footer HUD -->
+<div class="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+<div class="bg-surface-container-low p-3 border border-outline-variant w-48">
+<div class="text-[10px] text-primary font-bold mb-2">PRECIPITATION_INTENSITY</div>
+<div class="flex space-x-1">
+<div class="h-2 w-full bg-secondary-container opacity-20"></div>
+<div class="h-2 w-full bg-secondary-container opacity-50"></div>
+<div class="h-2 w-full bg-secondary-container"></div>
+<div class="h-2 w-full bg-primary"></div>
+<div class="h-2 w-full bg-error"></div>
+</div>
+</div>
+<div class="flex flex-col items-end space-y-2">
+<div class="bg-surface-dim/80 backdrop-blur-sm border border-outline-variant p-2 flex space-x-4 text-[10px]">
+<div><span class="text-outline uppercase">Lat:</span> 30.2672</div>
+<div><span class="text-outline uppercase">Long:</span> -97.7431</div>
+<div><span class="text-outline uppercase">Alt:</span> 489ft</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column Panels -->
+<div class="col-span-12 lg:col-span-4 space-y-4">
+<!-- Severe Weather Alerts -->
+<section class="bg-surface-container border-2 border-error/50">
+<div class="bg-error px-4 py-2 flex justify-between items-center">
+<h3 class="text-on-error font-black text-xs tracking-widest">CRITICAL ALERTS [02]</h3>
+<span class="material-symbols-outlined text-on-error text-sm">warning</span>
+</div>
+<div class="p-4 space-y-3">
+<div class="border-l-2 border-error pl-3">
+<div class="text-error text-[10px] font-bold uppercase">Tornado Watch 401</div>
+<div class="text-on-surface text-xs leading-tight mt-1">Potential cyclonic activity detected in Gillespie County. Sheltering recommended.</div>
+<div class="text-outline text-[9px] mt-1 font-mono">EXPIRES: 22:00Z</div>
+</div>
+<div class="border-l-2 border-primary-container pl-3">
+<div class="text-primary-container text-[10px] font-bold uppercase">Flash Flood Warning</div>
+<div class="text-on-surface text-xs leading-tight mt-1">Rapid accumulation expected in creek basins. STATION_04 reporting overflow.</div>
+<div class="text-outline text-[9px] mt-1 font-mono">EXPIRES: 20:30Z</div>
+</div>
+</div>
+</section>
+<!-- Current Conditions Station Alpha -->
+<section class="bg-surface-container border-2 border-outline-variant p-4">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h3 class="text-primary font-bold text-sm tracking-widest uppercase">Current_Site_Telemetry</h3>
+<p class="text-[10px] text-outline uppercase">STATION_01 (HUB)</p>
+</div>
+<div class="text-4xl font-black text-secondary-container">94<span class="text-lg">°F</span></div>
+</div>
+<div class="grid grid-cols-2 gap-px bg-outline-variant/30">
+<div class="bg-surface-container p-3">
+<div class="text-[9px] text-outline uppercase mb-1">Humidity</div>
+<div class="text-xl font-bold text-on-surface">12%</div>
+</div>
+<div class="bg-surface-container p-3">
+<div class="text-[9px] text-outline uppercase mb-1">Pressure</div>
+<div class="text-xl font-bold text-on-surface">1014.2<span class="text-xs">mb</span></div>
+</div>
+<div class="bg-surface-container p-3">
+<div class="text-[9px] text-outline uppercase mb-1">Wind_Velocity</div>
+<div class="text-xl font-bold text-primary-container">18<span class="text-xs">MPH NW</span></div>
+</div>
+<div class="bg-surface-container p-3">
+<div class="text-[9px] text-outline uppercase mb-1">UV_Index</div>
+<div class="text-xl font-bold text-error">9.4<span class="text-xs"> EXTREME</span></div>
+</div>
+</div>
+</section>
+<!-- 7-Day Precipitation Forecast -->
+<section class="bg-surface-container-high border-2 border-outline-variant p-4">
+<h3 class="text-primary font-bold text-sm tracking-widest uppercase mb-4">7_DAY_PRECIP_PROJECTION</h3>
+<div class="space-y-2">
+<!-- Forecast Rows -->
+<div class="flex items-center justify-between group hover:bg-surface-container-highest p-1 cursor-default transition-colors">
+<span class="text-[10px] font-bold text-outline w-8">MON</span>
+<span class="material-symbols-outlined text-on-surface text-lg">wb_sunny</span>
+<div class="flex-1 px-4">
+<div class="h-1 bg-surface-dim w-full relative">
+<div class="h-1 bg-primary-container w-[5%]"></div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-on-surface w-10 text-right">05%</span>
+</div>
+<div class="flex items-center justify-between group hover:bg-surface-container-highest p-1 transition-colors">
+<span class="text-[10px] font-bold text-outline w-8">TUE</span>
+<span class="material-symbols-outlined text-primary text-lg">wb_sunny</span>
+<div class="flex-1 px-4">
+<div class="h-1 bg-surface-dim w-full relative">
+<div class="h-1 bg-primary-container w-[10%]"></div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-on-surface w-10 text-right">10%</span>
+</div>
+<div class="flex items-center justify-between group hover:bg-surface-container-highest p-1 transition-colors">
+<span class="text-[10px] font-bold text-outline w-8">WED</span>
+<span class="material-symbols-outlined text-secondary-container text-lg" style="font-variation-settings: 'FILL' 1;">cloudy_snowing</span>
+<div class="flex-1 px-4">
+<div class="h-1 bg-surface-dim w-full relative">
+<div class="h-1 bg-secondary-container w-[85%]"></div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-secondary-container w-10 text-right">85%</span>
+</div>
+<div class="flex items-center justify-between group hover:bg-surface-container-highest p-1 transition-colors">
+<span class="text-[10px] font-bold text-outline w-8">THU</span>
+<span class="material-symbols-outlined text-secondary-container text-lg">rainy</span>
+<div class="flex-1 px-4">
+<div class="h-1 bg-surface-dim w-full relative">
+<div class="h-1 bg-secondary-container w-[40%]"></div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-on-surface w-10 text-right">40%</span>
+</div>
+<div class="flex items-center justify-between group hover:bg-surface-container-highest p-1 transition-colors">
+<span class="text-[10px] font-bold text-outline w-8">FRI</span>
+<span class="material-symbols-outlined text-on-surface text-lg">cloud</span>
+<div class="flex-1 px-4">
+<div class="h-1 bg-surface-dim w-full relative">
+<div class="h-1 bg-primary-container w-[20%]"></div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-on-surface w-10 text-right">20%</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Data Stream Ticker Footer -->
+<div class="col-span-12 bg-surface-container-lowest border-t border-outline-variant p-2 mt-4">
+<div class="flex items-center space-x-6 overflow-hidden whitespace-nowrap">
+<span class="text-[9px] bg-primary text-on-primary px-1 font-bold">SYSTEM_LOG</span>
+<div class="flex space-x-8 animate-[marquee_20s_linear_infinite] text-[10px] font-mono text-outline uppercase tracking-widest">
+<span>[14:42:01] SENSOR_3_FAULT: RECALIBRATING...</span>
+<span>[14:41:45] NEW PRESSURE MINIMA RECORDED AT STATION_02: 1012.4mb</span>
+<span>[14:41:30] SATELLITE_UPLINK_STABLE (99.8%)</span>
+<span>[14:41:02] AMBIENT NOISE FILTER ACTIVE</span>
+<span>[14:40:55] WIND SHEAR ALERT: SECTOR_04_NORTH</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+<style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+    </style>
+</body></html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Space+Grotesk:wght@300;400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e1e3de",
+                        "tertiary-fixed": "#ffd9dc",
+                        "secondary-container": "#50462f",
+                        "tertiary-container": "#533538",
+                        "on-tertiary-fixed": "#2d1417",
+                        "on-surface-variant": "#c0c9bf",
+                        "on-error": "#690005",
+                        "tertiary": "#e7bcbf",
+                        "primary-container": "#304135",
+                        "primary-fixed-dim": "#b8cbbb",
+                        "outline-variant": "#404941",
+                        "surface-container-high": "#272b27",
+                        "primary": "#b8cbbb",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#0c0f0c",
+                        "surface-container-highest": "#323632",
+                        "on-secondary-container": "#c2b496",
+                        "on-primary-fixed": "#0f1f15",
+                        "on-primary-fixed-variant": "#3a4b3e",
+                        "primary-fixed": "#d4e7d7",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#50462f",
+                        "surface-bright": "#373a36",
+                        "inverse-on-surface": "#2e312e",
+                        "background": "#111411",
+                        "on-primary": "#243429",
+                        "surface-container": "#1d201d",
+                        "on-surface": "#e1e3de",
+                        "inverse-primary": "#516355",
+                        "surface-container-low": "#191c19",
+                        "surface-variant": "#323632",
+                        "surface-dim": "#111411",
+                        "outline": "#8a938a",
+                        "on-primary-container": "#9aad9d",
+                        "secondary": "#d4c5a7",
+                        "on-tertiary-fixed-variant": "#5e3e41",
+                        "surface-tint": "#b8cbbb",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e1e3de",
+                        "secondary-fixed": "#f1e1c2",
+                        "secondary-fixed-dim": "#d4c5a7",
+                        "on-secondary": "#382f1a",
+                        "surface": "#111411",
+                        "on-tertiary-container": "#c79ea1",
+                        "on-tertiary": "#45292c",
+                        "on-secondary-fixed": "#221b07",
+                        "tertiary-fixed-dim": "#e7bcbf"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .hud-corner {
+            position: relative;
+        }
+        .hud-corner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 8px;
+            border-top: 1px solid #b8cbbb;
+            border-left: 1px solid #b8cbbb;
+        }
+        .hud-corner::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            border-bottom: 1px solid #b8cbbb;
+            border-right: 1px solid #b8cbbb;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30">
+<!-- TopNavBar -->
+<header class="bg-[#101415]/60 backdrop-blur-md fixed top-0 z-50 w-full flex justify-between items-center px-6 h-16 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+<div class="text-xl font-light tracking-[0.2em] text-primary uppercase font-headline">CEDAR_TECH</div>
+<div class="flex items-center gap-6">
+<div class="relative hidden md:block">
+<input class="bg-surface-container-low border-none focus:ring-1 focus:ring-primary/30 text-xs tracking-widest px-4 py-2 w-64 font-label" placeholder="SEARCH OPERATIONAL DATA..." type="text"/>
+</div>
+<div class="flex items-center gap-4 text-slate-500">
+<button class="hover:bg-primary-container/20 p-2 transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hover:bg-primary-container/20 p-2 transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="hover:bg-primary-container/20 p-2 transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined">sensors</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Operator profile avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a male technician with a focused expression in a dark high-tech environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_49UgbifcVsA3j7w773e8lbGlrHu8GZZOZQxl9gvKgMNkLRTOpVWwC_kM49GQstELs1cNCUZtBqUEC2kE8qeDIvnSC7Zg7FzYrm5HZU6Tj3yX8H9CtNUBKAHsVrS8MTFrsbezcFSvEW6zy78qfdzApdpH4tyFSPvaKx8IBufij85lLDG6uNBLvgEFUsQVeWQwJc2HaEQZaoS7D-R4tiXqGohQMHqlw8nBDgFjaBabrU2MSIhZF6-Mm012cEDxgLJEVtthka0iG_A"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex pt-16">
+<!-- SideNavBar -->
+<nav class="bg-[#101415] h-[calc(100vh-64px)] w-64 fixed left-0 flex flex-col py-8 font-headline text-sm tracking-widest uppercase hidden md:flex">
+<div class="px-6 mb-8">
+<div class="text-lg font-bold text-primary mb-1">FORESTER_OS</div>
+<div class="text-[10px] text-slate-500 tracking-[0.3em]">v4.2.0-STABLE</div>
+</div>
+<div class="flex-1 space-y-1">
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">query_stats</span> Telemetry
+                </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">precision_manufacturing</span> Projects
+                </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">calendar_view_day</span> Scheduler
+                </a>
+<a class="bg-primary/10 text-primary border-l-4 border-primary px-6 py-3 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">badge</span> Clients
+                </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">construction</span> Fleet
+                </a>
+<a class="text-slate-400 px-6 py-3 flex items-center gap-3 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">monitoring</span> Analytics
+                </a>
+</div>
+<div class="px-6 mb-6">
+<button class="w-full bg-gradient-to-br from-primary to-primary/70 text-on-primary py-3 rounded-DEFAULT font-bold tracking-tighter text-xs active:scale-95 transition-transform">
+                    INITIATE JOB
+                </button>
+</div>
+<div class="border-t border-outline-variant/10 pt-4">
+<a class="text-slate-400 px-6 py-2 flex items-center gap-3 text-xs hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">help_center</span> Support
+                </a>
+<a class="text-slate-400 px-6 py-2 flex items-center gap-3 text-xs hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">terminal</span> Logs
+                </a>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="md:ml-64 w-full p-8 min-h-screen bg-background">
+<!-- Dashboard Header -->
+<div class="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<span class="font-label text-[10px] tracking-[0.4em] text-primary uppercase">Unified Management</span>
+<h1 class="text-5xl font-light font-headline tracking-tighter text-on-surface mt-2">Client Registry</h1>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface-container-low p-4 hud-corner min-w-[140px]">
+<div class="text-[10px] font-label text-slate-500 uppercase mb-1">Total Active</div>
+<div class="text-2xl font-headline font-bold text-primary">248</div>
+</div>
+<div class="bg-surface-container-low p-4 hud-corner min-w-[140px]">
+<div class="text-[10px] font-label text-slate-500 uppercase mb-1">Pending Leads</div>
+<div class="text-2xl font-headline font-bold text-secondary">32</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Client List Column -->
+<div class="lg:col-span-7 space-y-4">
+<!-- List Header -->
+<div class="grid grid-cols-5 px-6 py-3 font-label text-[10px] tracking-widest text-slate-500 uppercase border-b border-outline-variant/20">
+<div class="col-span-2">Client Identity</div>
+<div class="text-center">Status</div>
+<div class="text-center">Acres</div>
+<div class="text-right">Activity</div>
+</div>
+<!-- Client Item: Active -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer">
+<div class="grid grid-cols-5 items-center px-6 py-5">
+<div class="col-span-2 flex items-center gap-4">
+<div class="w-10 h-10 bg-primary/10 flex items-center justify-center rounded-DEFAULT">
+<span class="material-symbols-outlined text-primary">landscape</span>
+</div>
+<div>
+<div class="font-headline font-medium text-on-surface tracking-tight">OAK RIDGE ESTATE</div>
+<div class="text-[10px] font-label text-slate-500 uppercase">UID: 992-BETA</div>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-2 py-1 bg-primary/10 text-primary text-[9px] font-bold tracking-widest uppercase rounded-sm border border-primary/20">Active</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="text-sm font-headline text-on-surface">1,240</div>
+<div class="w-16 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[75%]"></div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-xs text-on-surface">2H AGO</div>
+<div class="text-[9px] font-label text-slate-500 uppercase tracking-tighter">DATA SYNC</div>
+</div>
+</div>
+</div>
+<!-- Client Item: Lead -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer border-l-2 border-secondary/40">
+<div class="grid grid-cols-5 items-center px-6 py-5">
+<div class="col-span-2 flex items-center gap-4">
+<div class="w-10 h-10 bg-secondary/10 flex items-center justify-center rounded-DEFAULT">
+<span class="material-symbols-outlined text-secondary">explore</span>
+</div>
+<div>
+<div class="font-headline font-medium text-on-surface tracking-tight">NORTHERN PINES</div>
+<div class="text-[10px] font-label text-slate-500 uppercase">UID: 441-EPS</div>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-2 py-1 bg-secondary/10 text-secondary text-[9px] font-bold tracking-widest uppercase rounded-sm border border-secondary/20">Lead</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-500">
+<div class="text-sm font-headline">--</div>
+<div class="w-16 h-1 bg-surface-container-highest rounded-full"></div>
+</div>
+<div class="text-right">
+<div class="text-xs text-on-surface">2D AGO</div>
+<div class="text-[9px] font-label text-slate-500 uppercase tracking-tighter">INQUIRY</div>
+</div>
+</div>
+</div>
+<!-- Client Item: Completed -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer opacity-70">
+<div class="grid grid-cols-5 items-center px-6 py-5">
+<div class="col-span-2 flex items-center gap-4">
+<div class="w-10 h-10 bg-slate-800 flex items-center justify-center rounded-DEFAULT">
+<span class="material-symbols-outlined text-slate-400">check_circle</span>
+</div>
+<div>
+<div class="font-headline font-medium text-on-surface tracking-tight">RIVER VALLEY LTD</div>
+<div class="text-[10px] font-label text-slate-500 uppercase">UID: 105-ZETA</div>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-2 py-1 bg-slate-800 text-slate-400 text-[9px] font-bold tracking-widest uppercase rounded-sm">Completed</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="text-sm font-headline text-on-surface">450</div>
+<div class="w-16 h-1 bg-primary/40 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-full"></div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-xs text-on-surface">14D AGO</div>
+<div class="text-[9px] font-label text-slate-500 uppercase tracking-tighter">ARCHIVED</div>
+</div>
+</div>
+</div>
+<!-- Additional Item -->
+<div class="group bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer">
+<div class="grid grid-cols-5 items-center px-6 py-5">
+<div class="col-span-2 flex items-center gap-4">
+<div class="w-10 h-10 bg-primary/10 flex items-center justify-center rounded-DEFAULT">
+<span class="material-symbols-outlined text-primary">forest</span>
+</div>
+<div>
+<div class="font-headline font-medium text-on-surface tracking-tight">BLACKWOOD HOLDINGS</div>
+<div class="text-[10px] font-label text-slate-500 uppercase">UID: 827-GAMMA</div>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-2 py-1 bg-primary/10 text-primary text-[9px] font-bold tracking-widest uppercase rounded-sm border border-primary/20">Active</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="text-sm font-headline text-on-surface">3,120</div>
+<div class="w-16 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[35%]"></div>
+</div>
+</div>
+<div class="text-right">
+<div class="text-xs text-on-surface">6M AGO</div>
+<div class="text-[9px] font-label text-slate-500 uppercase tracking-tighter">OPERATIONAL</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Profile Expansion / Details Column -->
+<div class="lg:col-span-5">
+<div class="bg-surface-container-high hud-corner p-6 sticky top-24">
+<div class="flex justify-between items-start mb-8">
+<div>
+<span class="text-[10px] font-label text-primary tracking-widest uppercase">Detail Profile</span>
+<h2 class="text-3xl font-headline font-light tracking-tighter mt-1">OAK RIDGE ESTATE</h2>
+<p class="text-slate-400 text-xs mt-2 max-w-xs">Primary contact: Harold Miller. Clearing operations focused on invasive cedar removal in the eastern quadrant.</p>
+</div>
+<div class="text-right">
+<span class="material-symbols-outlined text-primary text-4xl" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<!-- Map Section -->
+<div class="mb-8">
+<div class="text-[10px] font-label text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+<span class="w-2 h-2 bg-primary rounded-full animate-pulse"></span> Property Map History
+                            </div>
+<div class="aspect-video w-full bg-surface-container-lowest overflow-hidden rounded-DEFAULT relative group">
+<img alt="Property map history" class="w-full h-full object-cover opacity-60" data-alt="high-altitude satellite topographic map showing dense forest terrain with digital grid overlays and heat map indicators" data-location="Texas Hill Country" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmagaddLqFvOYokEQ6sZtwBJ2F6j62SCee7vT-16D1eytHPVnquEWofFmrefabv4saHuIEa4nHrusD_7wi8CUfUP2OZxIivUfClmu1rlPVfGvool0Xje7Mp5zy2qoSc_dfp3-rndaHHPD7Xt72_unws7UpUHbdCuYiYNY7Ipj_S_MXkDjk9JWalifUO91RJCStsfMy5clyudvSNlL_gixD5rsGE0JrHbxSP28L7_17_ibChJxqbINDo5Fsu7MFFK4ksqxyBZbNZqc"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent"></div>
+<div class="absolute bottom-4 left-4 font-label text-[10px] tracking-widest bg-surface/80 px-2 py-1 backdrop-blur-sm">SECTOR 04-A // DENSITY: HIGH</div>
+</div>
+</div>
+<!-- Technical Stats Grid -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+<div class="bg-surface-container-low p-4">
+<div class="text-[9px] font-label text-slate-500 uppercase tracking-widest mb-1">Invoices Sent</div>
+<div class="flex items-baseline gap-2">
+<span class="text-xl font-headline font-bold">$14,200</span>
+<span class="text-[10px] text-primary">PAID</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-4">
+<div class="text-[9px] font-label text-slate-500 uppercase tracking-widest mb-1">Fleet Allocation</div>
+<div class="flex items-baseline gap-2">
+<span class="text-xl font-headline font-bold">03</span>
+<span class="text-[10px] text-slate-400 uppercase">UNITS</span>
+</div>
+</div>
+</div>
+<!-- Notes Section -->
+<div>
+<div class="text-[10px] font-label text-slate-500 uppercase tracking-widest mb-3">Operator Notes</div>
+<div class="space-y-3">
+<div class="bg-surface/30 p-3 text-xs leading-relaxed border-l border-primary/40 italic">
+                                    "Client requested specialized mulching around the legacy oak cluster. Terrain gradient exceeds 15% in zone B."
+                                    <div class="mt-2 text-[9px] font-label text-primary/60 tracking-widest uppercase">— SYSTEM LOG // 02.14.2024</div>
+</div>
+<div class="bg-surface/30 p-3 text-xs leading-relaxed border-l border-outline-variant/40">
+                                    "Initial site survey complete. GPS tags established for all primary perimeters."
+                                    <div class="mt-2 text-[9px] font-label text-slate-500 tracking-widest uppercase">— OP_SARAH // 01.30.2024</div>
+</div>
+</div>
+</div>
+<!-- CTA -->
+<div class="mt-10 pt-6 border-t border-outline-variant/10">
+<button class="w-full bg-surface-container-highest hover:bg-primary/10 text-on-surface py-3 flex items-center justify-center gap-2 transition-all font-headline font-medium tracking-tight border border-outline-variant/20">
+<span class="material-symbols-outlined text-sm">open_in_new</span>
+                                VIEW FULL OPERATIONAL DASHBOARD
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile NavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-[#101415]/90 backdrop-blur-lg flex justify-around items-center h-16 z-50 px-2">
+<button class="flex flex-col items-center gap-1 text-slate-500 active:scale-95 duration-150">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="text-[8px] font-label uppercase tracking-widest">Stats</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500 active:scale-95 duration-150">
+<span class="material-symbols-outlined">precision_manufacturing</span>
+<span class="text-[8px] font-label uppercase tracking-widest">Work</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary active:scale-95 duration-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">badge</span>
+<span class="text-[8px] font-label uppercase tracking-widest">Clients</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500 active:scale-95 duration-150">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-[8px] font-label uppercase tracking-widest">Data</span>
+</button>
+</nav>
+</body></html>
