@@ -221,6 +221,141 @@ function getClassColor(classification: VegClass, ndvi: number): string {
   }
 }
 
+// ── Overlapping tile consensus ──
+// Overlays a grid of 5×5-pixel tiles (75m) at 2-pixel stride (30m) = 60% overlap.
+// Each pixel is covered by up to 9 tiles. Tiles vote on classification via
+// confidence-weighted consensus; final pixel classification is the weighted
+// majority across all covering tiles. This eliminates salt-and-pepper noise
+// from single-pixel misclassification without any extra API calls.
+
+function applyTileConsensus(
+  results: SampleResult[],
+  spacingKm: number,
+  bbox: number[],
+): { refined: SampleResult[]; tileCount: number; consensusImprovedCells: number } {
+  if (results.length < 4) {
+    return { refined: results, tileCount: 0, consensusImprovedCells: 0 };
+  }
+
+  const centerLat = (bbox[1] + bbox[3]) / 2;
+  const kmPerDegLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
+  const kmPerDegLat = 111.32;
+  const spacingLng = spacingKm / kmPerDegLng;
+  const spacingLat = spacingKm / kmPerDegLat;
+
+  const minLng = bbox[0];
+  const minLat = bbox[1];
+
+  interface IndexedResult extends SampleResult {
+    col: number;
+    row: number;
+    originalIdx: number;
+  }
+
+  const indexed: IndexedResult[] = results.map((r, i) => ({
+    ...r,
+    col: Math.round((r.lng - minLng) / spacingLng),
+    row: Math.round((r.lat - minLat) / spacingLat),
+    originalIdx: i,
+  }));
+
+  const gridMap = new Map<string, IndexedResult>();
+  let maxCol = 0;
+  let maxRow = 0;
+  for (const ir of indexed) {
+    gridMap.set(`${ir.col},${ir.row}`, ir);
+    if (ir.col > maxCol) maxCol = ir.col;
+    if (ir.row > maxRow) maxRow = ir.row;
+  }
+
+  const tileRadius = 2; // 5×5 tile: center ± 2
+  const stride = 2;     // 60% overlap: (5 - 2) / 5 = 0.6
+
+  const pixelVotes: Array<Array<{ classification: VegClass; weight: number }>> =
+    results.map(() => []);
+
+  let tileCount = 0;
+
+  for (let tc = 0; tc <= maxCol; tc += stride) {
+    for (let tr = 0; tr <= maxRow; tr += stride) {
+      const tilePixels: IndexedResult[] = [];
+      for (let dc = -tileRadius; dc <= tileRadius; dc++) {
+        for (let dr = -tileRadius; dr <= tileRadius; dr++) {
+          const px = gridMap.get(`${tc + dc},${tr + dr}`);
+          if (px) tilePixels.push(px);
+        }
+      }
+
+      if (tilePixels.length < 2) continue;
+      tileCount++;
+
+      const classWeight: Record<VegClass, number> = {
+        cedar: 0, oak: 0, mixed_brush: 0, grass: 0, bare: 0,
+      };
+      for (const px of tilePixels) {
+        classWeight[px.classification] += px.confidence * (1 + px.bandVotes * 0.2);
+      }
+
+      let winner: VegClass = 'bare';
+      let maxW = -1;
+      for (const cls of Object.keys(classWeight) as VegClass[]) {
+        if (classWeight[cls] > maxW) {
+          maxW = classWeight[cls];
+          winner = cls;
+        }
+      }
+
+      const agreeing = tilePixels.filter((p) => p.classification === winner).length;
+      const agreement = agreeing / tilePixels.length;
+      const agreeConf =
+        tilePixels
+          .filter((p) => p.classification === winner)
+          .reduce((s, p) => s + p.confidence, 0) / agreeing;
+
+      const voteWeight = agreeConf * agreement;
+      for (const px of tilePixels) {
+        pixelVotes[px.originalIdx].push({ classification: winner, weight: voteWeight });
+      }
+    }
+  }
+
+  let consensusImprovedCells = 0;
+  const refined = results.map((original, idx) => {
+    const votes = pixelVotes[idx];
+    if (votes.length === 0) return original;
+
+    const cw: Record<VegClass, number> = {
+      cedar: 0, oak: 0, mixed_brush: 0, grass: 0, bare: 0,
+    };
+    for (const v of votes) {
+      cw[v.classification] += v.weight;
+    }
+
+    let bestClass: VegClass = original.classification;
+    let bestWeight = -1;
+    for (const cls of Object.keys(cw) as VegClass[]) {
+      if (cw[cls] > bestWeight) {
+        bestWeight = cw[cls];
+        bestClass = cls;
+      }
+    }
+
+    const totalWeight = Object.values(cw).reduce((a, b) => a + b, 0);
+    const winFraction = totalWeight > 0 ? bestWeight / totalWeight : 0;
+
+    if (bestClass !== original.classification) {
+      consensusImprovedCells++;
+      const newConf = Math.min(0.95, original.confidence * 0.3 + winFraction * 0.7);
+      return { ...original, classification: bestClass, confidence: Math.round(newConf * 100) / 100 };
+    }
+
+    const boostedConf = Math.min(0.95, original.confidence + winFraction * 0.15);
+    return { ...original, confidence: Math.round(boostedConf * 100) / 100 };
+  });
+
+  return { refined, tileCount, consensusImprovedCells };
+}
+
 // ── API handler ──
 
 export async function POST(req: NextRequest) {
@@ -315,6 +450,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Overlapping tile consensus: refine classifications using spatial context
+    const { refined, tileCount, consensusImprovedCells } =
+      applyTileConsensus(results, spacingKm, bbox);
+
     // Build cell polygons for map overlay (15m cells = 7.5m half-size)
     const centerLat = (bbox[1] + bbox[3]) / 2;
     const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
@@ -322,7 +461,7 @@ export async function POST(req: NextRequest) {
 
     const gridCells: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: results.map((s) => ({
+      features: refined.map((s) => ({
         type: 'Feature' as const,
         geometry: {
           type: 'Polygon' as const,
@@ -348,23 +487,23 @@ export async function POST(req: NextRequest) {
       })),
     };
 
-    // Summary statistics
-    const total = results.length;
-    const cedarCount = results.filter((r) => r.classification === 'cedar').length;
-    const oakCount = results.filter((r) => r.classification === 'oak').length;
-    const mixedCount = results.filter((r) => r.classification === 'mixed_brush').length;
-    const grassCount = results.filter((r) => r.classification === 'grass').length;
-    const bareCount = results.filter((r) => r.classification === 'bare').length;
+    // Summary statistics (computed from consensus-refined results)
+    const total = refined.length;
+    const cedarCount = refined.filter((r) => r.classification === 'cedar').length;
+    const oakCount = refined.filter((r) => r.classification === 'oak').length;
+    const mixedCount = refined.filter((r) => r.classification === 'mixed_brush').length;
+    const grassCount = refined.filter((r) => r.classification === 'grass').length;
+    const bareCount = refined.filter((r) => r.classification === 'bare').length;
 
     const cedarPct = total > 0 ? cedarCount / total : 0;
-    const avgNdvi = results.reduce((sum, r) => sum + r.ndvi, 0) / total;
-    const avgConf = results.reduce((sum, r) => sum + r.confidence, 0) / total;
-    const avgBandVotes = results.reduce((sum, r) => sum + r.bandVotes, 0) / total;
-    const avgGndvi = results.reduce((sum, r) => sum + r.gndvi, 0) / total;
-    const avgSavi = results.reduce((sum, r) => sum + r.savi, 0) / total;
+    const avgNdvi = refined.reduce((sum, r) => sum + r.ndvi, 0) / total;
+    const avgConf = refined.reduce((sum, r) => sum + r.confidence, 0) / total;
+    const avgBandVotes = refined.reduce((sum, r) => sum + r.bandVotes, 0) / total;
+    const avgGndvi = refined.reduce((sum, r) => sum + r.gndvi, 0) / total;
+    const avgSavi = refined.reduce((sum, r) => sum + r.savi, 0) / total;
 
     // High-confidence cedar: cells where ≥3 bands agreed
-    const highConfCedar = results.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
+    const highConfCedar = refined.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
 
     const summary = {
       totalSamples: total,
@@ -381,6 +520,16 @@ export async function POST(req: NextRequest) {
       avgBandVotes: Math.round(avgBandVotes * 10) / 10,
       highConfidenceCedarCells: highConfCedar,
       gridSpacingM: Math.round(spacingKm * 1000),
+      tileConsensus: {
+        tileCount,
+        tileOverlapPct: 60,
+        tileSizePixels: 5,
+        tileSizeM: Math.round(spacingKm * 5 * 1000),
+        stridePixels: 2,
+        strideM: Math.round(spacingKm * 2 * 1000),
+        consensusImprovedCells,
+        consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
+      },
     };
 
     return NextResponse.json(
