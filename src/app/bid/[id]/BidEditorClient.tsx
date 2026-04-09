@@ -51,6 +51,8 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     updateBidField,
   } = useBidStore();
 
+  const [convertBusy, setConvertBusy] = useState(false);
+
   // Prevent hydration mismatch: Zustand generates random IDs/bid numbers
   // on server vs client. Delay rendering until client is mounted.
   const [mounted, setMounted] = useState(false);
@@ -93,6 +95,29 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     saveBid();
     toast.success('Bid saved');
   }, [saveBid]);
+
+  const convertToJob = useCallback(async () => {
+    try {
+      setConvertBusy(true);
+      handleSave();
+      const res = await fetch('/api/jobs/from-bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bidId }),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(msg || 'Failed to convert bid to job.');
+      }
+      const data = (await res.json()) as { jobId: string };
+      toast.success('Job created');
+      window.location.href = `/job/${data.jobId}`;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to convert bid to job.');
+    } finally {
+      setConvertBusy(false);
+    }
+  }, [bidId, handleSave]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
@@ -143,6 +168,16 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
           >
             🚜 OPERATE
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs border-[#353534] text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-black uppercase tracking-widest hidden sm:inline-flex"
+            onClick={convertToJob}
+            disabled={convertBusy}
+            title="Convert this bid into a shared job for multi-user progress tracking"
+          >
+            {convertBusy ? 'CREATING_JOB…' : 'CONVERT_TO_JOB'}
+          </Button>
           <Button
             variant="outline"
             size="sm"

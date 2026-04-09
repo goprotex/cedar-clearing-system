@@ -210,6 +210,11 @@ export interface Bid {
   id: string;
   bidNumber: string;
   status: BidStatus;
+  /**
+   * Optional Supabase-backed job created from this bid.
+   * Stored client-side in Phase 1; server is source of truth once jobs are enabled.
+   */
+  jobId?: string;
   // Client
   clientName: string;
   clientEmail: string;
@@ -278,4 +283,28 @@ export interface BidOption {
     subtotal: number;
   }[];
   recommended: boolean;
+}
+
+// ──── Jobs (multi-user, multi-day progress) ────
+
+export type JobStatus = 'active' | 'paused' | 'completed' | 'cancelled';
+
+export interface Job {
+  id: string;
+  bid_id: string;
+  title: string;
+  status: JobStatus;
+  created_at: string;
+  bid_snapshot: Bid;
+  cedar_total_cells: number;
+  cedar_cleared_cells: number;
+}
+
+export interface JobEvent {
+  id: string;
+  job_id: string;
+  created_at: string;
+  created_by: string;
+  type: string;
+  data: unknown;
 }
