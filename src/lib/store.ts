@@ -483,7 +483,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
                   },
                 });
               } else if (eventType === 'result') {
-                resultData = payload as CedarAnalysis;
+                resultData = payload as unknown as CedarAnalysis;
               }
             } catch {
               /* skip malformed line */
