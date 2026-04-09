@@ -206,11 +206,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       map.addLayer({
         id: 'cedar-fill',
-        type: 'fill',
+        type: 'fill-extrusion',
         source: 'cedar-analysis',
         paint: {
-          'fill-color': ['get', 'color'],
-          'fill-opacity': 0.7,
+          'fill-extrusion-color': ['get', 'color'],
+          'fill-extrusion-opacity': 0.7,
+          'fill-extrusion-height': 2,
+          'fill-extrusion-base': 0,
         },
         layout: { visibility: 'none' },
       });
@@ -334,16 +336,16 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // Toggle cedar AI overlay (fill + border) — auto-hide when hologram is active
-    const cedarVisible = layers.cedarAI && !layers.hologram;
+    // Toggle cedar AI overlay (fill + border)
     for (const cedarLayerId of ['cedar-fill', 'cedar-border']) {
       const layer = map.getLayer(cedarLayerId);
       if (layer) {
-        map.setLayoutProperty(cedarLayerId, 'visibility', cedarVisible ? 'visible' : 'none');
+        map.setLayoutProperty(cedarLayerId, 'visibility', layers.cedarAI ? 'visible' : 'none');
       }
     }
     if (map.getLayer('cedar-fill')) {
-      map.setPaintProperty('cedar-fill', 'fill-opacity', opacities.cedarAI);
+      const cedarOpacity = layers.hologram ? Math.min(opacities.cedarAI, 0.45) : opacities.cedarAI;
+      map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', cedarOpacity);
     }
 
     // Toggle 3D terrain
@@ -428,15 +430,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram: enable terrain, switch to NDVI base map, hide cedar AI squares
+      // Hologram: enable terrain, switch to NDVI base map, keep cedar AI visible
       if (key === 'hologram' && !prev.hologram) {
-        // Save pre-hologram NAIP state to restore later
-        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d };
+        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
         next.terrain3d = true;
         next.naip = false;
         next.naipCIR = false;
-        next.naipNDVI = true; // NDVI as base map in hologram mode
-        next.cedarAI = false; // hide flat squares, 3D trees replace them
+        next.naipNDVI = true;
+        next.cedarAI = true;
         // Pitch the camera to see 3D trees from an angle
         const map = mapRef.current;
         if (map) {
@@ -451,6 +452,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipCIR = saved.naipCIR;
           next.naipNDVI = saved.naipNDVI;
           next.terrain3d = saved.terrain3d;
+          next.cedarAI = saved.cedarAI;
           preHoloLayersRef.current = null;
         }
         const map = mapRef.current;
