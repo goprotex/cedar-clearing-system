@@ -384,58 +384,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Fetch a single NAIP pixel with retry
+    async function fetchPixel(lng: number, lat: number, retries = 2): Promise<SampleResult> {
+      const geom = JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } });
+      const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
+
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          const pixelStr: string = data?.value || '';
+
+          if (!pixelStr || pixelStr === 'NoData') {
+            return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
+          }
+
+          const vals = pixelStr.split(/[\s,]+/).map(Number).filter((n) => !isNaN(n));
+          if (vals.length < 3) continue;
+
+          const [r, g, b] = vals;
+          const nir = vals.length >= 4 ? vals[3] : null;
+          let ndvi = 0;
+          if (nir !== null && nir + r > 0) ndvi = (nir - r) / (nir + r);
+
+          const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
+          return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
+        } catch {
+          if (attempt < retries) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
+      // All retries failed — return as bare with low confidence rather than dropping
+      return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.1, bandVotes: 0 };
+    }
+
     // Batch identify requests against NAIP ImageServer
-    const batchSize = 50;
+    const batchSize = 40;
     const results: SampleResult[] = [];
 
     for (let i = 0; i < samplePoints.length; i += batchSize) {
       const batch = samplePoints.slice(i, i + batchSize);
       const batchResults = await Promise.all(
-        batch.map(async (pt): Promise<SampleResult | null> => {
+        batch.map((pt) => {
           const [lng, lat] = pt.geometry.coordinates;
-          try {
-            const geom = JSON.stringify({
-              x: lng,
-              y: lat,
-              spatialReference: { wkid: 4326 },
-            });
-            const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
-
-            const res = await fetch(url, {
-              signal: AbortSignal.timeout(10000),
-            });
-            if (!res.ok) return null;
-
-            const data = await res.json();
-            const pixelStr: string = data?.value || '';
-
-            if (!pixelStr || pixelStr === 'NoData') {
-              return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
-            }
-
-            const vals = pixelStr
-              .split(/[\s,]+/)
-              .map(Number)
-              .filter((n) => !isNaN(n));
-            if (vals.length < 3) return null;
-
-            const [r, g, b] = vals;
-            const nir = vals.length >= 4 ? vals[3] : null;
-
-            let ndvi = 0;
-            if (nir !== null && nir + r > 0) {
-              ndvi = (nir - r) / (nir + r);
-            }
-
-            const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
-            return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
-          } catch {
-            return null;
-          }
+          return fetchPixel(lng, lat);
         })
       );
-
-      results.push(...batchResults.filter((r): r is SampleResult => r !== null));
+      results.push(...batchResults);
     }
 
     if (results.length === 0) {
