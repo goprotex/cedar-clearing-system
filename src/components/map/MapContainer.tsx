@@ -28,6 +28,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const drawRef = useRef<MapboxDraw | null>(null);
   const lastFlyToPastureRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
+  const rotationFrameRef = useRef<number | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -201,6 +202,22 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.addSource('pastures', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // ── Hologram mask: black fill outside pasture polygons ──
+      map.addSource('holo-mask', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({
+        id: 'holo-mask-fill',
+        type: 'fill',
+        source: 'holo-mask',
+        paint: {
+          'fill-color': '#000000',
+          'fill-opacity': 0.92,
+        },
+        layout: { visibility: 'none' },
       });
 
       // ── Cedar AI overlay source ──
@@ -425,16 +442,46 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // ── Hologram mode: desaturate base map, force NDVI + cedar visible ──
+    // ── Hologram mode ──
     if (layers.hologram) {
-      // Desaturate the satellite base map to make overlays pop
-      const baseLayers = map.getStyle().layers ?? [];
-      for (const bl of baseLayers) {
+      // Build inverted mask: world polygon with pasture shapes as holes
+      const maskSource = map.getSource('holo-mask') as mapboxgl.GeoJSONSource | undefined;
+      if (maskSource) {
+        const worldRing: [number, number][] = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+        const holes: [number, number][][] = currentBid.pastures
+          .filter(p => p.polygon.geometry.coordinates.length > 0)
+          .map(p => p.polygon.geometry.coordinates[0] as [number, number][]);
+
+        if (holes.length > 0) {
+          maskSource.setData({
+            type: 'FeatureCollection',
+            features: [{
+              type: 'Feature',
+              geometry: { type: 'Polygon', coordinates: [worldRing, ...holes] },
+              properties: {},
+            }],
+          });
+          map.setLayoutProperty('holo-mask-fill', 'visibility', 'visible');
+        }
+      }
+
+      // Desaturate the satellite base map
+      for (const bl of (map.getStyle().layers ?? [])) {
         if (bl.id.startsWith('satellite') || bl.id.includes('mapbox-satellite')) {
           try {
-            map.setPaintProperty(bl.id, 'raster-saturation', -0.7);
-            map.setPaintProperty(bl.id, 'raster-brightness-max', 0.4);
+            map.setPaintProperty(bl.id, 'raster-saturation', -0.8);
+            map.setPaintProperty(bl.id, 'raster-brightness-max', 0.35);
           } catch { /* not a raster layer */ }
+        }
+      }
+
+      // Hide all road/label/poi/building layers so pasture floats in void
+      for (const bl of (map.getStyle().layers ?? [])) {
+        if (bl.id.includes('road') || bl.id.includes('label') || bl.id.includes('poi') ||
+            bl.id.includes('building') || bl.id.includes('transit') || bl.id.includes('admin') ||
+            bl.id.includes('place') || bl.id.includes('water-') || bl.id.includes('waterway') ||
+            bl.id.includes('land-structure') || bl.id.includes('aeroway')) {
+          try { map.setLayoutProperty(bl.id, 'visibility', 'none'); } catch {}
         }
       }
 
@@ -444,27 +491,58 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
       }
 
-      // Green pasture borders in hologram mode
+      // Green pasture borders — glowing
       if (map.getLayer('pastures-border')) {
         map.setPaintProperty('pastures-border', 'line-color', '#00ff41');
         map.setPaintProperty('pastures-border', 'line-width', 3);
       }
       if (map.getLayer('pastures-fill')) {
         map.setPaintProperty('pastures-fill', 'fill-color', '#00ff41');
-        map.setPaintProperty('pastures-fill', 'fill-opacity', 0.08);
+        map.setPaintProperty('pastures-fill', 'fill-opacity', 0.05);
       }
       if (map.getLayer('pastures-labels')) {
         map.setPaintProperty('pastures-labels', 'text-color', '#00ff41');
       }
+
+      // Start slow auto-rotation
+      if (!rotationFrameRef.current) {
+        const rotate = () => {
+          if (!mapRef.current) return;
+          const bearing = mapRef.current.getBearing() + 0.15;
+          mapRef.current.setBearing(bearing);
+          rotationFrameRef.current = requestAnimationFrame(rotate);
+        };
+        rotationFrameRef.current = requestAnimationFrame(rotate);
+      }
     } else {
+      // Stop rotation
+      if (rotationFrameRef.current) {
+        cancelAnimationFrame(rotationFrameRef.current);
+        rotationFrameRef.current = null;
+      }
+
+      // Hide mask
+      if (map.getLayer('holo-mask-fill')) {
+        map.setLayoutProperty('holo-mask-fill', 'visibility', 'none');
+      }
+
       // Restore satellite base map
-      const baseLayers = map.getStyle().layers ?? [];
-      for (const bl of baseLayers) {
+      for (const bl of (map.getStyle().layers ?? [])) {
         if (bl.id.startsWith('satellite') || bl.id.includes('mapbox-satellite')) {
           try {
             map.setPaintProperty(bl.id, 'raster-saturation', 0);
             map.setPaintProperty(bl.id, 'raster-brightness-max', 1);
           } catch { /* not a raster layer */ }
+        }
+      }
+
+      // Restore road/label/poi layers
+      for (const bl of (map.getStyle().layers ?? [])) {
+        if (bl.id.includes('road') || bl.id.includes('label') || bl.id.includes('poi') ||
+            bl.id.includes('building') || bl.id.includes('transit') || bl.id.includes('admin') ||
+            bl.id.includes('place') || bl.id.includes('water-') || bl.id.includes('waterway') ||
+            bl.id.includes('land-structure') || bl.id.includes('aeroway')) {
+          try { map.setLayoutProperty(bl.id, 'visibility', 'visible'); } catch {}
         }
       }
 
@@ -485,6 +563,53 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
 
   }, [layers, opacities, currentBid.pastures, currentBid.propertyCenter]);
+
+  // Pause rotation on user interaction, resume after 3s idle
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !layers.hologram) return;
+
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const pause = () => {
+      if (rotationFrameRef.current) {
+        cancelAnimationFrame(rotationFrameRef.current);
+        rotationFrameRef.current = null;
+      }
+      if (resumeTimer) clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => {
+        if (!mapRef.current || !rotationFrameRef.current) {
+          const rotate = () => {
+            if (!mapRef.current) return;
+            mapRef.current.setBearing(mapRef.current.getBearing() + 0.15);
+            rotationFrameRef.current = requestAnimationFrame(rotate);
+          };
+          rotationFrameRef.current = requestAnimationFrame(rotate);
+        }
+      }, 3000);
+    };
+
+    map.on('mousedown', pause);
+    map.on('touchstart', pause);
+    map.on('wheel', pause);
+
+    return () => {
+      map.off('mousedown', pause);
+      map.off('touchstart', pause);
+      map.off('wheel', pause);
+      if (resumeTimer) clearTimeout(resumeTimer);
+    };
+  }, [layers.hologram]);
+
+  // Clean up rotation on unmount
+  useEffect(() => {
+    return () => {
+      if (rotationFrameRef.current) {
+        cancelAnimationFrame(rotationFrameRef.current);
+        rotationFrameRef.current = null;
+      }
+    };
+  }, []);
 
   // Ensure NAIP layers are mutually exclusive (only one at a time)
   const toggleLayer = useCallback((key: LayerKey) => {
