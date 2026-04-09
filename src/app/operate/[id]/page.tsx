@@ -6,5 +6,13 @@ export const metadata = {
 
 export default async function OperatorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <OperatorWrapper bidId={id} />;
+  return (
+    <>
+      <link
+        rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css"
+      />
+      <OperatorWrapper bidId={id} />
+    </>
+  );
 }

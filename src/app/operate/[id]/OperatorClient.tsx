@@ -145,20 +145,27 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !state.bid) return;
     const bid = state.bid;
+    const container = mapContainerRef.current;
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
     const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
+      container,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       center: bid.propertyCenter,
       zoom: bid.mapZoom,
       pitch: 45,
       antialias: true,
+      preserveDrawingBuffer: true,
+      failIfMajorPerformanceCaveat: false,
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
+
+    map.once('idle', () => {
+      map.resize();
+    });
 
     map.on('load', () => {
       map.addSource('mapbox-dem', {
@@ -391,6 +398,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   }, []);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+  const elapsedMs = Date.now() - state.sessionStart;
+  const bid = state.bid;
 
   if (!mapboxToken) {
     return (
@@ -406,50 +415,50 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     );
   }
 
-  if (!state.bid) {
-    return (
-      <div className="h-screen w-screen bg-[#131313] flex items-center justify-center text-[#e5e2e1]">
-        <div className="text-center space-y-4">
-          <div className="text-6xl">📋</div>
-          <h1 className="text-2xl font-black text-[#FF6B00]">NO_BID_DATA</h1>
-          <p className="text-sm text-[#a98a7d]">Bid not found in local storage</p>
-          <Link href="/bids" className="inline-block bg-[#FF6B00] text-black px-6 py-3 font-bold uppercase tracking-widest text-sm hover:bg-white transition-all">
-            Back to Bids
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const elapsedMs = Date.now() - state.sessionStart;
-
   return (
     <div className="h-screen w-screen bg-[#131313] relative overflow-hidden hologram-mode">
-      {/* Full-screen map */}
+      {/* Map container — always in DOM so ref is available when bid loads */}
       <div ref={mapContainerRef} className="absolute inset-0" />
+
+      {/* No-bid overlay */}
+      {!bid && (
+        <div className="absolute inset-0 z-30 bg-[#131313] flex items-center justify-center text-[#e5e2e1]">
+          <div className="text-center space-y-4">
+            <div className="text-6xl">📋</div>
+            <h1 className="text-2xl font-black text-[#FF6B00]">NO_BID_DATA</h1>
+            <p className="text-sm text-[#a98a7d]">Bid not found in local storage</p>
+            <Link href="/bids" className="inline-block bg-[#FF6B00] text-black px-6 py-3 font-bold uppercase tracking-widest text-sm hover:bg-white transition-all">
+              Back to Bids
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Holographic scan-line overlay */}
-      <div className="holo-scanlines" />
+      {bid && <div className="holo-scanlines" />}
 
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#000a02]/80 backdrop-blur-sm border-b border-green-900/40">
-        <div className="flex items-center gap-3">
-          <Link href={`/bid/${bidId}`} className="text-[#00ff41] font-black text-sm tracking-widest hover:text-white transition-colors">
-            ← CEDAR_HACK
-          </Link>
-          <span className="text-[10px] text-[#a98a7d] font-mono hidden sm:inline">
-            OPERATOR_MODE // {state.bid.bidNumber}
-          </span>
+      {bid && (
+        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#000a02]/80 backdrop-blur-sm border-b border-green-900/40">
+          <div className="flex items-center gap-3">
+            <Link href={`/bid/${bidId}`} className="text-[#00ff41] font-black text-sm tracking-widest hover:text-white transition-colors">
+              ← CEDAR_HACK
+            </Link>
+            <span className="text-[10px] text-[#a98a7d] font-mono hidden sm:inline">
+              OPERATOR_MODE // {bid.bidNumber}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-mono text-[#a98a7d]">
+              {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
-          <span className="text-[10px] font-mono text-[#a98a7d]">
-            {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* HUD panel */}
-      {hudOpen && (
+      {bid && hudOpen && (
         <div className="absolute top-14 left-3 z-10 holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Field HUD</span>
@@ -505,7 +514,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           )}
 
           {/* Pasture breakdown */}
-          {state.bid.pastures.filter(p => p.cedarAnalysis).map(p => {
+          {bid.pastures.filter(p => p.cedarAnalysis).map(p => {
             const totalCells = (p.cedarAnalysis?.gridCells?.features ?? []).filter(
               f => ['cedar', 'oak', 'mixed_brush'].includes(f.properties?.classification)
             ).length;
@@ -526,7 +535,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       )}
 
       {/* Collapsed HUD button */}
-      {!hudOpen && (
+      {bid && !hudOpen && (
         <button
           onClick={() => setHudOpen(true)}
           className="absolute top-14 left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
@@ -536,46 +545,48 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       )}
 
       {/* Bottom controls */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
-        <button
-          onClick={toggleGPS}
-          className={`px-5 py-3 rounded-lg font-bold text-sm uppercase tracking-widest transition-all ${
-            state.gpsActive
-              ? 'bg-red-600 text-white hover:bg-red-700 shadow-[0_0_20px_rgba(255,0,0,0.3)]'
-              : 'bg-[#13ff43] text-black hover:bg-[#00cc33] shadow-[0_0_20px_rgba(19,255,67,0.3)]'
-          }`}
-        >
-          {state.gpsActive ? '⏹ Stop GPS' : '▶ Start GPS'}
-        </button>
-
-        {state.gpsActive && (
+      {bid && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
           <button
-            onClick={recenter}
-            className="px-4 py-3 rounded-lg bg-[#FF6B00] text-black font-bold text-sm uppercase tracking-widest hover:bg-white transition-all"
+            onClick={toggleGPS}
+            className={`px-5 py-3 rounded-lg font-bold text-sm uppercase tracking-widest transition-all ${
+              state.gpsActive
+                ? 'bg-red-600 text-white hover:bg-red-700 shadow-[0_0_20px_rgba(255,0,0,0.3)]'
+                : 'bg-[#13ff43] text-black hover:bg-[#00cc33] shadow-[0_0_20px_rgba(19,255,67,0.3)]'
+            }`}
           >
-            📍 Recenter
+            {state.gpsActive ? '⏹ Stop GPS' : '▶ Start GPS'}
           </button>
-        )}
 
-        {stats.cleared > 0 && !state.gpsActive && (
-          <>
-            {confirmReset ? (
-              <div className="flex items-center gap-1 bg-red-900/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-red-500">
-                <span className="text-red-300 text-xs font-bold">Reset all progress?</span>
-                <button onClick={resetSession} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700">YES</button>
-                <button onClick={() => setConfirmReset(false)} className="px-2 py-1 bg-[#353534] text-white text-xs font-bold rounded hover:bg-[#555]">NO</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmReset(true)}
-                className="px-4 py-3 rounded-lg bg-[#353534] text-[#a98a7d] font-bold text-sm uppercase tracking-widest hover:bg-red-900 hover:text-red-300 transition-all"
-              >
-                Reset
-              </button>
-            )}
-          </>
-        )}
-      </div>
+          {state.gpsActive && (
+            <button
+              onClick={recenter}
+              className="px-4 py-3 rounded-lg bg-[#FF6B00] text-black font-bold text-sm uppercase tracking-widest hover:bg-white transition-all"
+            >
+              📍 Recenter
+            </button>
+          )}
+
+          {stats.cleared > 0 && !state.gpsActive && (
+            <>
+              {confirmReset ? (
+                <div className="flex items-center gap-1 bg-red-900/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-red-500">
+                  <span className="text-red-300 text-xs font-bold">Reset all progress?</span>
+                  <button onClick={resetSession} className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700">YES</button>
+                  <button onClick={() => setConfirmReset(false)} className="px-2 py-1 bg-[#353534] text-white text-xs font-bold rounded hover:bg-[#555]">NO</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmReset(true)}
+                  className="px-4 py-3 rounded-lg bg-[#353534] text-[#a98a7d] font-bold text-sm uppercase tracking-widest hover:bg-red-900 hover:text-red-300 transition-all"
+                >
+                  Reset
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
