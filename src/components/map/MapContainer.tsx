@@ -488,10 +488,12 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         }
       }
 
-      // Force NDVI visible at 100%
+      // NDVI: respect user toggle, default to ON in hologram mode
       if (map.getLayer('naip-ndvi-overlay')) {
-        map.setLayoutProperty('naip-ndvi-overlay', 'visibility', 'visible');
-        map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
+        map.setLayoutProperty('naip-ndvi-overlay', 'visibility', layers.naipNDVI ? 'visible' : 'none');
+        if (layers.naipNDVI) {
+          map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
+        }
       }
 
       // Green pasture borders — glowing

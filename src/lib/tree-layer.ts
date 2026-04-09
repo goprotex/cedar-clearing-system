@@ -536,12 +536,16 @@ export class TreeLayer3D {
       }
     }
     const merc = mapboxgl.MercatorCoordinate.fromLngLat(this.originLngLat, elevation);
-    const scale = merc.meterInMercatorCoordinateUnits();
+    const s = merc.meterInMercatorCoordinateUnits();
 
+    const scaleM = new THREE.Matrix4().makeScale(s, s, -s);
+    const rotM = new THREE.Matrix4().multiplyMatrices(
+      new THREE.Matrix4().makeRotationX(-Math.PI / 2),
+      new THREE.Matrix4().makeRotationY(Math.PI)
+    );
     const l = new THREE.Matrix4()
-      .makeTranslation(merc.x, merc.y, merc.z ?? 0)
-      .scale(new THREE.Vector3(scale, -scale, scale))
-      .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+      .multiplyMatrices(scaleM, rotM)
+      .setPosition(merc.x, merc.y, merc.z ?? 0);
 
     this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(l);
     this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
@@ -1008,8 +1012,8 @@ export class TreeLayer3D {
   private lngLatToScene(lng: number, lat: number): { x: number; z: number } {
     const merc = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
     return {
-      x: (merc.x - this.originMerc.x) / this.originMerc.scale,
-      z: (merc.y - this.originMerc.y) / this.originMerc.scale,
+      x: -(merc.x - this.originMerc.x) / this.originMerc.scale,
+      z: -(merc.y - this.originMerc.y) / this.originMerc.scale,
     };
   }
 }
