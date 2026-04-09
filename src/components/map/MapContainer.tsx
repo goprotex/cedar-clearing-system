@@ -507,7 +507,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         map.setPaintProperty('pastures-labels', 'text-color', '#00ff41');
       }
 
-      // ── 3D tree layer ──
+      // ── 3D tree layer (added first, then 2D hologram layers moved on top) ──
       if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
         if (treeLayerRef.current && !map.getLayer('3d-trees')) {
           treeLayerRef.current = null;
@@ -533,6 +533,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
           }));
         tl.updatePolygonWalls(walls);
+      }
+
+      // Move 2D hologram layers above the 3D tree layer so they render on top
+      for (const layerId of ['cedar-flat', 'cedar-fill', 'cedar-border', 'holo-mask-fill', 'pastures-fill', 'pastures-border', 'pastures-labels']) {
+        if (map.getLayer(layerId)) {
+          map.moveLayer(layerId);
+        }
       }
 
       // Start slow auto-rotation
