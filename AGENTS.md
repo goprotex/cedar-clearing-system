@@ -25,6 +25,10 @@ A `.env.local` file is required with the following keys:
 
 Placeholder values allow the app to start and render pages, but Supabase auth and Mapbox map tiles won't function without real credentials.
 
+### MCP and agent skills
+- Supabase MCP is configured in `.cursor/mcp.json` (project ref `eytrzccxbkpfltchdxvs`).
+- Supabase agent skills are installed in `.agents/skills/` — use them for Postgres and Supabase best practices.
+
 ### Key caveats
 - The middleware uses `supabaseUrl!` / `supabaseKey!` (non-null assertions). The app starts fine with placeholder values but real Supabase calls will fail.
 - Next.js 16 emits a deprecation warning: `"middleware" file convention is deprecated. Please use "proxy" instead.` This is benign for now.
