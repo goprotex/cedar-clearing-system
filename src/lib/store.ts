@@ -85,7 +85,17 @@ interface BidStore {
   drawingMode: boolean;
 
   // Analysis progress
-  analysisProgress: { active: boolean; step: string; detail: string } | null;
+  analysisProgress: {
+    active: boolean;
+    step: string;
+    detail: string;
+    pct: number;
+    phase: string;
+    cedarCount?: number;
+    oakCount?: number;
+    totalPoints?: number;
+    completed?: number;
+  } | null;
 
   // All saved bids (local storage for Phase 1)
   savedBids: BidSummary[];
@@ -221,10 +231,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
     }));
     get().recalculate();
     // Auto-fetch soil data for the new polygon's centroid
-    set({ analysisProgress: { active: true, step: 'Fetching soil data...', detail: 'Querying USDA SSURGO database for soil composition' } });
+    set({ analysisProgress: { active: true, phase: 'soil', step: 'Fetching soil data...', detail: 'Querying USDA SSURGO database', pct: 0 } });
     get().fetchSoilData(id, centroid[0], centroid[1]);
-    // Auto-fetch elevation
-    set({ analysisProgress: { active: true, step: 'Fetching elevation...', detail: 'Querying USGS elevation data for terrain profile' } });
+    set({ analysisProgress: { active: true, phase: 'elevation', step: 'Fetching elevation...', detail: 'Querying USGS elevation data', pct: 0 } });
     get().fetchElevation(id, centroid[0], centroid[1]);
     // Auto-run cedar spectral analysis
     get().analyzeCedar(id);
@@ -393,7 +402,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
     try {
-      set({ analysisProgress: { active: true, step: 'Running spectral analysis...', detail: `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution` } });
+      set({ analysisProgress: { active: true, phase: 'init', step: 'Initializing spectral analysis...', detail: `Scanning ${Math.round(pasture.acreage)} acres at 15m resolution`, pct: 0 } });
+
       const res = await fetch('/api/cedar-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -402,42 +412,92 @@ export const useBidStore = create<BidStore>((set, get) => ({
           acreage: pasture.acreage,
         }),
       });
+
       if (!res.ok) {
         set({ analysisProgress: null });
         return;
       }
-      set({ analysisProgress: { active: true, step: 'Processing results...', detail: 'Classifying vegetation: cedar, oak, grass, brush, bare ground' } });
-      const data: CedarAnalysis = await res.json();
-      get().updatePasture(pastureId, { cedarAnalysis: data });
 
-      // Auto-mark all cedar trees as "remove" by default
-      set({ analysisProgress: { active: true, step: 'Generating tree positions...', detail: 'Placing 3D trees based on spectral classification results' } });
+      const reader = res.body?.getReader();
+      if (!reader) {
+        set({ analysisProgress: null });
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let resultData: CedarAnalysis | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let eventType = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ') && eventType) {
+            try {
+              const payload = JSON.parse(line.slice(6));
+              if (eventType === 'progress') {
+                set({
+                  analysisProgress: {
+                    active: true,
+                    phase: payload.phase || 'sampling',
+                    step: payload.message || 'Processing...',
+                    detail: payload.detail || '',
+                    pct: payload.pct || 0,
+                    cedarCount: payload.cedarCount,
+                    oakCount: payload.oakCount,
+                    totalPoints: payload.totalPoints,
+                    completed: payload.completed,
+                  },
+                });
+              } else if (eventType === 'result') {
+                resultData = payload as CedarAnalysis;
+              }
+            } catch { /* skip malformed */ }
+            eventType = '';
+          }
+        }
+      }
+
+      if (!resultData) {
+        set({ analysisProgress: null });
+        return;
+      }
+
+      set({ analysisProgress: { active: true, phase: 'applying', step: 'Applying results to map...', detail: '', pct: 99, totalPoints: resultData.summary?.totalSamples } });
+      get().updatePasture(pastureId, { cedarAnalysis: resultData });
+
+      set({ analysisProgress: { active: true, phase: 'trees', step: 'Generating 3D tree positions...', detail: 'Placing trees from spectral data', pct: 99 } });
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
         const trees = extractTreesFromAnalysis([{
-          cedarAnalysis: data,
+          cedarAnalysis: resultData,
           density: updatedPasture.density,
         }]);
         const cedarTrees: MarkedTree[] = trees
           .filter((t) => t.species === 'cedar')
           .map((t) => ({
             id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            lng: t.lng,
-            lat: t.lat,
-            species: t.species,
+            lng: t.lng, lat: t.lat, species: t.species,
             action: 'remove' as const,
-            label: `Remove cedar`,
-            height: t.height,
-            canopyDiameter: t.canopyDiameter,
+            label: 'Remove cedar',
+            height: t.height, canopyDiameter: t.canopyDiameter,
           }));
         if (cedarTrees.length > 0) {
-          set({ analysisProgress: { active: true, step: 'Auto-marking cedars...', detail: `Marking ${cedarTrees.length} cedar trees for removal` } });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
       }
-      set({ analysisProgress: { active: true, step: 'Analysis complete!', detail: `Found ${data.summary.cedar.pct}% cedar across ${data.summary.totalSamples} sample points` } });
-      // Clear after a brief moment so user sees the completion
-      setTimeout(() => set({ analysisProgress: null }), 2000);
+
+      const s = resultData.summary;
+      set({ analysisProgress: { active: true, phase: 'done', step: 'Analysis complete', detail: `${s.cedar.pct}% cedar · ${s.oak?.pct || 0}% oak · ${s.totalSamples} samples`, pct: 100, totalPoints: s.totalSamples } });
+      setTimeout(() => set({ analysisProgress: null }), 3000);
     } catch {
       set({ analysisProgress: null });
     }

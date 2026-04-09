@@ -366,15 +366,12 @@ export async function POST(req: NextRequest) {
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
 
-    // 15m uniform grid — dense wall-to-wall coverage, no gaps
-    const spacingKm = 0.015; // 15m between sample points
+    const spacingKm = 0.015;
 
     const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
-
-    // Use all points — 15m grid is dense but manageable within 300s timeout
     const samplePoints = pointsInPoly;
 
     if (samplePoints.length === 0) {
@@ -415,124 +412,174 @@ export async function POST(req: NextRequest) {
           if (attempt < retries) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
         }
       }
-      // All retries failed — return as bare with low confidence rather than dropping
       return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.1, bandVotes: 0 };
     }
 
-    // Batch identify requests against NAIP ImageServer
-    const batchSize = 40;
-    const results: SampleResult[] = [];
+    const totalPoints = samplePoints.length;
+    const batchSize = 15;
+    const batchDelayMs = 150;
+    const totalBatches = Math.ceil(totalPoints / batchSize);
 
-    for (let i = 0; i < samplePoints.length; i += batchSize) {
-      const batch = samplePoints.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map((pt) => {
-          const [lng, lat] = pt.geometry.coordinates;
-          return fetchPixel(lng, lat);
-        })
-      );
-      results.push(...batchResults);
-    }
+    // Stream progress via SSE
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        function send(event: string, data: unknown) {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        }
 
-    if (results.length === 0) {
-      return NextResponse.json(
-        { error: 'No NAIP data available for this area' },
-        { status: 404 }
-      );
-    }
+        send('progress', {
+          phase: 'grid',
+          message: `Generated ${totalPoints} sample points at 15m resolution`,
+          totalPoints,
+          completed: 0,
+          pct: 0,
+        });
 
-    // Overlapping tile consensus: refine classifications using spatial context
-    const { refined, tileCount, consensusImprovedCells } =
-      applyTileConsensus(results, spacingKm, bbox);
+        const results: SampleResult[] = [];
+        let cedarSoFar = 0;
+        let oakSoFar = 0;
 
-    // Build cell polygons for map overlay (15m cells = 7.5m half-size)
-    const centerLat = (bbox[1] + bbox[3]) / 2;
-    const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
-    const halfLatDeg = spacingKm / 2 / 111.32;
+        for (let b = 0; b < totalBatches; b++) {
+          const start = b * batchSize;
+          const batch = samplePoints.slice(start, start + batchSize);
+          const batchResults = await Promise.all(
+            batch.map((pt) => fetchPixel(pt.geometry.coordinates[0], pt.geometry.coordinates[1]))
+          );
+          results.push(...batchResults);
 
-    const gridCells: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: refined.map((s) => ({
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: [
-            [
-              [s.lng - halfLngDeg, s.lat - halfLatDeg],
-              [s.lng + halfLngDeg, s.lat - halfLatDeg],
-              [s.lng + halfLngDeg, s.lat + halfLatDeg],
-              [s.lng - halfLngDeg, s.lat + halfLatDeg],
-              [s.lng - halfLngDeg, s.lat - halfLatDeg],
-            ],
-          ],
-        },
-        properties: {
-          classification: s.classification,
-          ndvi: Math.round(s.ndvi * 1000) / 1000,
-          gndvi: Math.round(s.gndvi * 1000) / 1000,
-          savi: Math.round(s.savi * 1000) / 1000,
-          confidence: Math.round(s.confidence * 100) / 100,
-          bandVotes: s.bandVotes,
-          color: getClassColor(s.classification, s.ndvi),
-        },
-      })),
-    };
+          for (const r of batchResults) {
+            if (r.classification === 'cedar') cedarSoFar++;
+            if (r.classification === 'oak') oakSoFar++;
+          }
 
-    // Summary statistics (computed from consensus-refined results)
-    const total = refined.length;
-    const cedarCount = refined.filter((r) => r.classification === 'cedar').length;
-    const oakCount = refined.filter((r) => r.classification === 'oak').length;
-    const mixedCount = refined.filter((r) => r.classification === 'mixed_brush').length;
-    const grassCount = refined.filter((r) => r.classification === 'grass').length;
-    const bareCount = refined.filter((r) => r.classification === 'bare').length;
+          const completed = results.length;
+          const pct = Math.round((completed / totalPoints) * 100);
+          send('progress', {
+            phase: 'sampling',
+            message: `Sampling NAIP imagery — ${completed}/${totalPoints} points`,
+            detail: `Cedar: ${cedarSoFar} | Oak: ${oakSoFar} | Batch ${b + 1}/${totalBatches}`,
+            totalPoints,
+            completed,
+            pct,
+            cedarCount: cedarSoFar,
+            oakCount: oakSoFar,
+          });
 
-    const cedarPct = total > 0 ? cedarCount / total : 0;
-    const avgNdvi = refined.reduce((sum, r) => sum + r.ndvi, 0) / total;
-    const avgConf = refined.reduce((sum, r) => sum + r.confidence, 0) / total;
-    const avgBandVotes = refined.reduce((sum, r) => sum + r.bandVotes, 0) / total;
-    const avgGndvi = refined.reduce((sum, r) => sum + r.gndvi, 0) / total;
-    const avgSavi = refined.reduce((sum, r) => sum + r.savi, 0) / total;
+          if (b < totalBatches - 1) {
+            await new Promise(r => setTimeout(r, batchDelayMs));
+          }
+        }
 
-    // High-confidence cedar: cells where ≥3 bands agreed
-    const highConfCedar = refined.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
+        send('progress', {
+          phase: 'consensus',
+          message: 'Running tile consensus refinement...',
+          totalPoints,
+          completed: totalPoints,
+          pct: 95,
+        });
 
-    const summary = {
-      totalSamples: total,
-      cedar: { count: cedarCount, pct: Math.round(cedarPct * 100) },
-      oak: { count: oakCount, pct: Math.round((oakCount / total) * 100) },
-      mixedBrush: { count: mixedCount, pct: Math.round((mixedCount / total) * 100) },
-      grass: { count: grassCount, pct: Math.round((grassCount / total) * 100) },
-      bare: { count: bareCount, pct: Math.round((bareCount / total) * 100) },
-      estimatedCedarAcres: Math.round(cedarPct * ac * 10) / 10,
-      averageNDVI: Math.round(avgNdvi * 1000) / 1000,
-      averageGNDVI: Math.round(avgGndvi * 1000) / 1000,
-      averageSAVI: Math.round(avgSavi * 1000) / 1000,
-      confidence: Math.round(avgConf * 100),
-      avgBandVotes: Math.round(avgBandVotes * 10) / 10,
-      highConfidenceCedarCells: highConfCedar,
-      gridSpacingM: Math.round(spacingKm * 1000),
-      tileConsensus: {
-        tileCount,
-        tileOverlapPct: 60,
-        tileSizePixels: 5,
-        tileSizeM: Math.round(spacingKm * 5 * 1000),
-        stridePixels: 2,
-        strideM: Math.round(spacingKm * 2 * 1000),
-        consensusImprovedCells,
-        consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
+
+        const { refined, tileCount, consensusImprovedCells } =
+          applyTileConsensus(results, spacingKm, bbox);
+
+        send('progress', {
+          phase: 'building',
+          message: 'Building classification grid...',
+          totalPoints,
+          completed: totalPoints,
+          pct: 98,
+        });
+
+        const centerLat = (bbox[1] + bbox[3]) / 2;
+        const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
+        const halfLatDeg = spacingKm / 2 / 111.32;
+
+        const gridCells: GeoJSON.FeatureCollection = {
+          type: 'FeatureCollection',
+          features: refined.map((s) => ({
+            type: 'Feature' as const,
+            geometry: {
+              type: 'Polygon' as const,
+              coordinates: [
+                [
+                  [s.lng - halfLngDeg, s.lat - halfLatDeg],
+                  [s.lng + halfLngDeg, s.lat - halfLatDeg],
+                  [s.lng + halfLngDeg, s.lat + halfLatDeg],
+                  [s.lng - halfLngDeg, s.lat + halfLatDeg],
+                  [s.lng - halfLngDeg, s.lat - halfLatDeg],
+                ],
+              ],
+            },
+            properties: {
+              classification: s.classification,
+              ndvi: Math.round(s.ndvi * 1000) / 1000,
+              gndvi: Math.round(s.gndvi * 1000) / 1000,
+              savi: Math.round(s.savi * 1000) / 1000,
+              confidence: Math.round(s.confidence * 100) / 100,
+              bandVotes: s.bandVotes,
+              color: getClassColor(s.classification, s.ndvi),
+            },
+          })),
+        };
+
+        const total = refined.length;
+        const cedarCount = refined.filter((r) => r.classification === 'cedar').length;
+        const oakCount = refined.filter((r) => r.classification === 'oak').length;
+        const mixedCount = refined.filter((r) => r.classification === 'mixed_brush').length;
+        const grassCount = refined.filter((r) => r.classification === 'grass').length;
+        const bareCount = refined.filter((r) => r.classification === 'bare').length;
+
+        const cedarPct = total > 0 ? cedarCount / total : 0;
+        const avgNdvi = refined.reduce((sum, r) => sum + r.ndvi, 0) / total;
+        const avgConf = refined.reduce((sum, r) => sum + r.confidence, 0) / total;
+        const avgBandVotes = refined.reduce((sum, r) => sum + r.bandVotes, 0) / total;
+        const avgGndvi = refined.reduce((sum, r) => sum + r.gndvi, 0) / total;
+        const avgSavi = refined.reduce((sum, r) => sum + r.savi, 0) / total;
+        const highConfCedar = refined.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
+
+        const summary = {
+          totalSamples: total,
+          cedar: { count: cedarCount, pct: Math.round(cedarPct * 100) },
+          oak: { count: oakCount, pct: Math.round((oakCount / total) * 100) },
+          mixedBrush: { count: mixedCount, pct: Math.round((mixedCount / total) * 100) },
+          grass: { count: grassCount, pct: Math.round((grassCount / total) * 100) },
+          bare: { count: bareCount, pct: Math.round((bareCount / total) * 100) },
+          estimatedCedarAcres: Math.round(cedarPct * ac * 10) / 10,
+          averageNDVI: Math.round(avgNdvi * 1000) / 1000,
+          averageGNDVI: Math.round(avgGndvi * 1000) / 1000,
+          averageSAVI: Math.round(avgSavi * 1000) / 1000,
+          confidence: Math.round(avgConf * 100),
+          avgBandVotes: Math.round(avgBandVotes * 10) / 10,
+          highConfidenceCedarCells: highConfCedar,
+          gridSpacingM: Math.round(spacingKm * 1000),
+          tileConsensus: {
+            tileCount,
+            tileOverlapPct: 60,
+            tileSizePixels: 5,
+            tileSizeM: Math.round(spacingKm * 5 * 1000),
+            stridePixels: 2,
+            strideM: Math.round(spacingKm * 2 * 1000),
+            consensusImprovedCells,
+            consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
+          },
+        };
+
+        send('result', { gridCells, summary });
+        controller.close();
       },
-    };
+    });
 
-    return NextResponse.json(
-      { gridCells, summary },
-      { headers: { 'Cache-Control': 'private, max-age=3600' } }
-    );
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
   } catch (err) {
     return NextResponse.json(
-      {
-        error: 'Analysis failed',
-        detail: err instanceof Error ? err.message : 'Unknown error',
-      },
+      { error: 'Analysis failed', detail: err instanceof Error ? err.message : 'Unknown error' },
       { status: 500 }
     );
   }

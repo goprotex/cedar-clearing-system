@@ -1092,26 +1092,76 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         </div>
       )}
 
-      {/* Analysis progress overlay */}
+      {/* Apple Glass–style analysis progress overlay */}
       {analysisProgress?.active && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <div className="bg-slate-900/90 backdrop-blur-sm border border-green-500/30 rounded-xl shadow-2xl px-8 py-6 max-w-sm text-center space-y-3 pointer-events-auto">
-            {/* Spinner */}
-            <div className="flex justify-center">
-              <div className="w-10 h-10 border-3 border-green-500/30 border-t-green-400 rounded-full animate-spin" />
+          <div className="w-[340px] backdrop-blur-xl bg-black/60 border border-white/10 rounded-3xl shadow-[0_8px_60px_rgba(0,255,65,0.15)] px-7 py-6 space-y-4 pointer-events-auto">
+            {/* Phase icon + title */}
+            <div className="flex items-center gap-3">
+              <div className="relative w-10 h-10 shrink-0">
+                <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(0,255,65,0.1)" strokeWidth="2.5" />
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="#00ff41" strokeWidth="2.5"
+                    strokeDasharray={`${(analysisProgress.pct || 0)} 100`}
+                    strokeLinecap="round"
+                    className="transition-all duration-500"
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-green-400">
+                  {analysisProgress.pct || 0}%
+                </span>
+              </div>
+              <div className="min-w-0">
+                <div className="text-white/90 font-semibold text-sm truncate">
+                  {analysisProgress.step}
+                </div>
+                <div className="text-white/40 text-[11px] font-medium">
+                  {analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
+                   analysisProgress.phase === 'consensus' ? 'TILE_CONSENSUS' :
+                   analysisProgress.phase === 'done' ? 'COMPLETE' : 'INITIALIZING'}
+                </div>
+              </div>
             </div>
-            {/* Step */}
-            <div className="text-green-300 font-semibold text-sm">
-              {analysisProgress.step}
+
+            {/* Progress bar */}
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${analysisProgress.pct || 0}%`,
+                  background: analysisProgress.phase === 'done'
+                    ? 'linear-gradient(90deg, #00ff41, #33ff66)'
+                    : 'linear-gradient(90deg, #00ff41, #00cc33)',
+                  boxShadow: '0 0 12px rgba(0,255,65,0.4)',
+                }}
+              />
             </div>
-            {/* Detail */}
-            <div className="text-slate-400 text-xs leading-relaxed">
-              {analysisProgress.detail}
-            </div>
-            {/* Pulse bar */}
-            <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full animate-pulse" style={{ width: '100%' }} />
-            </div>
+
+            {/* Stats row */}
+            {analysisProgress.phase === 'sampling' && (
+              <div className="flex justify-between text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_#00ff41]" />
+                  <span className="text-white/60">Cedar</span>
+                  <span className="text-green-400 font-bold">{analysisProgress.cedarCount ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_6px_#ffaa00]" />
+                  <span className="text-white/60">Oak</span>
+                  <span className="text-amber-400 font-bold">{analysisProgress.oakCount ?? 0}</span>
+                </div>
+                <div className="text-white/30 font-mono">
+                  {analysisProgress.completed ?? 0}/{analysisProgress.totalPoints ?? 0}
+                </div>
+              </div>
+            )}
+
+            {/* Detail text */}
+            {analysisProgress.detail && (
+              <div className="text-white/30 text-[10px] text-center font-mono tracking-wide">
+                {analysisProgress.detail}
+              </div>
+            )}
           </div>
         </div>
       )}
