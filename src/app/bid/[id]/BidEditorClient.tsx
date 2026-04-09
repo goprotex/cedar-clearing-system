@@ -94,27 +94,30 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   // All hooks above — safe to early-return now
   if (!mounted) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-400">
-        Loading bid...
+      <div className="h-screen flex items-center justify-center bg-[#131313] text-[#a98a7d]">
+        <div className="text-center">
+          <div className="text-[#FF6B00] text-2xl font-black uppercase tracking-widest mb-2">LOADING_BID</div>
+          <div className="text-xs font-mono">INITIALIZING_ESTIMATOR...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col bg-[#131313] text-[#e5e2e1]">
       {/* Top bar */}
-      <header className="h-14 bg-slate-900 text-white flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <Link href="/bids" className="text-amber-500 font-bold text-lg hover:text-amber-400">
+      <header className="h-14 bg-[#131313] border-b-2 border-[#353534] text-[#FFB693] flex items-center justify-between px-3 md:px-4 shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <Link href="/bids" className="text-[#FF6B00] font-bold text-lg hover:text-white tracking-widest uppercase shrink-0">
             CH
           </Link>
-          <span className="text-slate-500">|</span>
-          <span className="font-medium">{currentBid.bidNumber}</span>
+          <span className="text-[#353534] shrink-0">|</span>
+          <span className="font-mono font-bold text-sm truncate">{currentBid.bidNumber}</span>
           <Select
             value={currentBid.status}
             onValueChange={(v) => updateBidField('status', v as BidStatus)}
           >
-            <SelectTrigger className={`h-7 w-28 text-xs bg-transparent border ${STATUS_COLORS[currentBid.status]}`}>
+            <SelectTrigger className={`h-7 w-24 md:w-28 text-xs bg-transparent border ${STATUS_COLORS[currentBid.status]} shrink-0`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -123,56 +126,71 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
               ))}
             </SelectContent>
           </Select>
+          <span className="text-[10px] text-[#5a4136] font-mono hidden lg:inline truncate">
+            // {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
-            className="text-xs border-slate-600 text-slate-300 hover:bg-slate-800"
+            className="text-xs border-[#353534] text-[#a98a7d] hover:bg-[#353534] hover:text-white font-bold uppercase tracking-widest hidden sm:inline-flex"
             onClick={handleSave}
           >
-            Save
+            SAVE_DRAFT
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs border-[#353534] text-[#a98a7d] hover:bg-[#353534] hover:text-white font-bold sm:hidden"
+            onClick={handleSave}
+          >
+            SAVE
           </Button>
           <Button
             size="sm"
-            className="text-xs bg-amber-600 hover:bg-amber-700"
+            className="text-xs bg-[#FF6B00] text-black font-black hover:bg-white uppercase tracking-widest hidden sm:inline-flex"
             onClick={() => {
               handleSave();
               toast.info('PDF generation coming in Phase 4');
             }}
           >
-            Generate PDF
+            GENERATE_PDF
           </Button>
         </div>
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Map (takes remaining space) */}
-        <div className="flex-1 relative">
+        <div className="h-[40vh] md:h-auto md:flex-1 relative shrink-0">
           {mapboxToken ? (
             <MapContainer accessToken={mapboxToken} />
           ) : (
-            <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-400">
-              <div className="text-center space-y-2">
-                <p className="text-lg">Mapbox token not configured</p>
-                <p className="text-sm">
-                  Add <code className="bg-slate-700 px-1.5 py-0.5 rounded">NEXT_PUBLIC_MAPBOX_TOKEN</code> to your{' '}
-                  <code className="bg-slate-700 px-1.5 py-0.5 rounded">.env.local</code> file
+            <div className="w-full h-full bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d]">
+              <div className="text-center space-y-2 border-2 border-[#353534] p-8">
+                <p className="text-lg font-black uppercase tracking-tighter">SATELLITE_FEED_OFFLINE</p>
+                <p className="text-sm font-mono">
+                  Add <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to your{' '}
+                  <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">.env.local</code> file
                 </p>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <span className="w-2 h-2 bg-red-500 animate-pulse" />
+                  <span className="text-[10px] text-red-400 font-black uppercase">SIGNAL_LOST</span>
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Right sidebar */}
-        <div className="w-[400px] bg-white border-l flex flex-col shrink-0 overflow-hidden">
+        <div className="w-full md:w-[400px] bg-[#131313] border-t-2 md:border-t-0 md:border-l-2 border-[#353534] flex flex-col shrink-0 overflow-hidden flex-1 md:flex-none">
           <Tabs defaultValue="pastures" className="flex flex-col h-full overflow-hidden">
-            <TabsList className="mx-3 mt-3 shrink-0">
-              <TabsTrigger value="pastures" className="text-xs">Pastures</TabsTrigger>
-              <TabsTrigger value="options" className="text-xs">Options</TabsTrigger>
-              <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
+            <TabsList className="mx-3 mt-3 shrink-0 bg-[#1c1b1b] border border-[#353534]">
+              <TabsTrigger value="pastures" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Pastures</TabsTrigger>
+              <TabsTrigger value="options" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Options</TabsTrigger>
+              <TabsTrigger value="details" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Details</TabsTrigger>
+              <TabsTrigger value="settings" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pastures" className="flex-1 min-h-0 flex flex-col overflow-hidden mt-0">
@@ -180,9 +198,9 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
               <div className="py-3 px-3 shrink-0">
                 <Button
                   onClick={addPasture}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-sm"
+                  className="w-full bg-[#FF6B00] text-black font-black text-sm uppercase tracking-widest hover:bg-white transition-all"
                 >
-                  + Add Pasture
+                  + ADD_PASTURE
                 </Button>
               </div>
 
@@ -190,10 +208,10 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
               <div className="flex-1 min-h-0 overflow-y-auto px-3">
                 <div className="space-y-3 pb-4">
                   {currentBid.pastures.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground text-sm">
+                    <div className="text-center py-12 text-[#a98a7d] text-sm border-2 border-dashed border-[#353534]">
                       <p className="text-2xl mb-2">🗺️</p>
-                      <p>No pastures yet</p>
-                      <p className="text-xs mt-1">Click &quot;Add Pasture&quot; to start drawing</p>
+                      <p className="font-black uppercase tracking-tight">NO_ZONES_DEFINED</p>
+                      <p className="text-xs mt-1">Click &quot;ADD_PASTURE&quot; to begin mapping</p>
                     </div>
                   ) : (
                     currentBid.pastures.map((p) => (

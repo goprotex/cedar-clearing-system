@@ -2,7 +2,6 @@
 
 import { useBidStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/rates';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function BidSummary() {
   const { currentBid, rateCard } = useBidStore();
@@ -15,81 +14,87 @@ export default function BidSummary() {
   const discount = beforeAdjustments * (currentBid.discountPct / 100);
 
   return (
-    <Card className="bg-slate-900 text-white">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Bid Summary</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        {/* Per-pasture breakdown */}
+    <div className="bg-[#2a2a2a] border-2 border-[#13ff43]/30 p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[#353534] pb-2">
+        <span className="text-[10px] text-[#13ff43] font-black uppercase tracking-widest">FINANCIAL_SUMMARY</span>
+        <span className="text-[10px] text-[#5a4136] font-mono">BID_{currentBid.bidNumber}</span>
+      </div>
+
+      {/* Per-pasture breakdown */}
+      <div className="space-y-1.5 text-sm">
         {currentBid.pastures.map((p) => (
           <div key={p.id} className="flex justify-between">
-            <span className="text-slate-300 truncate mr-2">
+            <span className="text-[#a98a7d] truncate mr-2 text-xs uppercase">
               {p.name} ({p.acreage} ac)
             </span>
-            <span className="font-mono">{formatCurrency(p.subtotal)}</span>
+            <span className="font-mono text-[#e5e2e1] text-xs">{formatCurrency(p.subtotal)}</span>
           </div>
         ))}
 
         {currentBid.pastures.length > 0 && (
-          <div className="border-t border-slate-700 pt-2 flex justify-between font-medium">
-            <span>Pasture Subtotal</span>
-            <span className="font-mono">{formatCurrency(pastureSubtotal)}</span>
+          <div className="border-t border-[#353534] pt-2 flex justify-between font-bold text-xs uppercase">
+            <span className="text-[#a98a7d]">Pasture Subtotal</span>
+            <span className="font-mono text-[#e5e2e1]">{formatCurrency(pastureSubtotal)}</span>
           </div>
         )}
 
         {/* Fees */}
         {currentBid.mobilizationFee > 0 && (
-          <div className="flex justify-between text-slate-300">
-            <span>Mobilization</span>
-            <span className="font-mono">{formatCurrency(currentBid.mobilizationFee)}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-[#a98a7d] uppercase">Mobilization</span>
+            <span className="font-mono text-[#e5e2e1]">{formatCurrency(currentBid.mobilizationFee)}</span>
           </div>
         )}
         {currentBid.burnPermitFee > 0 && (
-          <div className="flex justify-between text-slate-300">
-            <span>Burn Permit</span>
-            <span className="font-mono">{formatCurrency(currentBid.burnPermitFee)}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-[#a98a7d] uppercase">Burn Permit</span>
+            <span className="font-mono text-[#e5e2e1]">{formatCurrency(currentBid.burnPermitFee)}</span>
           </div>
         )}
         {currentBid.customLineItems.map((li) => (
-          <div key={li.id} className="flex justify-between text-slate-300">
-            <span className="truncate mr-2">{li.description || 'Custom Item'}</span>
-            <span className="font-mono">{formatCurrency(li.amount)}</span>
+          <div key={li.id} className="flex justify-between text-xs">
+            <span className="text-[#a98a7d] truncate mr-2 uppercase">{li.description || 'Custom Item'}</span>
+            <span className="font-mono text-[#e5e2e1]">{formatCurrency(li.amount)}</span>
           </div>
         ))}
 
         {/* Adjustments */}
         {currentBid.contingencyPct > 0 && (
-          <div className="flex justify-between text-slate-300">
-            <span>Contingency ({currentBid.contingencyPct}%)</span>
-            <span className="font-mono">+{formatCurrency(contingency)}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-[#a98a7d] uppercase">Contingency ({currentBid.contingencyPct}%)</span>
+            <span className="font-mono text-[#ffb693]">+{formatCurrency(contingency)}</span>
           </div>
         )}
         {currentBid.discountPct > 0 && (
-          <div className="flex justify-between text-emerald-400">
-            <span>Discount ({currentBid.discountPct}%)</span>
-            <span className="font-mono">-{formatCurrency(discount)}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-[#13ff43] uppercase">Discount ({currentBid.discountPct}%)</span>
+            <span className="font-mono text-[#13ff43]">-{formatCurrency(discount)}</span>
           </div>
         )}
+      </div>
 
-        {/* Total */}
-        <div className="border-t border-slate-600 pt-3 flex justify-between text-xl font-bold">
-          <span>Total</span>
-          <span className="font-mono text-emerald-400">{formatCurrency(currentBid.totalAmount)}</span>
+      {/* Total */}
+      <div className="border-t-2 border-[#353534] pt-3">
+        <div className="text-[10px] text-[#ffb693] uppercase font-bold mb-1">TOTAL_ESTIMATE</div>
+        <div className="text-4xl font-black text-[#FF6B00] tracking-tighter glow-orange">
+          {formatCurrency(currentBid.totalAmount)}
         </div>
+      </div>
 
-        {/* Duration */}
-        {currentBid.totalAcreage > 0 && (
-          <div className="text-center text-slate-400 text-xs pt-1">
-            {currentBid.totalAcreage} acres | Est. {currentBid.estimatedDaysLow}–{currentBid.estimatedDaysHigh} days
-          </div>
-        )}
+      {/* Duration */}
+      {currentBid.totalAcreage > 0 && (
+        <div className="flex items-center justify-between text-[10px] text-[#5a4136] font-mono uppercase pt-1">
+          <span>{currentBid.totalAcreage} ACRES</span>
+          <span>EST. {currentBid.estimatedDaysLow}–{currentBid.estimatedDaysHigh} DAYS</span>
+        </div>
+      )}
 
-        {currentBid.totalAmount > 0 && currentBid.totalAmount < rateCard.minimumBid && (
-          <div className="text-center text-amber-400 text-xs">
-            Minimum bid of {formatCurrency(rateCard.minimumBid)} applied
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {currentBid.totalAmount > 0 && currentBid.totalAmount < rateCard.minimumBid && (
+        <div className="text-center text-[10px] text-[#FF6B00] font-bold uppercase">
+          ⚠ MINIMUM_BID {formatCurrency(rateCard.minimumBid)} APPLIED
+        </div>
+      )}
+    </div>
   );
 }

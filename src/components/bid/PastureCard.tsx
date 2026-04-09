@@ -33,36 +33,36 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
 
   return (
-    <Card
-      className={`transition-all cursor-pointer ${
-        isSelected ? 'ring-2 ring-amber-500 shadow-lg' : 'hover:shadow-md'
+    <div
+      className={`transition-all cursor-pointer bg-[#1c1b1b] border ${
+        isSelected ? 'border-[#FF6B00] shadow-[0_0_15px_rgba(255,107,0,0.15)]' : 'border-[#353534] hover:border-[#5a4136]'
       }`}
       onClick={() => selectPasture(pasture.id)}
     >
-      <CardHeader className="pb-3">
+      <div className="p-3 border-b border-[#353534]">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">
+          <div className="flex-1">
             <Input
               value={pasture.name}
               onChange={(e) => updatePasture(pasture.id, { name: e.target.value })}
               onClick={(e) => e.stopPropagation()}
-              className="h-7 text-base font-semibold border-none p-0 focus-visible:ring-1"
+              className="h-7 text-sm font-black uppercase tracking-tight border-none p-0 bg-transparent text-[#ffb693] focus-visible:ring-1 focus-visible:ring-[#FF6B00]"
             />
-          </CardTitle>
+          </div>
           <div className="flex items-center gap-2">
             {pasture.acreage > 0 && (
-              <Badge variant="secondary" className="font-mono">
-                {pasture.acreage} ac
-              </Badge>
+              <span className="font-mono text-xs text-[#e5e2e1] bg-[#353534] px-2 py-0.5">
+                {pasture.acreage} AC
+              </span>
             )}
             {pasture.subtotal > 0 && (
-              <Badge className="bg-emerald-600 font-mono">
+              <span className="font-mono text-xs text-[#13ff43] bg-[#13ff43]/10 px-2 py-0.5">
                 {formatCurrency(pasture.subtotal)}
-              </Badge>
+              </span>
             )}
             <button
               title="Remove pasture"
-              className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
+              className="text-[#5a4136] hover:text-red-500 transition-colors p-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 if (confirm(`Remove "${pasture.name}"? This cannot be undone.`)) {
@@ -74,42 +74,38 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
             </button>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className="p-3 space-y-3" onClick={(e) => e.stopPropagation()}>
         {/* Draw polygon button */}
         {pasture.acreage === 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full border-dashed border-amber-500 text-amber-700 hover:bg-amber-50"
+          <button
+            className="w-full border-2 border-dashed border-[#FF6B00] text-[#FF6B00] text-xs font-bold uppercase tracking-widest py-2 hover:bg-[#FF6B00] hover:text-black transition-all"
             onClick={() => {
               selectPasture(pasture.id);
               setDrawingMode(true);
             }}
           >
-            Draw Pasture Boundary on Map
-          </Button>
+            DRAW_BOUNDARY
+          </button>
         )}
 
         {pasture.acreage > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-xs text-muted-foreground"
+          <button
+            className="w-full text-[10px] text-[#5a4136] hover:text-[#ffb693] uppercase tracking-widest py-1 transition-colors"
             onClick={() => {
               selectPasture(pasture.id);
               setDrawingMode(true);
             }}
           >
-            Redraw Boundary
-          </Button>
+            REDRAW_BOUNDARY
+          </button>
         )}
 
         {/* Vegetation Type */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label className="text-xs">Vegetation</Label>
+            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">Vegetation</Label>
             <Select
               value={pasture.vegetationType}
               onValueChange={(v) => updatePasture(pasture.id, { vegetationType: v as VegetationType })}
@@ -127,7 +123,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
 
           {/* Density */}
           <div>
-            <Label className="text-xs">Density</Label>
+            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">Density</Label>
             <Select
               value={pasture.density}
               onValueChange={(v) => updatePasture(pasture.id, { density: v as DensityClass })}
@@ -147,7 +143,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
         {/* Terrain + Method */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label className="text-xs">Terrain</Label>
+            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">Terrain</Label>
             <Select
               value={pasture.terrain}
               onValueChange={(v) => updatePasture(pasture.id, { terrain: v as TerrainClass })}
@@ -164,7 +160,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           </div>
 
           <div>
-            <Label className="text-xs">Clearing Method</Label>
+            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">Method</Label>
             <Select
               value={pasture.clearingMethod}
               onValueChange={(v) => updatePasture(pasture.id, { clearingMethod: v as ClearingMethod })}
@@ -183,7 +179,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
 
         {/* Disposal */}
         <div>
-          <Label className="text-xs">Disposal Method</Label>
+          <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">Disposal</Label>
           <Select
             value={pasture.disposalMethod}
             onValueChange={(v) => updatePasture(pasture.id, { disposalMethod: v as DisposalMethod })}
@@ -201,7 +197,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
 
         {/* Method info */}
         {methodConfig && (
-          <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+          <div className="text-xs text-[#a98a7d] bg-[#201f1f] border border-[#353534] p-2">
             <span className="font-medium">Equipment:</span> {methodConfig.equipment}
             <br />
             <span className="font-medium">Result:</span> {methodConfig.result}
@@ -214,7 +210,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
 
         {/* Method-specific adders */}
         <div className="space-y-1">
-          <Label className="text-xs font-medium">Add-ons</Label>
+          <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">Add-ons</Label>
           {(pasture.adders ?? []).map((adder, idx) => {
             const def = rateCard.methodAdders.find((d) => d.id === adder.adderId);
             return (
@@ -285,13 +281,13 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
 
         {/* Soil multiplier display */}
         {pasture.acreage > 0 && !pasture.soilData && (
-          <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2 animate-pulse">
-            Loading soil data...
+          <div className="text-xs text-[#a98a7d] bg-[#201f1f] border border-[#353534] p-2 animate-pulse">
+            LOADING_SOIL_DATA...
           </div>
         )}
         {pasture.soilData && (
-          <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2 space-y-0.5">
-            <div className="font-medium text-foreground">
+          <div className="text-xs text-[#a98a7d] bg-[#201f1f] border border-[#353534] p-2 space-y-0.5">
+            <div className="font-bold text-[#ffb693] uppercase">
               Soil: {pasture.soilData.series}
               {pasture.soilData.mapUnit && (
                 <span className="font-normal text-muted-foreground"> — {pasture.soilData.mapUnit}</span>
@@ -326,7 +322,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-xs border-red-300 text-red-700 hover:bg-red-50"
+            className="w-full text-xs border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-black"
             disabled={analyzing}
             onClick={async () => {
               setAnalyzing(true);
@@ -340,9 +336,9 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
         {pasture.cedarAnalysis && (
           <div className="text-xs space-y-2">
             {/* Spectral Analysis */}
-            <div className="text-muted-foreground bg-muted/50 border rounded p-2 space-y-1">
-              <div className="font-semibold text-foreground flex items-center justify-between">
-                <span>📊 Spectral Analysis (NAIP)</span>
+            <div className="text-[#a98a7d] bg-[#201f1f] border border-[#353534] p-2 space-y-1">
+              <div className="font-bold text-[#ffb693] uppercase flex items-center justify-between">
+                <span>📊 SPECTRAL_ANALYSIS (NAIP)</span>
                 <Badge variant="outline" className="text-[10px]">
                   {pasture.cedarAnalysis.summary.confidence}% conf
                 </Badge>
@@ -394,7 +390,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+            className="w-full text-xs border-[#13ff43]/50 text-[#13ff43] hover:bg-[#13ff43]/10"
             disabled={analyzingSeasonal}
             onClick={async () => {
               setAnalyzingSeasonal(true);
@@ -406,8 +402,8 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           </Button>
         )}
         {pasture.seasonalAnalysis && (
-          <div className="text-xs space-y-1 bg-emerald-50 border border-emerald-200 rounded p-2">
-            <div className="font-semibold text-emerald-800 flex items-center justify-between">
+          <div className="text-xs space-y-1 bg-[#13ff43]/5 border border-[#13ff43]/20 p-2">
+            <div className="font-bold text-[#13ff43] uppercase flex items-center justify-between">
               <span>🌡️ Seasonal NDVI</span>
               <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600">
                 {pasture.seasonalAnalysis.confidence}% conf
@@ -460,7 +456,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
 
         {/* Hours estimate + per-acre rate */}
         {pasture.acreage > 0 && (
-          <div className="text-xs text-muted-foreground space-y-0.5">
+          <div className="text-xs text-[#a98a7d] space-y-0.5 bg-[#201f1f] border border-[#353534] p-2">
             <div>
               <span className="font-medium">Rate:</span> {formatCurrency(Math.round(pasture.subtotal / pasture.acreage))}/acre
               {' | '}
@@ -479,7 +475,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
             <Button
               variant="outline"
               size="sm"
-              className="w-full border-cyan-600 text-cyan-700 hover:bg-cyan-50"
+              className="w-full border-[#ffb693]/50 text-[#ffb693] hover:bg-[#ffb693]/10"
               disabled={aiLoading}
               onClick={async () => {
                 setAiLoading(true);
@@ -498,9 +494,9 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
               )}
             </Button>
             {aiResult && (
-              <div className="text-xs bg-cyan-50 border border-cyan-200 rounded p-2 space-y-1">
-                <div className="font-semibold text-cyan-800">AI Recommendation Applied</div>
-                <div className="text-cyan-700">{aiResult.reasoning}</div>
+              <div className="text-xs bg-[#ffb693]/5 border border-[#ffb693]/20 p-2 space-y-1">
+                <div className="font-bold text-[#ffb693] uppercase">AI_RECOMMENDATION_APPLIED</div>
+                <div className="text-[#a98a7d]">{aiResult.reasoning}</div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px]">
                     Difficulty: {aiResult.estimatedDifficulty}/10
@@ -519,15 +515,15 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
         {/* Saved Trees */}
         {(pasture.savedTrees?.length ?? 0) > 0 && (
           <div className="space-y-1">
-            <Label className="text-xs font-semibold">Marked Trees ({pasture.savedTrees.length})</Label>
+            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">MARKED_TREES ({pasture.savedTrees.length})</Label>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {pasture.savedTrees.map((t) => (
                 <div
                   key={t.id}
-                  className={`flex items-center justify-between text-[11px] px-2 py-1 rounded ${
+                  className={`flex items-center justify-between text-[11px] px-2 py-1 ${
                     t.action === 'save'
-                      ? 'bg-green-50 border border-green-200 text-green-800'
-                      : 'bg-red-50 border border-red-200 text-red-800'
+                      ? 'bg-[#13ff43]/5 border border-[#13ff43]/20 text-[#13ff43]'
+                      : 'bg-red-500/5 border border-red-500/20 text-red-400'
                   }`}
                 >
                   <span>
@@ -556,7 +552,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           onChange={(e) => updatePasture(pasture.id, { notes: e.target.value })}
           className="text-xs h-16 resize-none"
         />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

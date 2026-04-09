@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { useBidStore } from '@/lib/store';
 import { generateBidOptions } from '@/lib/options';
 import { formatCurrency, getMethodConfig } from '@/lib/rates';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 export default function BidOptions() {
@@ -17,103 +16,99 @@ export default function BidOptions() {
 
   if (currentBid.pastures.length === 0 || currentBid.totalAcreage === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground text-sm">
-        <p className="text-2xl mb-2">📊</p>
-        <p>Add pastures with boundaries to see options</p>
-        <p className="text-xs mt-1">Options compare different clearing methods across all pastures</p>
+      <div className="text-center py-12 text-[#a98a7d] text-sm">
+        <p className="text-2xl mb-2 opacity-40">◇</p>
+        <p className="font-bold uppercase tracking-widest text-xs">NO_DATA_AVAILABLE</p>
+        <p className="text-[10px] mt-1 uppercase tracking-widest">Add pastures with boundaries to generate options</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Compare pricing across clearing methods. These options apply a single method to all pastures
-        for easy comparison. Your current bid uses per-pasture method selections.
+      <p className="text-[10px] text-[#a98a7d] uppercase tracking-widest">
+        Compare pricing across clearing methods. Single method applied to all pastures.
       </p>
 
       {options.map((option) => {
         const methodConfig = getMethodConfig(option.clearingMethod, rateCard);
         return (
-          <Card
+          <div
             key={option.id}
-            className={`transition-all ${
-              option.recommended ? 'ring-2 ring-emerald-500 shadow-md' : ''
+            className={`bg-[#1c1b1b] border transition-all p-4 ${
+              option.recommended ? 'border-[#13ff43] shadow-[0_0_12px_rgba(19,255,67,0.15)]' : 'border-[#353534]'
             }`}
           >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold">
-                  {option.label}
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  {option.recommended && (
-                    <Badge className="bg-emerald-600 text-[10px]">RECOMMENDED</Badge>
-                  )}
-                  <span className="font-mono font-bold text-lg text-emerald-600">
-                    {formatCurrency(option.totalAmount)}
-                  </span>
-                </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-black uppercase tracking-wide text-[#e5e2e1]">
+                {option.label}
+              </span>
+              <div className="flex items-center gap-2">
+                {option.recommended && (
+                  <Badge className="bg-[#13ff43]/20 text-[#13ff43] border border-[#13ff43]/40 text-[10px] uppercase tracking-widest rounded-none">
+                    RECOMMENDED
+                  </Badge>
+                )}
+                <span className="font-mono font-bold text-lg text-[#13ff43]">
+                  {formatCurrency(option.totalAmount)}
+                </span>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {/* Key metrics */}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="bg-muted/50 rounded p-2 text-center">
-                  <div className="font-mono font-semibold">{formatCurrency(option.perAcreCost)}</div>
-                  <div className="text-muted-foreground">per acre</div>
+            </div>
+
+            {/* Key metrics */}
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="bg-[#201f1f] border border-[#353534] p-2 text-center">
+                <div className="font-mono font-bold text-[#e5e2e1]">{formatCurrency(option.perAcreCost)}</div>
+                <div className="text-[10px] text-[#a98a7d] uppercase tracking-widest">per acre</div>
+              </div>
+              <div className="bg-[#201f1f] border border-[#353534] p-2 text-center">
+                <div className="font-mono font-bold text-[#e5e2e1]">{currentBid.totalAcreage} ac</div>
+                <div className="text-[10px] text-[#a98a7d] uppercase tracking-widest">total</div>
+              </div>
+              <div className="bg-[#201f1f] border border-[#353534] p-2 text-center">
+                <div className="font-mono font-bold text-[#e5e2e1]">
+                  {option.estimatedDaysLow}–{option.estimatedDaysHigh}
                 </div>
-                <div className="bg-muted/50 rounded p-2 text-center">
-                  <div className="font-mono font-semibold">{currentBid.totalAcreage} ac</div>
-                  <div className="text-muted-foreground">total</div>
-                </div>
-                <div className="bg-muted/50 rounded p-2 text-center">
-                  <div className="font-mono font-semibold">
-                    {option.estimatedDaysLow}–{option.estimatedDaysHigh}
+                <div className="text-[10px] text-[#a98a7d] uppercase tracking-widest">days</div>
+              </div>
+            </div>
+
+            {/* Method info */}
+            {methodConfig && (
+              <div className="text-xs text-[#a98a7d] mt-2">
+                <span className="font-bold text-[#ffb693]">Equipment:</span> {methodConfig.equipment}
+                {' · '}
+                <span className="font-bold text-[#ffb693]">Result:</span> {methodConfig.result}
+              </div>
+            )}
+
+            {/* Per-pasture breakdown */}
+            {option.pastureBreakdown.length > 1 && (
+              <div className="text-xs space-y-0.5 pt-2 mt-2 border-t border-[#353534]">
+                {option.pastureBreakdown.map((pb) => (
+                  <div key={pb.pastureId} className="flex justify-between text-[#a98a7d]">
+                    <span>{pb.pastureName} ({pb.acreage} ac)</span>
+                    <span className="font-mono text-[#e5e2e1]">{formatCurrency(pb.subtotal)}</span>
                   </div>
-                  <div className="text-muted-foreground">days</div>
-                </div>
+                ))}
               </div>
-
-              {/* Method info */}
-              {methodConfig && (
-                <div className="text-xs text-muted-foreground">
-                  <span className="font-medium">Equipment:</span> {methodConfig.equipment}
-                  {' · '}
-                  <span className="font-medium">Result:</span> {methodConfig.result}
-                </div>
-              )}
-
-              {/* Per-pasture breakdown */}
-              {option.pastureBreakdown.length > 1 && (
-                <div className="text-xs space-y-0.5 pt-1 border-t">
-                  {option.pastureBreakdown.map((pb) => (
-                    <div key={pb.pastureId} className="flex justify-between text-muted-foreground">
-                      <span>{pb.pastureName} ({pb.acreage} ac)</span>
-                      <span className="font-mono">{formatCurrency(pb.subtotal)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            )}
+          </div>
         );
       })}
 
       {/* Current bid comparison */}
-      <Card className="bg-slate-50 border-dashed">
-        <CardContent className="py-3">
-          <div className="flex items-center justify-between text-sm">
-            <div>
-              <span className="font-medium">Current Bid</span>
-              <span className="text-xs text-muted-foreground ml-2">(per-pasture methods)</span>
-            </div>
-            <span className="font-mono font-bold text-emerald-600">
-              {formatCurrency(currentBid.totalAmount)}
-            </span>
+      <div className="bg-[#2a2a2a] border-2 border-dashed border-[#FF6B00]/40 p-3">
+        <div className="flex items-center justify-between text-sm">
+          <div>
+            <span className="font-black uppercase text-[#e5e2e1]">Current Bid</span>
+            <span className="text-[10px] text-[#a98a7d] uppercase tracking-widest ml-2">(per-pasture methods)</span>
           </div>
-        </CardContent>
-      </Card>
+          <span className="font-mono font-bold text-[#FF6B00] text-lg">
+            {formatCurrency(currentBid.totalAmount)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
