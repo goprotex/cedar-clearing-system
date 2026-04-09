@@ -367,6 +367,11 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                   {pasture.cedarAnalysis.summary.highConfidenceCedarCells} cells verified cedar (≥3 band agreement)
                 </div>
               )}
+              {pasture.cedarAnalysis.summary.tileConsensus && (
+                <div className="text-[10px] text-muted-foreground">
+                  Tile consensus: {pasture.cedarAnalysis.summary.tileConsensus.tileCount} tiles ({pasture.cedarAnalysis.summary.tileConsensus.tileSizeM}m, {pasture.cedarAnalysis.summary.tileConsensus.tileOverlapPct}% overlap) · {pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedCells} cells refined ({pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedPct}%)
+                </div>
+              )}
             </div>
 
             <div className="text-center">

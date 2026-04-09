@@ -105,6 +105,17 @@ export interface CedarClassCount {
   pct: number;
 }
 
+export interface TileConsensusStats {
+  tileCount: number;
+  tileOverlapPct: number;
+  tileSizePixels: number;
+  tileSizeM: number;
+  stridePixels: number;
+  strideM: number;
+  consensusImprovedCells: number;
+  consensusImprovedPct: number;
+}
+
 export interface CedarAnalysisSummary {
   totalSamples: number;
   cedar: CedarClassCount;
@@ -120,6 +131,7 @@ export interface CedarAnalysisSummary {
   avgBandVotes: number;
   highConfidenceCedarCells: number;
   gridSpacingM: number;
+  tileConsensus?: TileConsensusStats;
 }
 
 export interface CedarAnalysis {
