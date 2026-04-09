@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useBidStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/rates';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,15 @@ export default function BidsListClient() {
                 <div className="col-span-2 text-right text-xs text-[#a98a7d] font-mono">
                   {new Date(bid.updatedAt).toLocaleDateString()}
                 </div>
-                <div className="col-span-1 text-right">
+                <div className="col-span-1 text-right flex items-center justify-end gap-2">
+                  <Link
+                    href={`/operate/${bid.id}`}
+                    className="text-[10px] text-[#13ff43] hover:text-white font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Launch operator mode"
+                  >
+                    🚜
+                  </Link>
                   <button
                     className="text-[10px] text-[#5a4136] hover:text-red-500 font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => {
@@ -152,18 +161,27 @@ export default function BidsListClient() {
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#353534]">
                   <span className="text-[10px] text-[#a98a7d] font-mono">{new Date(bid.updatedAt).toLocaleDateString()}</span>
-                  <button
-                    className="text-[10px] text-[#5a4136] hover:text-red-500 font-bold uppercase"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm('Delete this bid?')) {
-                        deleteBid(bid.id);
-                        toast.success('Bid deleted');
-                      }
-                    }}
-                  >
-                    DELETE
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/operate/${bid.id}`}
+                      className="text-[10px] text-[#13ff43] font-bold uppercase"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      🚜 OPERATE
+                    </Link>
+                    <button
+                      className="text-[10px] text-[#5a4136] hover:text-red-500 font-bold uppercase"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Delete this bid?')) {
+                          deleteBid(bid.id);
+                          toast.success('Bid deleted');
+                        }
+                      }}
+                    >
+                      DELETE
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

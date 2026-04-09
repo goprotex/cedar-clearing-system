@@ -206,11 +206,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       map.addLayer({
         id: 'cedar-fill',
-        type: 'fill',
+        type: 'fill-extrusion',
         source: 'cedar-analysis',
         paint: {
-          'fill-color': ['get', 'color'],
-          'fill-opacity': 0.7,
+          'fill-extrusion-color': ['get', 'color'],
+          'fill-extrusion-opacity': 0.7,
+          'fill-extrusion-height': 2,
+          'fill-extrusion-base': 0,
         },
         layout: { visibility: 'none' },
       });
@@ -343,7 +345,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
     if (map.getLayer('cedar-fill')) {
       const cedarOpacity = layers.hologram ? Math.min(opacities.cedarAI, 0.45) : opacities.cedarAI;
-      map.setPaintProperty('cedar-fill', 'fill-opacity', cedarOpacity);
+      map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', cedarOpacity);
     }
 
     // Toggle 3D terrain

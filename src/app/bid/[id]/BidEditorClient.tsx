@@ -131,6 +131,13 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href={`/operate/${currentBid.id}`}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-[#13ff43]/50 text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-bold uppercase tracking-widest transition-all rounded-sm hidden sm:inline-flex"
+            title="Launch fullscreen operator mode with GPS tracking"
+          >
+            🚜 OPERATE
+          </Link>
           <Button
             variant="outline"
             size="sm"
