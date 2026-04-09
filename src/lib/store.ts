@@ -104,6 +104,8 @@ interface BidStore {
   setCurrentBid: (bid: Bid) => void;
   updateBidField: <K extends keyof Bid>(field: K, value: Bid[K]) => void;
   newBid: () => void;
+  /** Fresh bid but keep this id (for routes like `/operate` or deep-linked UUIDs). */
+  newBidWithId: (id: string) => void;
 
   // Pasture
   addPasture: () => void;
@@ -175,6 +177,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
     selectedPastureId: null,
     drawingMode: false,
   }),
+
+  newBidWithId: (id) => {
+    const fresh = createDefaultBid();
+    set({
+      currentBid: { ...fresh, id },
+      selectedPastureId: null,
+      drawingMode: false,
+    });
+  },
 
   addPasture: () => {
     set((state) => {

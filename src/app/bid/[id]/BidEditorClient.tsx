@@ -67,7 +67,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     // the previous (stale) bid. Reset to a fresh bid keyed to this ID.
     const state = useBidStore.getState();
     if (state.currentBid.id !== bidId) {
-      state.newBid();
+      useBidStore.getState().newBidWithId(bidId);
     }
     setMounted(true);
   }, [bidId, loadBid]);
