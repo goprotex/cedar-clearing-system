@@ -61,11 +61,10 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUpdatedAt = useRef(currentBid.updatedAt);
 
-  // Mark mounted without using an effect body setState (eslint rule)
-  if (!mounted && typeof window !== 'undefined') {
-    // This is only evaluated client-side; it prevents server/client ID mismatch.
+  // Mark mounted client-side (prevents hydration mismatch).
+  useEffect(() => {
     setMounted(true);
-  }
+  }, []);
 
   // Load bid from localStorage after mount
   useEffect(() => {
@@ -103,7 +102,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
       const res = await fetch('/api/jobs/from-bid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bidId }),
+        body: JSON.stringify({ bidId, bid: currentBid }),
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
@@ -117,7 +116,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     } finally {
       setConvertBusy(false);
     }
-  }, [bidId, handleSave]);
+  }, [bidId, handleSave, currentBid]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
