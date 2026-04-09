@@ -9,6 +9,7 @@ import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
 import { TreeLayer3D, extractTreesFromAnalysis } from '@/lib/tree-layer';
 import type { PastureWall } from '@/lib/tree-layer';
+import type { MarkedTree } from '@/types';
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -23,6 +24,7 @@ interface MapContainerProps {
 }
 
 type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI' | 'hologram';
+type Species = 'cedar' | 'oak' | 'mixed';
 
 export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,11 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     hologram: 1.0,
   });
 
+  const [speciesVisible, setSpeciesVisible] = useState<Record<Species, boolean>>({
+    cedar: true, oak: true, mixed: true,
+  });
+  const [markMode, setMarkMode] = useState<'save' | 'remove' | null>(null);
+
   const {
     currentBid,
     selectedPastureId,
@@ -60,6 +67,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     setPasturePolygon,
     setDrawingMode,
     selectPasture,
+    markTree,
+    unmarkTree,
   } = useBidStore();
 
   // Handle polygon creation from draw
@@ -535,6 +544,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
           }));
         tl.updatePolygonWalls(walls);
+
+        for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
+          tl.setSpeciesVisible(sp, speciesVisible[sp]);
+        }
       }
 
       // Move 2D hologram layers above the 3D tree layer so they render on top
@@ -608,7 +621,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-  }, [layers, opacities, currentBid.pastures, currentBid.propertyCenter]);
+  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
 
   // Pause rotation on user interaction, resume after 3s idle
   useEffect(() => {
@@ -796,6 +809,67 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   }, [currentBid.pastures]);
 
 
+  // ── Tree marking click handler ──
+  useEffect(() => {
+    const map = mapRef.current;
+    const tl = treeLayerRef.current;
+    if (!map || !tl || !markMode || !layers.hologram || !selectedPastureId) return;
+
+    const onClick = (e: mapboxgl.MapMouseEvent) => {
+      const nearest = tl.findNearestTree(e.lngLat.lng, e.lngLat.lat, 25);
+      if (!nearest) return;
+
+      const pasture = currentBid.pastures.find((p) => p.id === selectedPastureId);
+      if (!pasture) return;
+
+      const existing = (pasture.savedTrees ?? []).find(
+        (t) => Math.abs(t.lng - nearest.lng) < 0.00001 && Math.abs(t.lat - nearest.lat) < 0.00001
+      );
+
+      if (existing) {
+        if (existing.action === markMode) {
+          unmarkTree(selectedPastureId, existing.id);
+        } else {
+          unmarkTree(selectedPastureId, existing.id);
+          const tree: MarkedTree = {
+            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            lng: nearest.lng, lat: nearest.lat, species: nearest.species,
+            action: markMode,
+            label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
+            height: nearest.height, canopyDiameter: nearest.canopyDiameter,
+          };
+          markTree(selectedPastureId, tree);
+        }
+      } else {
+        const tree: MarkedTree = {
+          id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          lng: nearest.lng, lat: nearest.lat, species: nearest.species,
+          action: markMode,
+          label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
+          height: nearest.height, canopyDiameter: nearest.canopyDiameter,
+        };
+        markTree(selectedPastureId, tree);
+      }
+    };
+
+    map.on('click', onClick);
+    map.getCanvas().style.cursor = markMode === 'save' ? 'cell' : 'crosshair';
+
+    return () => {
+      map.off('click', onClick);
+      map.getCanvas().style.cursor = '';
+    };
+  }, [markMode, layers.hologram, selectedPastureId, currentBid.pastures, markTree, unmarkTree]);
+
+  // ── Sync marked trees to 3D layer ──
+  useEffect(() => {
+    const tl = treeLayerRef.current;
+    if (!tl || !layers.hologram) return;
+
+    const allMarked = currentBid.pastures.flatMap((p) => p.savedTrees ?? []);
+    tl.updateMarkedTrees(allMarked);
+  }, [currentBid.pastures, layers.hologram]);
+
   // ── Fly to selected pasture when selection changes ──
   useEffect(() => {
     const map = mapRef.current;
@@ -922,7 +996,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
             <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
 
-            {/* Hologram 3D toggle */}
+            {/* Hologram toggle */}
             <LayerRow
               label="🔮 Hologram"
               active={layers.hologram}
@@ -931,6 +1005,18 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               onOpacity={(v) => setOpacities((p) => ({ ...p, hologram: v }))}
               holoMode={layers.hologram}
             />
+
+            {/* Species filters (only show when hologram is active) */}
+            {layers.hologram && (
+              <div className="mt-1 pt-1 border-t border-green-800/50">
+                <span className="text-[9px] text-green-500 uppercase tracking-wider px-2 font-semibold">
+                  Species
+                </span>
+                <SpeciesToggle label="Cedar" color="#00ff41" active={speciesVisible.cedar} onToggle={() => setSpeciesVisible(v => ({ ...v, cedar: !v.cedar }))} />
+                <SpeciesToggle label="Oak" color="#ffaa00" active={speciesVisible.oak} onToggle={() => setSpeciesVisible(v => ({ ...v, oak: !v.oak }))} />
+                <SpeciesToggle label="Mixed" color="#22dd44" active={speciesVisible.mixed} onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))} />
+              </div>
+            )}
 
           </div>
         ) : (
@@ -947,15 +1033,54 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         )}
       </div>
 
-      {/* Screenshot button (hologram mode) */}
+      {/* Hologram controls (bottom-right) */}
       {layers.hologram && (
         <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
+          <button
+            onClick={() => setMarkMode(markMode === 'save' ? null : 'save')}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              markMode === 'save'
+                ? 'bg-green-500/80 text-white shadow-[0_0_12px_rgba(0,255,68,0.5)]'
+                : 'holo-button'
+            }`}
+            title="Mark trees to SAVE (click on trees)"
+          >
+            🛡️ Save
+          </button>
+          <button
+            onClick={() => setMarkMode(markMode === 'remove' ? null : 'remove')}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              markMode === 'remove'
+                ? 'bg-red-500/80 text-white shadow-[0_0_12px_rgba(255,34,68,0.5)]'
+                : 'holo-button'
+            }`}
+            title="Mark trees to REMOVE (click on trees)"
+          >
+            ✂️ Remove
+          </button>
           <button
             onClick={captureScreenshot}
             className="holo-button px-3 py-2 rounded-lg text-xs font-medium"
             title="Capture hologram screenshot"
           >
             📸 Capture
+          </button>
+        </div>
+      )}
+
+      {/* Mark mode banner */}
+      {markMode && layers.hologram && (
+        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
+          markMode === 'save'
+            ? 'bg-green-600/90 text-white shadow-[0_0_20px_rgba(0,255,68,0.3)]'
+            : 'bg-red-600/90 text-white shadow-[0_0_20px_rgba(255,34,68,0.3)]'
+        }`}>
+          {markMode === 'save' ? '🛡️ Click trees to SAVE' : '✂️ Click trees to REMOVE'}
+          <button
+            onClick={() => setMarkMode(null)}
+            className="ml-3 underline hover:no-underline"
+          >
+            Done
           </button>
         </div>
       )}
@@ -1054,3 +1179,23 @@ function LayerRow({
   );
 }
 
+function SpeciesToggle({ label, color, active, onToggle }: { label: string; color: string; active: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`w-full flex items-center gap-2 px-2 py-0.5 text-[11px] font-medium rounded transition-all duration-200 ${
+        active ? 'text-white/90' : 'text-white/30 line-through'
+      }`}
+    >
+      <span
+        className="w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-300"
+        style={{
+          backgroundColor: active ? color : 'transparent',
+          border: `1.5px solid ${color}`,
+          boxShadow: active ? `0 0 6px ${color}` : 'none',
+        }}
+      />
+      {label}
+    </button>
+  );
+}
