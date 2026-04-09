@@ -7,9 +7,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
-import { TreeLayer3D, extractTreesFromAnalysis } from '@/lib/tree-layer';
-import type { PastureWall } from '@/lib/tree-layer';
-import type { MarkedTree } from '@/types';
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -24,13 +21,11 @@ interface MapContainerProps {
 }
 
 type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI' | 'hologram';
-type Species = 'cedar' | 'oak' | 'mixed';
 
 export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
-  const treeLayerRef = useRef<TreeLayer3D | null>(null);
   const lastFlyToPastureRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
@@ -52,10 +47,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     cedarAI: 0.7,
     hologram: 1.0,
   });
-  const [speciesVisible, setSpeciesVisible] = useState<Record<Species, boolean>>({
-    cedar: true, oak: true, mixed: true,
-  });
-  const [markMode, setMarkMode] = useState<'save' | 'remove' | null>(null);
 
   const {
     currentBid,
@@ -65,8 +56,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     setPasturePolygon,
     setDrawingMode,
     selectPasture,
-    markTree,
-    unmarkTree,
   } = useBidStore();
 
   // Handle polygon creation from draw
@@ -76,16 +65,32 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       const feature = e.features[0] as GeoJSON.Feature<GeoJSON.Polygon>;
       if (!feature || feature.geometry.type !== 'Polygon') return;
 
-      // Validate polygon has at least 3 distinct points (GeoJSON closes the ring, so >=4 coords)
       if (feature.geometry.coordinates[0].length < 4) return;
 
       const acreage = calculateAcreage(feature);
       const centroid = getCentroid(feature);
       setPasturePolygon(selectedPastureId, feature, acreage, centroid);
 
-      // Clear the draw layer since we manage polygons ourselves
       if (drawRef.current) {
         drawRef.current.deleteAll();
+      }
+
+      // Auto-enable hologram mode after drawing a pasture
+      setLayers((prev) => {
+        if (prev.hologram) return prev;
+        const next = { ...prev };
+        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
+        next.hologram = true;
+        next.terrain3d = false;
+        next.naip = false;
+        next.naipCIR = false;
+        next.naipNDVI = true;
+        next.cedarAI = true;
+        return next;
+      });
+      const map = mapRef.current;
+      if (map) {
+        map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
       }
     },
     [selectedPastureId, setPasturePolygon]
@@ -375,48 +380,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
     }
 
-    // ── Hologram mode: 3D tree layer ──
-    if (layers.hologram) {
-      if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
-        // Clean up stale ref if layer was somehow removed
-        if (treeLayerRef.current && !map.getLayer('3d-trees')) {
-          treeLayerRef.current = null;
-        }
-        if (!treeLayerRef.current) {
-          const treeLayer = new TreeLayer3D(currentBid.propertyCenter);
-          treeLayerRef.current = treeLayer;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          map.addLayer(treeLayer as any);
-        }
-      }
-
-      // Always sync tree data when pastures change
-      const tl = treeLayerRef.current;
-      if (tl) {
-        const trees = extractTreesFromAnalysis(currentBid.pastures);
-        if (trees.length > 0) tl.updateTrees(trees);
-
-        const walls: PastureWall[] = currentBid.pastures
-          .filter(p => p.polygon.geometry.coordinates.length > 0)
-          .map(p => ({
-            id: p.id,
-            coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
-            color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
-          }));
-        tl.updatePolygonWalls(walls);
-
-        // Sync species visibility
-        for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
-          tl.setSpeciesVisible(sp, speciesVisible[sp]);
-        }
-      }
-    } else {
-      if (treeLayerRef.current && map.getLayer('3d-trees')) {
-        map.removeLayer('3d-trees');
-        treeLayerRef.current = null;
-      }
-    }
-  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
+  }, [layers, opacities, currentBid.pastures, currentBid.propertyCenter]);
 
   // Ensure NAIP layers are mutually exclusive (only one at a time)
   const toggleLayer = useCallback((key: LayerKey) => {
@@ -430,19 +394,22 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram: enable terrain, switch to NDVI base map, keep cedar AI visible
+      // Hologram: disable 3D terrain, switch to NDVI base map, keep cedar AI visible
       if (key === 'hologram' && !prev.hologram) {
         preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
-        next.terrain3d = true;
+        next.terrain3d = false;
         next.naip = false;
         next.naipCIR = false;
         next.naipNDVI = true;
         next.cedarAI = true;
-        // Pitch the camera to see 3D trees from an angle
         const map = mapRef.current;
         if (map) {
           map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
         }
+      }
+      // Block 3D terrain while hologram is active
+      if (key === 'terrain3d' && prev.hologram) {
+        return prev;
       }
       // Restore previous state when hologram turns off
       if (key === 'hologram' && prev.hologram) {
@@ -549,75 +516,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     source.setData({ type: 'FeatureCollection', features: allFeatures });
   }, [currentBid.pastures]);
 
-  // ── Tree marking click handler ──
-  useEffect(() => {
-    const map = mapRef.current;
-    const tl = treeLayerRef.current;
-    if (!map || !tl || !markMode || !layers.hologram || !selectedPastureId) return;
-
-    const onClick = (e: mapboxgl.MapMouseEvent) => {
-      const nearest = tl.findNearestTree(e.lngLat.lng, e.lngLat.lat, 25);
-      if (!nearest) return;
-
-      const pasture = currentBid.pastures.find((p) => p.id === selectedPastureId);
-      if (!pasture) return;
-
-      // Check if tree is already marked at this location
-      const existing = (pasture.savedTrees ?? []).find(
-        (t) => Math.abs(t.lng - nearest.lng) < 0.00001 && Math.abs(t.lat - nearest.lat) < 0.00001
-      );
-
-      if (existing) {
-        // Toggle or remove
-        if (existing.action === markMode) {
-          unmarkTree(selectedPastureId, existing.id);
-        } else {
-          // Switch from save⇄remove — remove then re-add
-          unmarkTree(selectedPastureId, existing.id);
-          const tree: MarkedTree = {
-            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            lng: nearest.lng,
-            lat: nearest.lat,
-            species: nearest.species,
-            action: markMode,
-            label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
-            height: nearest.height,
-            canopyDiameter: nearest.canopyDiameter,
-          };
-          markTree(selectedPastureId, tree);
-        }
-      } else {
-        const tree: MarkedTree = {
-          id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          lng: nearest.lng,
-          lat: nearest.lat,
-          species: nearest.species,
-          action: markMode,
-          label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
-          height: nearest.height,
-          canopyDiameter: nearest.canopyDiameter,
-        };
-        markTree(selectedPastureId, tree);
-      }
-    };
-
-    map.on('click', onClick);
-    map.getCanvas().style.cursor = markMode === 'save' ? 'cell' : 'crosshair';
-
-    return () => {
-      map.off('click', onClick);
-      map.getCanvas().style.cursor = '';
-    };
-  }, [markMode, layers.hologram, selectedPastureId, currentBid.pastures, markTree, unmarkTree]);
-
-  // ── Sync marked trees to 3D layer ──
-  useEffect(() => {
-    const tl = treeLayerRef.current;
-    if (!tl || !layers.hologram) return;
-
-    const allMarked = currentBid.pastures.flatMap((p) => p.savedTrees ?? []);
-    tl.updateMarkedTrees(allMarked);
-  }, [currentBid.pastures, layers.hologram]);
 
   // ── Fly to selected pasture when selection changes ──
   useEffect(() => {
@@ -721,13 +619,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
 
             <LayerRow
-              label="⛰️ 3D"
+              label={layers.hologram ? '⛰️ 3D (off in hologram)' : '⛰️ 3D'}
               active={layers.terrain3d}
               opacity={opacities.terrain3d}
               opacityRange={[0.5, 2.5]}
               opacityStep={0.1}
               onToggle={() => toggleLayer('terrain3d')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, terrain3d: v }))}
+              disabled={layers.hologram}
               holoMode={layers.hologram}
             />
 
@@ -754,32 +653,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               holoMode={layers.hologram}
             />
 
-            {/* Species filters (only show when hologram is active) */}
-            {layers.hologram && (
-              <div className="mt-1 pt-1 border-t border-green-800/50">
-                <span className="text-[9px] text-green-500 uppercase tracking-wider px-2 font-semibold">
-                  Species
-                </span>
-                <SpeciesToggle
-                  label="Cedar"
-                  color="#00ff41"
-                  active={speciesVisible.cedar}
-                  onToggle={() => setSpeciesVisible(v => ({ ...v, cedar: !v.cedar }))}
-                />
-                <SpeciesToggle
-                  label="Oak"
-                  color="#ffaa00"
-                  active={speciesVisible.oak}
-                  onToggle={() => setSpeciesVisible(v => ({ ...v, oak: !v.oak }))}
-                />
-                <SpeciesToggle
-                  label="Mixed"
-                  color="#22dd44"
-                  active={speciesVisible.mixed}
-                  onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))}
-                />
-              </div>
-            )}
           </div>
         ) : (
           <button
@@ -798,29 +671,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {/* Screenshot button (hologram mode) */}
       {layers.hologram && (
         <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
-          {/* Tree marking mode buttons */}
-          <button
-            onClick={() => setMarkMode(markMode === 'save' ? null : 'save')}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              markMode === 'save'
-                ? 'bg-green-500/80 text-white shadow-[0_0_12px_rgba(0,255,68,0.5)]'
-                : 'holo-button'
-            }`}
-            title="Mark trees to SAVE (click on trees)"
-          >
-            🛡️ Save
-          </button>
-          <button
-            onClick={() => setMarkMode(markMode === 'remove' ? null : 'remove')}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              markMode === 'remove'
-                ? 'bg-red-500/80 text-white shadow-[0_0_12px_rgba(255,34,68,0.5)]'
-                : 'holo-button'
-            }`}
-            title="Mark trees to REMOVE (click on trees)"
-          >
-            ✂️ Remove
-          </button>
           <button
             onClick={captureScreenshot}
             className="holo-button px-3 py-2 rounded-lg text-xs font-medium"
@@ -831,27 +681,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         </div>
       )}
 
-      {/* Mark mode banner */}
-      {markMode && layers.hologram && (
-        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
-          markMode === 'save'
-            ? 'bg-green-600/90 text-white shadow-[0_0_20px_rgba(0,255,68,0.3)]'
-            : 'bg-red-600/90 text-white shadow-[0_0_20px_rgba(255,34,68,0.3)]'
-        }`}>
-          {markMode === 'save' ? '🛡️ Click trees to SAVE' : '✂️ Click trees to REMOVE'}
-          <button
-            onClick={() => setMarkMode(null)}
-            className="ml-3 underline hover:no-underline"
-          >
-            Done
-          </button>
-        </div>
-      )}
-
-      {/* Hologram: no trees hint */}
+      {/* Hologram: no analysis data hint */}
       {layers.hologram && !currentBid.pastures.some(p => p.cedarAnalysis?.gridCells?.features?.length) && (
         <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 holo-panel px-4 py-2 rounded-lg shadow-lg text-xs text-green-300 max-w-xs text-center">
-          🔮 No tree data yet — run <span className="font-bold text-green-100">Spectral Analysis</span> on a pasture to generate 3D hologram trees
+          🔮 No analysis data yet — draw a pasture to auto-run spectral analysis
         </div>
       )}
 
@@ -891,6 +724,7 @@ function LayerRow({
   onToggle,
   onOpacity,
   holoMode = false,
+  disabled = false,
 }: {
   label: string;
   active: boolean;
@@ -900,23 +734,26 @@ function LayerRow({
   onToggle: () => void;
   onOpacity: (v: number) => void;
   holoMode?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-0.5">
       <button
-        onClick={onToggle}
+        onClick={disabled ? undefined : onToggle}
         className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
-          active
-            ? holoMode
-              ? 'bg-green-700/60 text-green-100 shadow-[0_0_8px_rgba(0,255,65,0.3)]'
-              : 'bg-amber-600 text-white'
-            : holoMode
-              ? 'text-green-300/70 hover:bg-green-900/40 hover:text-green-200'
-              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+          disabled
+            ? 'text-slate-500 cursor-not-allowed opacity-50'
+            : active
+              ? holoMode
+                ? 'bg-green-700/60 text-green-100 shadow-[0_0_8px_rgba(0,255,65,0.3)]'
+                : 'bg-amber-600 text-white'
+              : holoMode
+                ? 'text-green-300/70 hover:bg-green-900/40 hover:text-green-200'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
         }`}
       >
         {label}
-        {active && <span className="float-right text-[10px] opacity-75">ON</span>}
+        {active && !disabled && <span className="float-right text-[10px] opacity-75">ON</span>}
       </button>
       {active && (
         <div className="flex items-center gap-1.5 px-2 pb-0.5">
@@ -938,35 +775,3 @@ function LayerRow({
   );
 }
 
-function SpeciesToggle({
-  label,
-  color,
-  active,
-  onToggle,
-}: {
-  label: string;
-  color: string;
-  active: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      className={`w-full flex items-center gap-2 px-2 py-0.5 text-[11px] font-medium rounded transition-all duration-200 ${
-        active
-          ? 'text-white/90'
-          : 'text-white/30 line-through'
-      }`}
-    >
-      <span
-        className="w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-300"
-        style={{
-          backgroundColor: active ? color : 'transparent',
-          border: `1.5px solid ${color}`,
-          boxShadow: active ? `0 0 6px ${color}` : 'none',
-        }}
-      />
-      {label}
-    </button>
-  );
-}
