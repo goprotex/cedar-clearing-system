@@ -351,18 +351,34 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
     if (map.getLayer('cedar-fill')) {
       if (layers.hologram) {
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-color', [
+          'match', ['get', 'classification'],
+          'cedar', '#00ff41',
+          'oak', '#ffaa00',
+          'mixed_brush', '#22dd44',
+          '#00ff41',
+        ]);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', 0.85);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 6);
       } else {
+        map.setPaintProperty('cedar-fill', 'fill-extrusion-color', ['get', 'color']);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', opacities.cedarAI);
         map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 2);
       }
     }
     if (map.getLayer('cedar-border')) {
       if (layers.hologram) {
+        map.setPaintProperty('cedar-border', 'line-color', [
+          'match', ['get', 'classification'],
+          'cedar', '#00ff41',
+          'oak', '#ffaa00',
+          'mixed_brush', '#22dd44',
+          '#00ff41',
+        ]);
         map.setPaintProperty('cedar-border', 'line-opacity', 0.8);
         map.setPaintProperty('cedar-border', 'line-width', 1);
       } else {
+        map.setPaintProperty('cedar-border', 'line-color', ['get', 'color']);
         map.setPaintProperty('cedar-border', 'line-opacity', 0.5);
         map.setPaintProperty('cedar-border', 'line-width', 0.5);
       }
@@ -573,11 +589,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     const source = map.getSource('cedar-analysis') as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
 
-    // Merge all pastures' cedar analysis grid cells into one FeatureCollection
     const allFeatures: GeoJSON.Feature[] = [];
     for (const p of currentBid.pastures) {
       if (p.cedarAnalysis?.gridCells?.features) {
-        allFeatures.push(...p.cedarAnalysis.gridCells.features);
+        for (const f of p.cedarAnalysis.gridCells.features) {
+          const cls = f.properties?.classification;
+          if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') {
+            allFeatures.push(f);
+          }
+        }
       }
     }
 
