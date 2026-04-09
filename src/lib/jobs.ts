@@ -79,3 +79,78 @@ export type JobRecord = {
   members: Array<{ userId: string; role: 'owner' | 'worker' | 'viewer' }>;
 };
 
+export function localJobKey(jobId: string) {
+  return `ccc_job_${jobId}`;
+}
+
+export function saveLocalJob(job: JobRecord) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(localJobKey(job.id), JSON.stringify(job));
+}
+
+export function loadLocalJob(jobId: string): JobRecord | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(localJobKey(jobId));
+    if (!raw) return null;
+    return JSON.parse(raw) as JobRecord;
+  } catch {
+    return null;
+  }
+}
+
+export function localJobEventsKey(jobId: string) {
+  return `ccc_job_events_${jobId}`;
+}
+
+export type LocalJobEvent = {
+  id: string;
+  created_at: string;
+  type: string;
+  data: unknown;
+};
+
+export function appendLocalJobEvent(jobId: string, event: Omit<LocalJobEvent, 'id'>) {
+  if (typeof window === 'undefined') return;
+  const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const existing = loadLocalJobEvents(jobId);
+  const next = [{ id, ...event }, ...existing].slice(0, 200);
+  localStorage.setItem(localJobEventsKey(jobId), JSON.stringify(next));
+}
+
+export function loadLocalJobEvents(jobId: string): LocalJobEvent[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(localJobEventsKey(jobId));
+    return raw ? (JSON.parse(raw) as LocalJobEvent[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function createLocalJobFromBid(bid: Bid): JobRecord {
+  const jobId = jobIdFromBidId(bid.id);
+  const title = `${bid.propertyName || 'Untitled Property'} — ${bid.bidNumber}`;
+  const job: JobRecord = {
+    id: jobId,
+    bidId: bid.id,
+    createdAt: new Date().toISOString(),
+    title,
+    status: 'active',
+    cedar_total_cells: 0,
+    cedar_cleared_cells: 0,
+    members: [{ userId: 'local', role: 'owner' }],
+  };
+  saveLocalJob(job);
+  saveJobBidSnapshot(bid);
+  appendLocalJobEvent(jobId, { created_at: job.createdAt, type: 'job_created', data: { bidId: bid.id } });
+  return job;
+}
+
+export function loadLocalJobBundle(jobId: string): { job: JobRecord | null; bid: Bid | null; events: LocalJobEvent[] } {
+  const job = loadLocalJob(jobId);
+  const bid = job ? loadJobBidSnapshot(job.bidId) : null;
+  const events = loadLocalJobEvents(jobId);
+  return { job, bid, events };
+}
+

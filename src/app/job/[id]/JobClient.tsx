@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Job, JobEvent } from '@/types';
+import { loadLocalJobBundle } from '@/lib/jobs';
 
 function fmt(ts: string) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
@@ -19,7 +20,38 @@ export default function JobClient({ jobId }: { jobId: string }) {
       try {
         setErr(null);
         const res = await fetch(`/api/jobs/${jobId}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+          const local = loadLocalJobBundle(jobId);
+            if (local?.job) {
+              if (cancelled) return;
+            if (!local.bid) {
+              throw new Error('Local job snapshot is missing the bid payload.');
+            }
+            setJob({
+            id: local.job.id,
+            bid_id: local.job.bidId,
+            title: local.job.title,
+            status: local.job.status,
+            created_at: local.job.createdAt,
+            bid_snapshot: local.bid,
+            cedar_total_cells: local.job.cedar_total_cells,
+            cedar_cleared_cells: local.job.cedar_cleared_cells,
+          });
+              setEvents((local.events ?? []).map((e) => ({
+                id: e.id,
+                job_id: jobId,
+                created_at: e.created_at,
+                created_by: 'local',
+                type: e.type,
+                data: e.data,
+              })));
+              setErr(null);
+              return;
+            }
+          }
+          throw new Error(await res.text());
+        }
         const data = (await res.json()) as { job: Job; events: JobEvent[] };
         if (cancelled) return;
         setJob(data.job);

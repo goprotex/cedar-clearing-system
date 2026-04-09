@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Link from 'next/link';
 import { toast } from 'sonner';
 import type { BidStatus } from '@/types';
+import { createLocalJobFromBid } from '@/lib/jobs';
 
 const STATUS_OPTIONS: { value: BidStatus; label: string }[] = [
   { value: 'draft', label: 'Draft' },
@@ -104,13 +105,23 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bidId, bid: currentBid }),
       });
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        throw new Error(msg || 'Failed to convert bid to job.');
+      if (res.ok) {
+        const data = (await res.json()) as { jobId: string };
+        toast.success('Job created');
+        window.location.href = `/job/${data.jobId}`;
+        return;
       }
-      const data = (await res.json()) as { jobId: string };
-      toast.success('Job created');
-      window.location.href = `/job/${data.jobId}`;
+
+      // Local-only fallback when Supabase auth isn’t available yet.
+      if (res.status === 401) {
+        const job = createLocalJobFromBid(currentBid);
+        toast.success('Job created (local)');
+        window.location.href = `/job/${job.id}`;
+        return;
+      }
+
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || 'Failed to convert bid to job.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to convert bid to job.');
     } finally {
