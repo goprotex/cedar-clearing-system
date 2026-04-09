@@ -1,38 +1,48 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 
+const LANDING_NAV = [
+  { href: '/bids', label: 'ESTIMATOR' },
+  { href: '/fleet', label: 'FLEET' },
+  { href: '/intel', label: 'INTEL' },
+  { href: '/archive', label: 'ARCHIVE' },
+  { href: '/map-radar', label: 'RADAR' },
+];
+
 export default function Home() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
       {/* TopAppBar */}
       <header className="fixed top-0 w-full z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center px-4 md:px-6 py-4">
-        <div className="text-xl md:text-2xl font-black text-[#FF6B00] tracking-tighter uppercase">
-          CEDAR_HACK
+        <div className="flex items-center gap-3">
+          <button
+            className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={menuOpen}
+          >
+            <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+            <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${menuOpen ? 'opacity-0' : ''}`} />
+            <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+          </button>
+          <div className="text-xl md:text-2xl font-black text-[#FF6B00] tracking-tighter uppercase">
+            CEDAR_HACK
+          </div>
         </div>
         <nav className="hidden md:flex gap-8 items-center">
-          <Link
-            href="/bids"
-            className="uppercase tracking-tight font-bold text-[#e5e2e1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1"
-          >
-            ESTIMATOR
-          </Link>
-          <Link
-            href="/fleet"
-            className="uppercase tracking-tight font-bold text-[#e5e2e1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1"
-          >
-            FLEET
-          </Link>
-          <Link
-            href="/intel"
-            className="uppercase tracking-tight font-bold text-[#e5e2e1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1"
-          >
-            INTEL
-          </Link>
-          <Link
-            href="/map-radar"
-            className="uppercase tracking-tight font-bold text-[#e5e2e1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1"
-          >
-            RADAR
-          </Link>
+          {LANDING_NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="uppercase tracking-tight font-bold text-[#e5e2e1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-2 py-1"
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
         <Link
           href="/bids"
@@ -42,6 +52,40 @@ export default function Home() {
           <span className="hidden sm:inline">_SYSTEM</span>
         </Link>
       </header>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+      <div
+        className={`fixed top-[65px] left-0 w-full bg-[#131313] border-b-2 border-[#353534] z-45 md:hidden transition-all duration-300 overflow-hidden ${
+          menuOpen ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+        style={{ zIndex: 45 }}
+      >
+        <nav className="flex flex-col py-2">
+          {LANDING_NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMenuOpen(false)}
+              className="uppercase tracking-tight font-bold text-[#e5e2e1] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm border-b border-[#353534]/50"
+            >
+              {item.label}
+            </Link>
+          ))}
+          <Link
+            href="/sys-health"
+            onClick={() => setMenuOpen(false)}
+            className="uppercase tracking-tight font-bold text-[#13ff43] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm"
+          >
+            SYS_HEALTH
+          </Link>
+        </nav>
+      </div>
 
       <main className="pt-20">
         {/* Hero Section */}
