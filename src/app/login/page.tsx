@@ -4,6 +4,16 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 
+function parseHashParams(hash: string): Record<string, string> {
+  const h = hash.startsWith('#') ? hash.slice(1) : hash;
+  const params = new URLSearchParams(h);
+  const out: Record<string, string> = {};
+  params.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
+}
+
 export default function LoginPage() {
   const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>('magic');
   const [email, setEmail] = useState('');
@@ -23,6 +33,64 @@ export default function LoginPage() {
       if (cancelled) return;
       if (data.user) {
         window.location.href = '/bids';
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [envMissing]);
+
+  useEffect(() => {
+    // Surface any errors from server-side callback redirects.
+    try {
+      const url = new URL(window.location.href);
+      const e = url.searchParams.get('error');
+      if (e) {
+        setErr(decodeURIComponent(e));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (envMissing) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Handle magic-link redirects which return tokens in the URL hash fragment.
+        const hash = window.location.hash || '';
+        if (!hash) return;
+
+        const hp = parseHashParams(hash);
+        const access_token = hp.access_token;
+        const refresh_token = hp.refresh_token;
+        const next = hp.next && hp.next.startsWith('/') ? hp.next : '/bids';
+        const errorDescription = hp.error_description || hp.error;
+
+        if (errorDescription) {
+          setErr(decodeURIComponent(String(errorDescription)));
+          return;
+        }
+
+        if (!access_token || !refresh_token) return;
+
+        const supabase = createClient();
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) throw error;
+
+        // Clean the URL so tokens aren't left in the address bar / history.
+        try {
+          window.history.replaceState({}, '', '/login');
+        } catch {
+          // ignore
+        }
+
+        if (!cancelled) {
+          window.location.href = next;
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setErr(e instanceof Error ? e.message : 'Auth failed.');
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -138,7 +206,9 @@ export default function LoginPage() {
               const supabase = createClient();
 
               if (mode === 'magic') {
-                const redirectTo = `${window.location.origin}/auth/callback`;
+                // Route through `/auth/magic` so the hash fragment is preserved and we can setSession() on `/login`.
+                // Supabase requires redirect URLs to be on the allow list in Auth settings.
+                const redirectTo = `${window.location.origin}/auth/magic?next=/bids`;
                 const { error } = await supabase.auth.signInWithOtp({
                   email: email.trim(),
                   options: { emailRedirectTo: redirectTo },
@@ -153,7 +223,8 @@ export default function LoginPage() {
                 if (error) throw error;
                 window.location.href = '/bids';
               } else {
-                const redirectTo = `${window.location.origin}/auth/callback`;
+                // For email confirmations, keep the redirect on-app so the browser can establish the session.
+                const redirectTo = `${window.location.origin}/auth/magic?next=/bids`;
                 const { error } = await supabase.auth.signUp({
                   email: email.trim(),
                   password,
