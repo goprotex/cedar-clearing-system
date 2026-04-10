@@ -18,9 +18,12 @@ export async function GET() {
   const supabase = createClient(cookieStore);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
-  if (authErr) return NextResponse.json({ error: authErr.message }, { status: 401 });
-  const userId = auth.user?.id;
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (authErr || !auth.user?.id) {
+    // No auth session — return empty data so the monitor page still renders
+    // the map and UI.  Jobs/cleared-cells will be empty until the user signs in.
+    return NextResponse.json({ jobs: [], clearedByJob: {} as Record<string, string[]>, operatorsByJob: {} as Record<string, unknown[]> });
+  }
+  const userId = auth.user.id;
 
   const { data: memberships, error: memErr } = await supabase
     .from('job_members')
@@ -59,9 +62,16 @@ export async function GET() {
 
   const operatorsByJob: Record<string, unknown[]> = {};
   for (const row of operators ?? []) {
-    (operatorsByJob[row.job_id] ??= []).push(row);
+    (operatorsByJob[row.job_id] ??= []).push({
+      user_id: row.user_id,
+      lng: row.lng,
+      lat: row.lat,
+      heading: row.heading_deg ?? null,
+      speed_mps: row.speed_mps ?? null,
+      accuracy_m: row.accuracy_m ?? null,
+      updated_at: row.updated_at,
+    });
   }
 
   return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], clearedByJob, operatorsByJob });
 }
-

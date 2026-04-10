@@ -1,17 +1,17 @@
-'use client';
-
 import Link from 'next/link';
 
-export default function OperatorProfilePlaceholder({ params }: { params: { id: string } }) {
+export default async function OperatorProfilePlaceholder({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] p-6 space-y-4">
       <div className="max-w-xl mx-auto border-2 border-[#353534] bg-[#0e0e0e] p-6 space-y-3">
         <div className="text-[#FF6B00] text-2xl font-black uppercase tracking-widest">OPERATOR_PROFILE</div>
         <div className="text-xs font-mono text-[#a98a7d]">
-          Placeholder page — we’ll build the operator profile UI here (assignments, stats, machine, notes).
+          Placeholder page &mdash; the operator profile UI goes here (assignments, stats, machine, notes).
         </div>
         <div className="text-sm font-mono">
-          Operator ID: <span className="text-[#13ff43]">{params.id}</span>
+          Operator ID: <span className="text-[#13ff43]">{id}</span>
         </div>
         <div className="flex gap-2">
           <Link
@@ -31,4 +31,3 @@ export default function OperatorProfilePlaceholder({ params }: { params: { id: s
     </div>
   );
 }
-

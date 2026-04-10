@@ -7,6 +7,8 @@ import Link from 'next/link';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
+import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
+import { loadBidFromSupabase, getAuthUserId } from '@/lib/db';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
@@ -131,6 +133,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const watchIdRef = useRef<number | null>(null);
   const trailCoordsRef = useRef<[number, number][]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [ndviEnabled, setNdviEnabled] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -147,18 +150,37 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Load bid from localStorage
+  // Load bid from Supabase (preferred) or localStorage (fallback)
   useEffect(() => {
-    const raw = localStorage.getItem(`ccc_bid_${bidId}`);
-    if (!raw) return;
-    const bid: Bid = JSON.parse(raw);
-    const trees = extractTreesFromAnalysis(bid.pastures);
+    let cancelled = false;
+    (async () => {
+      let bid: Bid | null = null;
 
-    const saved = loadOperatorSession(bidId);
-    const clearedCellIds = new Set(saved?.clearedCellIds ?? []);
-    const clearedCells = saved?.clearedCells ?? [];
+      if (isSupabaseConfigured) {
+        try {
+          const sb = createSupabaseBrowser();
+          const userId = await getAuthUserId(sb);
+          if (userId) {
+            const result = await loadBidFromSupabase(sb, bidId);
+            if (!result.error && result.bid) bid = result.bid;
+          }
+        } catch { /* fall through */ }
+      }
 
-    setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
+      if (!bid) {
+        const raw = localStorage.getItem(`ccc_bid_${bidId}`);
+        if (raw) bid = JSON.parse(raw) as Bid;
+      }
+
+      if (cancelled || !bid) return;
+      const trees = extractTreesFromAnalysis(bid.pastures);
+      const saved = loadOperatorSession(bidId);
+      const clearedCellIds = new Set(saved?.clearedCellIds ?? []);
+      const clearedCells = saved?.clearedCells ?? [];
+
+      setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
+    })();
+    return () => { cancelled = true; };
   }, [bidId]);
 
   // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
@@ -183,12 +205,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           }
           throw new Error(await res.text().catch(() => 'Failed to load shared progress.'));
         }
-        const data = (await res.json()) as { cellIds: string[] };
+        const data = (await res.json()) as { cells: Array<{ cell_id: string }> };
         if (cancelled) return;
         setSharedEnabled(true);
         setSharedStatus('ready');
         setState((prev) => {
-          const merged = mergeClearedCellIds(prev.clearedCellIds, data.cellIds ?? []);
+          const cellIds = (data.cells ?? []).map((c) => c.cell_id);
+          const merged = mergeClearedCellIds(prev.clearedCellIds, cellIds);
           if (merged.size === prev.clearedCellIds.size) return prev;
           saveOperatorSession(bidId, Array.from(merged), prev.clearedCells);
           return { ...prev, clearedCellIds: merged };
@@ -248,7 +271,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     cedarCellsRef.current = cells;
   }, [state.bid]);
 
-  // Initialize map
+  // Initialize map.  Wrapped in requestAnimationFrame so the container always
+  // has real layout dimensions when Mapbox reads them.
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !state.bid) return;
     const bid = state.bid;
@@ -263,187 +287,209 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     const { center, zoom } = resolveOperatorView(bid);
 
-    // iPad / in-cab devices often struggle with heavy terrain/3D layers.
-    // Default to a lighter rendering path on coarse-pointer devices.
     const coarsePointer =
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(pointer: coarse)').matches;
 
-    let map: mapboxgl.Map;
-    try {
-      map = new mapboxgl.Map({
-        container,
-        style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
-        center,
-        zoom,
-        pitch: coarsePointer ? 0 : 45,
-        antialias: true,
-        preserveDrawingBuffer: true,
-        failIfMajorPerformanceCaveat: false,
-      });
-    } catch (e) {
-      setMapError(e instanceof Error ? e.message : 'Map failed to initialize.');
-      return;
-    }
+    // Delay creation by one frame so layout is settled and the container
+    // has non-zero dimensions.  This avoids 0×0-canvas bugs on iPad Safari.
+    let cancelled = false;
+    const initTimer = setTimeout(() => {
+      if (cancelled || mapRef.current) return;
 
-    const bumpResize = () => {
+      let map: mapboxgl.Map;
       try {
-        map.resize();
-      } catch {
-        /* ignore */
-      }
-    };
-    requestAnimationFrame(bumpResize);
-    setTimeout(bumpResize, 50);
-    setTimeout(bumpResize, 300);
-
-    let loadWatch: number | null = window.setTimeout(() => {
-      if (!map.isStyleLoaded()) {
-        setMapError(
-          'Map style is taking too long to load. Check NEXT_PUBLIC_MAPBOX_TOKEN on the server, network, or ad blockers blocking api.mapbox.com.',
-        );
-      }
-    }, 15000);
-
-    map.on('error', (e) => {
-      const msg =
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (e as any)?.error?.message ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (e as any)?.error?.toString?.() ||
-        'Mapbox failed to load.';
-      setMapError(String(msg));
-    });
-
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
-
-    map.once('idle', () => {
-      bumpResize();
-    });
-
-    map.on('load', () => {
-      if (loadWatch != null) {
-        window.clearTimeout(loadWatch);
-        loadWatch = null;
-      }
-      try {
-      // High fidelity terrain/sky only on non-coarse pointer devices.
-      if (!coarsePointer) {
-        try {
-          map.addSource('mapbox-dem', {
-            type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
-          });
-          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
-          map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
-        } catch {
-          // If terrain fails, keep going with base map only.
-        }
-      }
-
-      // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
-      if (!coarsePointer) {
-        try {
-          map.addSource('naip-ndvi', {
-            type: 'raster',
-            tiles: [
-              'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
-            ],
-            tileSize: 256,
-          });
-          map.addLayer({
-            id: 'naip-ndvi-overlay',
-            type: 'raster',
-            source: 'naip-ndvi',
-            paint: { 'raster-opacity': 0.85 },
-            layout: { visibility: 'none' },
-          });
-        } catch {
-          // Optional overlay; ignore if it fails.
-        }
-      }
-
-      // Pasture polygon outlines with holographic green glow
-      const pastureFeatures: GeoJSON.Feature[] = bid.pastures
-        .filter((p) => (p.polygon?.geometry?.coordinates?.length ?? 0) > 0)
-        .map(p => ({
-          type: 'Feature', geometry: p.polygon.geometry,
-          properties: { name: p.name, color: '#00ff41' },
-        }));
-
-      map.addSource('pastures', { type: 'geojson', data: { type: 'FeatureCollection', features: pastureFeatures } });
-      map.addLayer({ id: 'pastures-fill', type: 'fill', source: 'pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.05 } });
-      map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
-      map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
-
-      // Cedar grid cells — fill-extrusion with holographic coloring
-      const allCedarFeatures: GeoJSON.Feature[] = [];
-      for (const p of bid.pastures) {
-        if (!p.cedarAnalysis?.gridCells?.features) continue;
-        p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
-          const cls = f.properties?.classification;
-          if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
-          const cellId = `${p.id}:${idx}`;
-          const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
-          allCedarFeatures.push({
-            ...f,
-            properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
-          });
+        map = new mapboxgl.Map({
+          container,
+          style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
+          center,
+          zoom,
+          pitch: coarsePointer ? 0 : 45,
+          antialias: true,
+          preserveDrawingBuffer: true,
+          failIfMajorPerformanceCaveat: false,
         });
-      }
-
-      map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
-
-      if (coarsePointer) {
-        // 2D fill on iPad/field devices for stability/perf
-        map.addLayer({
-          id: 'cedar-cells-fill-2d',
-          type: 'fill',
-          source: 'cedar-cells',
-          paint: {
-            'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
-            'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
-          },
-        });
-      } else {
-        map.addLayer({
-          id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
-          paint: {
-            'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
-            'fill-extrusion-opacity': 0.55,
-            'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
-            'fill-extrusion-base': 0,
-          },
-        });
-      }
-
-      map.addLayer({
-        id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
-        paint: {
-          'line-color': ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']],
-          'line-width': 0.5,
-          'line-opacity': 0.4,
-        },
-      });
-
-      // Operator trail line
-      map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } });
-      map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
-      } catch (err) {
-        setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
+      } catch (e) {
+        setMapError(e instanceof Error ? e.message : 'Map failed to initialize.');
         return;
       }
-      bumpResize();
-      setTimeout(bumpResize, 100);
-    });
 
-    mapRef.current = map;
+      const bumpResize = () => {
+        try { map.resize(); } catch { /* ignore */ }
+      };
+      requestAnimationFrame(bumpResize);
+      setTimeout(bumpResize, 100);
+      setTimeout(bumpResize, 500);
+      setTimeout(bumpResize, 1500);
+
+      let loadWatch: number | null = window.setTimeout(() => {
+        if (!map.isStyleLoaded()) {
+          setMapError(
+            'Map style is taking too long to load. Check NEXT_PUBLIC_MAPBOX_TOKEN on the server, network, or ad blockers blocking api.mapbox.com.',
+          );
+        }
+      }, 15000);
+
+      map.on('error', (e) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const err = (e as any)?.error;
+        const msg = err?.message || err?.toString?.() || 'Mapbox failed to load.';
+        const isTileErr = /tile|source|sprite|glyph/i.test(String(msg));
+        if (!isTileErr) {
+          setMapError(String(msg));
+        }
+      });
+
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
+
+      map.once('idle', () => {
+        bumpResize();
+        setMapReady(true);
+      });
+
+      map.on('load', () => {
+        if (loadWatch != null) {
+          window.clearTimeout(loadWatch);
+          loadWatch = null;
+        }
+        try {
+          if (!coarsePointer) {
+            try {
+              map.addSource('mapbox-dem', {
+                type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
+              });
+              map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
+              map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+            } catch {
+              // terrain optional
+            }
+          }
+
+          if (!coarsePointer) {
+            try {
+              map.addSource('naip-ndvi', {
+                type: 'raster',
+                tiles: [
+                  'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+                ],
+                tileSize: 256,
+              });
+              map.addLayer({
+                id: 'naip-ndvi-overlay',
+                type: 'raster',
+                source: 'naip-ndvi',
+                paint: { 'raster-opacity': 0.85 },
+                layout: { visibility: 'none' },
+              });
+            } catch {
+              // optional overlay
+            }
+          }
+
+          const pastureFeatures: GeoJSON.Feature[] = bid.pastures
+            .filter((p) => (p.polygon?.geometry?.coordinates?.length ?? 0) > 0)
+            .map(p => ({
+              type: 'Feature', geometry: p.polygon.geometry,
+              properties: { name: p.name, color: '#00ff41' },
+            }));
+
+          map.addSource('pastures', { type: 'geojson', data: { type: 'FeatureCollection', features: pastureFeatures } });
+          map.addLayer({ id: 'pastures-fill', type: 'fill', source: 'pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.05 } });
+          map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
+          map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
+
+          const allCedarFeatures: GeoJSON.Feature[] = [];
+          for (const p of bid.pastures) {
+            if (!p.cedarAnalysis?.gridCells?.features) continue;
+            p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
+              const cls = f.properties?.classification;
+              if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
+              const cellId = `${p.id}:${idx}`;
+              const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
+              allCedarFeatures.push({
+                ...f,
+                properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
+              });
+            });
+          }
+
+          map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
+
+          if (coarsePointer) {
+            map.addLayer({
+              id: 'cedar-cells-fill-2d',
+              type: 'fill',
+              source: 'cedar-cells',
+              paint: {
+                'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
+                'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
+              },
+            });
+          } else {
+            map.addLayer({
+              id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
+              paint: {
+                'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
+                'fill-extrusion-opacity': 0.55,
+                'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
+                'fill-extrusion-base': 0,
+              },
+            });
+          }
+
+          map.addLayer({
+            id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
+            paint: {
+              'line-color': ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']],
+              'line-width': 0.5,
+              'line-opacity': 0.4,
+            },
+          });
+
+          map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } });
+          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
+        } catch (err) {
+          setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
+          return;
+        }
+
+        // Auto-center on pasture polygons so the operator sees their work area
+        const bounds = new mapboxgl.LngLatBounds();
+        let hasBounds = false;
+        for (const p of bid.pastures) {
+          const ring = p.polygon?.geometry?.coordinates?.[0];
+          if (!ring || ring.length < 3) continue;
+          for (const c of ring) {
+            if (Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+              bounds.extend(c as [number, number]);
+              hasBounds = true;
+            }
+          }
+        }
+        if (hasBounds) {
+          map.fitBounds(bounds, {
+            padding: { top: 60, bottom: 80, left: 20, right: 20 },
+            maxZoom: 17,
+            duration: 1200,
+          });
+        }
+
+        bumpResize();
+        setTimeout(bumpResize, 100);
+      });
+
+      mapRef.current = map;
+    }, 50);
 
     return () => {
-      if (loadWatch != null) window.clearTimeout(loadWatch);
-      map.remove();
-      mapRef.current = null;
+      cancelled = true;
+      clearTimeout(initTimer);
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
   }, [state.bid]);
 
@@ -684,11 +730,18 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   }
 
   return (
-    <div className="min-h-[100dvh] h-[100dvh] w-screen bg-[#131313] relative overflow-hidden operate-mode-root isolate">
-      {/* Map container — must be lowest z-layer; do NOT apply hologram-mode on the
-          root because its ::after pseudo-element (z-index:5) occludes the WebGL
-          canvas on iPad / Safari, causing the map to appear invisible. */}
-      <div ref={mapContainerRef} className="absolute inset-0 z-0 min-h-0" />
+    <div
+      className="bg-[#131313] relative overflow-hidden operate-mode-root"
+      style={{ position: 'fixed', inset: 0, width: '100vw', height: '100dvh' }}
+    >
+      {/* Map container — uses fixed dimensions so Mapbox always gets a real size.
+          No CSS transforms (they cause Mapbox to miscompute the viewport).
+          No stacking-context tricks (isolate, will-change) that interfere with
+          WebGL compositing on iPad/Safari. */}
+      <div
+        ref={mapContainerRef}
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+      />
 
       {/* No-bid overlay */}
       {!bid && (
@@ -704,20 +757,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       )}
 
-      {/* Holographic vignette + scan-line overlays — rendered as separate divs
-          instead of via .hologram-mode::after so they never block the WebGL canvas
-          on iPad / Safari (pointer-events:none keeps touch passthrough). */}
-      {bid && (
-        <div
-          className="absolute inset-0 pointer-events-none z-[5]"
-          style={{
-            boxShadow: 'inset 0 0 60px rgba(0,255,180,0.06), inset 0 0 120px rgba(0,0,0,0.3)',
-            border: '1px solid rgba(0,255,200,0.12)',
-          }}
-        />
-      )}
-      {bid && <div className="holo-scanlines" />}
-
       {/* Map error overlay */}
       {bid && mapError && (
         <div className="absolute inset-0 z-40 bg-[#131313]/90 backdrop-blur-sm flex items-center justify-center text-[#e5e2e1]">
@@ -727,6 +766,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             <div className="text-[11px] text-[#a98a7d]">
               If this is a token/style error, verify <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> and refresh.
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Map loading indicator — helps diagnose initialization failures */}
+      {bid && !mapReady && !mapError && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-[#000a02]/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-green-900/40">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-[#00ff41] rounded-full animate-pulse" />
+            <span className="text-[10px] font-mono text-[#a98a7d]">LOADING_MAP...</span>
           </div>
         </div>
       )}
