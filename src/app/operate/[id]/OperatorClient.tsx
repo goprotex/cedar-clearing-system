@@ -13,6 +13,130 @@ const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 200
 const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
 const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
 const OPERATOR_PUBLISH_MS = 2500;
+const OPERATOR_PREFS_PREFIX = 'ccc_operator_prefs_';
+
+type OperatorBaseStyle = 'satellite-streets' | 'satellite' | 'outdoors';
+
+type OperatorLayerPrefs = {
+  baseStyle: OperatorBaseStyle;
+  terrain3d: boolean;
+  sky: boolean;
+  ndvi: boolean;
+  hideLabels: boolean;
+  hideRoads: boolean;
+};
+
+function prefsKey(bidId: string) {
+  return `${OPERATOR_PREFS_PREFIX}${bidId}`;
+}
+
+function defaultPrefs(coarsePointer: boolean): OperatorLayerPrefs {
+  return {
+    baseStyle: coarsePointer ? 'satellite' : 'satellite-streets',
+    terrain3d: !coarsePointer,
+    sky: !coarsePointer,
+    ndvi: false,
+    hideLabels: false,
+    hideRoads: false,
+  };
+}
+
+function loadPrefs(bidId: string, coarsePointer: boolean): OperatorLayerPrefs {
+  try {
+    const raw = localStorage.getItem(prefsKey(bidId));
+    if (!raw) return defaultPrefs(coarsePointer);
+    const parsed = JSON.parse(raw) as Partial<OperatorLayerPrefs> | null;
+    const base = defaultPrefs(coarsePointer);
+    if (!parsed || typeof parsed !== 'object') return base;
+    return {
+      baseStyle: parsed.baseStyle ?? base.baseStyle,
+      terrain3d: typeof parsed.terrain3d === 'boolean' ? parsed.terrain3d : base.terrain3d,
+      sky: typeof parsed.sky === 'boolean' ? parsed.sky : base.sky,
+      ndvi: typeof parsed.ndvi === 'boolean' ? parsed.ndvi : base.ndvi,
+      hideLabels: typeof parsed.hideLabels === 'boolean' ? parsed.hideLabels : base.hideLabels,
+      hideRoads: typeof parsed.hideRoads === 'boolean' ? parsed.hideRoads : base.hideRoads,
+    };
+  } catch {
+    return defaultPrefs(coarsePointer);
+  }
+}
+
+function savePrefs(bidId: string, prefs: OperatorLayerPrefs) {
+  localStorage.setItem(prefsKey(bidId), JSON.stringify(prefs));
+}
+
+function styleUrl(style: OperatorBaseStyle): string {
+  if (style === 'satellite') return 'mapbox://styles/mapbox/satellite-v9';
+  if (style === 'outdoors') return 'mapbox://styles/mapbox/outdoors-v12';
+  return 'mapbox://styles/mapbox/satellite-streets-v12';
+}
+
+function setLayerVisibilitySafe(map: mapboxgl.Map, layerId: string, visible: boolean) {
+  try {
+    if (!map.getLayer(layerId)) return;
+    map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+  } catch {
+    // ignore
+  }
+}
+
+function setStyleGroupVisibility(map: mapboxgl.Map, predicate: (layer: mapboxgl.Layer) => boolean, visible: boolean) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const layers = (map.getStyle() as any)?.layers as mapboxgl.Layer[] | undefined;
+    if (!layers) return;
+    for (const l of layers) {
+      if (!l?.id) continue;
+      if (!predicate(l)) continue;
+      setLayerVisibilitySafe(map, l.id, visible);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function setTerrainEnabledSafe(map: mapboxgl.Map, enabled: boolean) {
+  try {
+    if (!enabled) {
+      map.setTerrain(null);
+      return;
+    }
+    const srcId = 'mapbox-dem';
+    if (!map.getSource(srcId)) {
+      map.addSource(srcId, {
+        type: 'raster-dem',
+        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+    map.setTerrain({ source: srcId, exaggeration: 1.2 });
+  } catch {
+    // ignore
+  }
+}
+
+function setSkyEnabledSafe(map: mapboxgl.Map, enabled: boolean) {
+  try {
+    const id = 'sky';
+    if (!enabled) {
+      if (map.getLayer(id)) map.removeLayer(id);
+      return;
+    }
+    if (map.getLayer(id)) return;
+    map.addLayer({
+      id,
+      type: 'sky',
+      paint: {
+        'sky-type': 'atmosphere',
+        'sky-atmosphere-sun': [0.0, 90.0],
+        'sky-atmosphere-sun-intensity': 15,
+      },
+    });
+  } catch {
+    // ignore
+  }
+}
 
 interface ClearedCell {
   cellIndex: number;
@@ -76,12 +200,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const watchIdRef = useRef<number | null>(null);
   const trailCoordsRef = useRef<[number, number][]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [ndviEnabled, setNdviEnabled] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
   const lastPublishRef = useRef<number>(0);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
+  const coarsePointerRef = useRef(false);
+
+  const [layerPrefs, setLayerPrefs] = useState<OperatorLayerPrefs>(() => defaultPrefs(false));
+  const layerPrefsRef = useRef(layerPrefs);
+  layerPrefsRef.current = layerPrefs;
 
   const [state, setState] = useState<OperatorState>({
     bid: null, trees: [], clearedCellIds: new Set(), clearedCells: [],
@@ -99,12 +228,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     const bid: Bid = JSON.parse(raw);
     const trees = extractTreesFromAnalysis(bid.pastures);
 
+    const coarsePointer =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches;
+    coarsePointerRef.current = coarsePointer;
+    const prefs = loadPrefs(bidId, coarsePointer);
+    setLayerPrefs(prefs);
+
     const saved = loadOperatorSession(bidId);
     const clearedCellIds = new Set(saved?.clearedCellIds ?? []);
     const clearedCells = saved?.clearedCells ?? [];
 
     setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
   }, [bidId]);
+
+  useEffect(() => {
+    try {
+      savePrefs(bidId, layerPrefs);
+    } catch {
+      // ignore
+    }
+  }, [bidId, layerPrefs]);
 
   // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
   useEffect(() => {
@@ -203,18 +348,195 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
 
-    // iPad / in-cab devices often struggle with heavy terrain/3D layers.
-    // Default to a lighter rendering path on coarse-pointer devices.
-    const coarsePointer =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(pointer: coarse)').matches;
+    const coarsePointer = coarsePointerRef.current;
+
+    const addCustomLayers = () => {
+      const map = mapRef.current;
+      if (!map || !map.isStyleLoaded()) return;
+
+      // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
+      // Keep as optional even on iPad, but default it off.
+      try {
+        if (!map.getSource('naip-ndvi')) {
+          map.addSource('naip-ndvi', {
+            type: 'raster',
+            tiles: [
+              'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+            ],
+            tileSize: 256,
+          });
+        }
+        if (!map.getLayer('naip-ndvi-overlay')) {
+          map.addLayer({
+            id: 'naip-ndvi-overlay',
+            type: 'raster',
+            source: 'naip-ndvi',
+            paint: { 'raster-opacity': 0.85 },
+            layout: { visibility: 'none' },
+          });
+        }
+      } catch {
+        // Optional overlay; ignore if it fails.
+      }
+
+      // Pasture polygon outlines with holographic green glow
+      try {
+        const pastureFeatures: GeoJSON.Feature[] = bid.pastures
+          .filter(p => p.polygon.geometry.coordinates.length > 0)
+          .map(p => ({
+            type: 'Feature',
+            geometry: p.polygon.geometry,
+            properties: { name: p.name, color: '#00ff41' },
+          }));
+
+        if (!map.getSource('pastures')) {
+          map.addSource('pastures', { type: 'geojson', data: { type: 'FeatureCollection', features: pastureFeatures } });
+        } else {
+          const src = map.getSource('pastures') as mapboxgl.GeoJSONSource;
+          src.setData({ type: 'FeatureCollection', features: pastureFeatures });
+        }
+
+        if (!map.getLayer('pastures-fill')) {
+          map.addLayer({ id: 'pastures-fill', type: 'fill', source: 'pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.05 } });
+        }
+        if (!map.getLayer('pastures-border')) {
+          map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
+        }
+        if (!map.getLayer('pastures-label')) {
+          map.addLayer({
+            id: 'pastures-label',
+            type: 'symbol',
+            source: 'pastures',
+            layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] },
+            paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 },
+          });
+        }
+      } catch {
+        // ignore
+      }
+
+      // Cedar grid cells — fill-extrusion with holographic coloring
+      try {
+        const allCedarFeatures: GeoJSON.Feature[] = [];
+        for (const p of bid.pastures) {
+          if (!p.cedarAnalysis?.gridCells?.features) continue;
+          p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
+            const cls = f.properties?.classification;
+            if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
+            const cellId = `${p.id}:${idx}`;
+            const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
+            allCedarFeatures.push({
+              ...f,
+              properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
+            });
+          });
+        }
+
+        if (!map.getSource('cedar-cells')) {
+          map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
+        } else {
+          const src = map.getSource('cedar-cells') as mapboxgl.GeoJSONSource;
+          src.setData({ type: 'FeatureCollection', features: allCedarFeatures });
+        }
+
+        if (coarsePointer) {
+          if (!map.getLayer('cedar-cells-fill-2d')) {
+            map.addLayer({
+              id: 'cedar-cells-fill-2d',
+              type: 'fill',
+              source: 'cedar-cells',
+              paint: {
+                'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
+                'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
+              },
+            });
+          }
+          if (map.getLayer('cedar-cells-fill')) {
+            try { map.removeLayer('cedar-cells-fill'); } catch { /* ignore */ }
+          }
+        } else {
+          if (!map.getLayer('cedar-cells-fill')) {
+            map.addLayer({
+              id: 'cedar-cells-fill',
+              type: 'fill-extrusion',
+              source: 'cedar-cells',
+              paint: {
+                'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
+                'fill-extrusion-opacity': 0.55,
+                'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
+                'fill-extrusion-base': 0,
+              },
+            });
+          }
+          if (map.getLayer('cedar-cells-fill-2d')) {
+            try { map.removeLayer('cedar-cells-fill-2d'); } catch { /* ignore */ }
+          }
+        }
+
+        if (!map.getLayer('cedar-cells-border')) {
+          map.addLayer({
+            id: 'cedar-cells-border',
+            type: 'line',
+            source: 'cedar-cells',
+            paint: {
+              'line-color': ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']],
+              'line-width': 0.5,
+              'line-opacity': 0.4,
+            },
+          });
+        }
+      } catch {
+        // ignore
+      }
+
+      // Operator trail line
+      try {
+        if (!map.getSource('trail')) {
+          map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } });
+        }
+        if (!map.getLayer('trail-line')) {
+          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const applyPrefsToMap = () => {
+      const map = mapRef.current;
+      if (!map || !map.isStyleLoaded()) return;
+      const prefs = layerPrefsRef.current;
+
+      setTerrainEnabledSafe(map, prefs.terrain3d);
+      setSkyEnabledSafe(map, prefs.sky);
+      setLayerVisibilitySafe(map, 'naip-ndvi-overlay', prefs.ndvi);
+
+      // Hide/show labels and roads by toggling relevant style layers.
+      setStyleGroupVisibility(
+        map,
+        (l) =>
+          (l.type === 'symbol' &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            typeof (l as any)?.layout?.['text-field'] !== 'undefined') ||
+          l.id.includes('label'),
+        !prefs.hideLabels,
+      );
+      setStyleGroupVisibility(
+        map,
+        (l) =>
+          l.id.includes('road') ||
+          l.id.includes('bridge') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          typeof (l as any)?.['source-layer'] === 'string' && String((l as any)['source-layer']).includes('road'),
+        !prefs.hideRoads,
+      );
+    };
 
     let map: mapboxgl.Map;
     try {
       map = new mapboxgl.Map({
         container,
-        style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
+        style: styleUrl(layerPrefsRef.current.baseStyle ?? (coarsePointer ? 'satellite' : 'satellite-streets')),
         center: bid.propertyCenter,
         zoom: bid.mapZoom,
         pitch: coarsePointer ? 0 : 45,
@@ -244,108 +566,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.resize();
     });
 
-    map.on('load', () => {
-      // High fidelity terrain/sky only on non-coarse pointer devices.
-      if (!coarsePointer) {
-        try {
-          map.addSource('mapbox-dem', {
-            type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
-          });
-          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
-          map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
-        } catch {
-          // If terrain fails, keep going with base map only.
-        }
-      }
-
-      // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
-      if (!coarsePointer) {
-        try {
-          map.addSource('naip-ndvi', {
-            type: 'raster',
-            tiles: [
-              'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
-            ],
-            tileSize: 256,
-          });
-          map.addLayer({
-            id: 'naip-ndvi-overlay',
-            type: 'raster',
-            source: 'naip-ndvi',
-            paint: { 'raster-opacity': 0.85 },
-            layout: { visibility: 'none' },
-          });
-        } catch {
-          // Optional overlay; ignore if it fails.
-        }
-      }
-
-      // Pasture polygon outlines with holographic green glow
-      const pastureFeatures: GeoJSON.Feature[] = bid.pastures
-        .filter(p => p.polygon.geometry.coordinates.length > 0)
-        .map(p => ({
-          type: 'Feature', geometry: p.polygon.geometry,
-          properties: { name: p.name, color: '#00ff41' },
-        }));
-
-      map.addSource('pastures', { type: 'geojson', data: { type: 'FeatureCollection', features: pastureFeatures } });
-      map.addLayer({ id: 'pastures-fill', type: 'fill', source: 'pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.05 } });
-      map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
-      map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
-
-      // Cedar grid cells — fill-extrusion with holographic coloring
-      const allCedarFeatures: GeoJSON.Feature[] = [];
-      for (const p of bid.pastures) {
-        if (!p.cedarAnalysis?.gridCells?.features) continue;
-        p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
-          const cls = f.properties?.classification;
-          if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
-          const cellId = `${p.id}:${idx}`;
-          const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
-          allCedarFeatures.push({
-            ...f,
-            properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
-          });
-        });
-      }
-
-      map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
-
-      if (coarsePointer) {
-        // 2D fill on iPad/field devices for stability/perf
-        map.addLayer({
-          id: 'cedar-cells-fill-2d',
-          type: 'fill',
-          source: 'cedar-cells',
-          paint: {
-            'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
-            'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
-          },
-        });
-      } else {
-        map.addLayer({
-          id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
-          paint: {
-            'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
-            'fill-extrusion-opacity': 0.55,
-            'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
-            'fill-extrusion-base': 0,
-          },
-        });
-      }
-
-      map.addLayer({
-        id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
-        paint: {
-          'line-color': ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']],
-          'line-width': 0.5,
-          'line-opacity': 0.4,
-        },
-      });
-
-      // Operator trail line
-      map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } });
-      map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
+    map.on('style.load', () => {
+      addCustomLayers();
+      applyPrefsToMap();
     });
 
     mapRef.current = map;
@@ -353,14 +576,41 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     return () => { map.remove(); mapRef.current = null; };
   }, [state.bid]);
 
-  // Toggle NDVI overlay visibility
+  // Apply prefs on change (and when style reloads)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const layerId = 'naip-ndvi-overlay';
-    if (!map.getLayer(layerId)) return;
-    map.setLayoutProperty(layerId, 'visibility', ndviEnabled ? 'visible' : 'none');
-  }, [ndviEnabled]);
+    if (!map) return;
+    const apply = () => {
+      if (!map.isStyleLoaded()) return;
+      const prefs = layerPrefsRef.current;
+      setTerrainEnabledSafe(map, prefs.terrain3d);
+      setSkyEnabledSafe(map, prefs.sky);
+      setLayerVisibilitySafe(map, 'naip-ndvi-overlay', prefs.ndvi);
+      setStyleGroupVisibility(
+        map,
+        (l) =>
+          (l.type === 'symbol' &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            typeof (l as any)?.layout?.['text-field'] !== 'undefined') ||
+          l.id.includes('label'),
+        !prefs.hideLabels,
+      );
+      setStyleGroupVisibility(
+        map,
+        (l) =>
+          l.id.includes('road') ||
+          l.id.includes('bridge') ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          typeof (l as any)?.['source-layer'] === 'string' && String((l as any)['source-layer']).includes('road'),
+        !prefs.hideRoads,
+      );
+    };
+    apply();
+    map.on('styledata', apply);
+    return () => {
+      try { map.off('styledata', apply); } catch { /* ignore */ }
+    };
+  }, [layerPrefs]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -637,16 +887,115 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setNdviEnabled((v) => !v)}
+              onClick={() => setLayersOpen((v) => !v)}
               className="text-[10px] font-mono text-[#a98a7d] hover:text-white border border-green-900/40 px-2 py-1 rounded"
-              title="Toggle NDVI overlay"
+              title="Map layers and filters"
             >
-              {ndviEnabled ? 'NDVI_ON' : 'NDVI_OFF'}
+              {layersOpen ? 'LAYERS_CLOSE' : 'LAYERS'}
             </button>
             <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[10px] font-mono text-[#a98a7d]">
               {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Layers panel */}
+      {bid && layersOpen && (
+        <div className="absolute top-12 right-3 z-20 w-[92vw] max-w-sm border border-green-900/40 bg-[#0b120d]/90 backdrop-blur-md rounded-lg p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Layers</div>
+            <button onClick={() => setLayersOpen(false)} className="text-[#a98a7d] hover:text-white text-xs">✕</button>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[10px] text-[#a98a7d] uppercase tracking-widest">Base map</div>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { id: 'satellite-streets', label: 'SAT+LABELS' },
+                { id: 'satellite', label: 'SAT_ONLY' },
+                { id: 'outdoors', label: 'OUTDOORS' },
+              ] as Array<{ id: OperatorBaseStyle; label: string }>).map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    setLayerPrefs((p) => {
+                      const next = { ...p, baseStyle: opt.id };
+                      const map = mapRef.current;
+                      if (map) {
+                        try { map.setStyle(styleUrl(opt.id)); } catch { /* ignore */ }
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`px-2 py-2 rounded border text-[10px] font-mono ${
+                    layerPrefs.baseStyle === opt.id
+                      ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]'
+                      : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, terrain3d: !p.terrain3d }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.terrain3d ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="3D terrain (best with map pitch)"
+            >
+              {layerPrefs.terrain3d ? 'TERRAIN_3D_ON' : 'TERRAIN_3D_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, sky: !p.sky }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.sky ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+            >
+              {layerPrefs.sky ? 'SKY_ON' : 'SKY_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, ndvi: !p.ndvi }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.ndvi ? 'border-[#FF6B00] text-[#FF6B00] bg-[#1b0f06]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Vegetation index overlay (may appear dark depending on imagery)"
+            >
+              {layerPrefs.ndvi ? 'NDVI_ON' : 'NDVI_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, hideLabels: !p.hideLabels }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.hideLabels ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Hide map labels"
+            >
+              {layerPrefs.hideLabels ? 'LABELS_HIDDEN' : 'LABELS_VISIBLE'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, hideRoads: !p.hideRoads }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.hideRoads ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Hide road/bridge layers"
+            >
+              {layerPrefs.hideRoads ? 'ROADS_HIDDEN' : 'ROADS_VISIBLE'}
+            </button>
+            <button
+              onClick={() => {
+                const coarse = coarsePointerRef.current;
+                setLayerPrefs(defaultPrefs(coarse));
+              }}
+              className="px-3 py-2 rounded border border-green-900/40 text-[10px] font-mono text-[#a98a7d] hover:text-white"
+              title="Reset layers to defaults for this device"
+            >
+              RESET_DEFAULTS
+            </button>
           </div>
         </div>
       )}
