@@ -371,7 +371,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
               map.addSource('mapbox-dem', {
                 type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
               });
-              map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
               map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
             } catch {
               // terrain optional
@@ -391,7 +390,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
               id: 'soil-overlay',
               type: 'raster',
               source: 'soil-wms',
-              paint: { 'raster-opacity': 0.45 },
+              paint: { 'raster-opacity': 1.0 },
               layout: { visibility: 'none' },
             });
           } catch { /* optional */ }
@@ -573,23 +572,26 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    const layerMap: Record<OperatorLayerKey, string> = {
-      soil: 'soil-overlay',
-      naipNDVI: 'naip-ndvi-overlay',
-      naipCIR: 'naip-cir-overlay',
-      terrain3d: '',
-    };
+    // NDVI and CIR
+    if (map.getLayer('naip-ndvi-overlay')) {
+      map.setLayoutProperty('naip-ndvi-overlay', 'visibility', operatorLayers.naipNDVI ? 'visible' : 'none');
+    }
+    if (map.getLayer('naip-cir-overlay')) {
+      map.setLayoutProperty('naip-cir-overlay', 'visibility', operatorLayers.naipCIR ? 'visible' : 'none');
+    }
 
-    for (const [key, layerId] of Object.entries(layerMap)) {
-      if (layerId && map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, 'visibility', operatorLayers[key as OperatorLayerKey] ? 'visible' : 'none');
+    // Soil — always on top at full opacity when visible
+    if (map.getLayer('soil-overlay')) {
+      map.setLayoutProperty('soil-overlay', 'visibility', operatorLayers.soil ? 'visible' : 'none');
+      if (operatorLayers.soil) {
+        map.moveLayer('soil-overlay');
       }
     }
 
-    // 3D terrain toggle
+    // 3D terrain — 2x exaggeration
     if (operatorLayers.terrain3d) {
       if (map.getSource('mapbox-dem')) {
-        try { map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 }); } catch { /* */ }
+        try { map.setTerrain({ source: 'mapbox-dem', exaggeration: 2.0 }); } catch { /* */ }
       }
     } else {
       try { map.setTerrain(null as unknown as mapboxgl.TerrainSpecification); } catch { /* */ }
