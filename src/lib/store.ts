@@ -9,6 +9,8 @@ import {
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
 import { extractTreesFromAnalysis } from '@/lib/tree-layer';
+import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
+import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -85,7 +87,15 @@ interface BidStore {
   drawingMode: boolean;
 
   // Analysis progress
-  analysisProgress: { active: boolean; step: string; detail: string } | null;
+  analysisProgress: {
+    active: boolean;
+    step: string;
+    detail: string;
+    /** 0–100 when known (spectral chunking); omit for indeterminate */
+    progressPct?: number;
+    /** Short labels for what the pipeline is doing */
+    processLines?: string[];
+  } | null;
 
   // All saved bids (local storage for Phase 1)
   savedBids: BidSummary[];
@@ -392,32 +402,135 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (!pasture || pasture.acreage === 0) return;
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
+    const spectralProcessLines = [
+      'Partition pasture into regions sized for reliable NAIP sampling',
+      'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
+      'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
+      'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
+      'Overlapping-tile consensus to stabilize class boundaries',
+    ];
+
     try {
-      set({ analysisProgress: { active: true, step: 'Running spectral analysis...', detail: `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution` } });
-      const res = await fetch('/api/cedar-detect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          coordinates: pasture.polygon.geometry.coordinates,
-          acreage: pasture.acreage,
-        }),
+      const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
+      const totalChunks = chunkCoords.length;
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Spectral analysis (NAIP)',
+          detail:
+            totalChunks > 1
+              ? `Large pasture: analyzing ${totalChunks} regions sequentially (~${Math.round(pasture.acreage)} acres total, 15 m cells). This can take several minutes.`
+              : `Sampling NAIP imagery across ~${Math.round(pasture.acreage)} acres at 15 m resolution.`,
+          progressPct: 0,
+          processLines: spectralProcessLines,
+        },
       });
-      if (!res.ok) {
-        set({ analysisProgress: null });
-        return;
+
+      const parts: CedarAnalysis[] = [];
+
+      for (let i = 0; i < chunkCoords.length; i++) {
+        const coords = chunkCoords[i];
+        const chunkAcres = polygonAcreage(coords);
+        const pctWhileFetching = Math.min(88, Math.round(((i + 0.35) / totalChunks) * 88));
+
+        set({
+          analysisProgress: {
+            active: true,
+            step: 'Spectral analysis (NAIP)',
+            detail: `Region ${i + 1} of ${totalChunks}: requesting multispectral pixels from USGS (~${Math.round(chunkAcres)} ac in this region)…`,
+            progressPct: Math.round((i / totalChunks) * 85),
+            processLines: [
+              ...spectralProcessLines.slice(0, 2),
+              `Current: region ${i + 1}/${totalChunks} — NAIP identify batches (server)`,
+              ...spectralProcessLines.slice(2),
+            ],
+          },
+        });
+
+        const res = await fetch('/api/cedar-detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coordinates: coords,
+            acreage: chunkAcres,
+          }),
+        });
+
+        set({
+          analysisProgress: {
+            active: true,
+            step: 'Spectral analysis (NAIP)',
+            detail: `Region ${i + 1} of ${totalChunks}: classifying vegetation and applying spatial consensus…`,
+            progressPct: pctWhileFetching,
+            processLines: spectralProcessLines,
+          },
+        });
+
+        if (!res.ok) {
+          set({
+            analysisProgress: {
+              active: true,
+              step: 'Spectral analysis failed',
+              detail: `Region ${i + 1} of ${totalChunks} could not be analyzed. Try again or split the pasture into smaller polygons.`,
+              progressPct: undefined,
+              processLines: undefined,
+            },
+          });
+          setTimeout(() => set({ analysisProgress: null }), 6000);
+          return;
+        }
+
+        const chunkData: CedarAnalysis = await res.json();
+        parts.push(chunkData);
       }
-      set({ analysisProgress: { active: true, step: 'Processing results...', detail: 'Classifying vegetation: cedar, oak, grass, brush, bare ground' } });
-      const data: CedarAnalysis = await res.json();
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Merging spectral results',
+          detail:
+            totalChunks > 1
+              ? `Combining ${totalChunks} regions and deduplicating edge cells…`
+              : 'Finalizing summary statistics…',
+          progressPct: 92,
+          processLines: spectralProcessLines,
+        },
+      });
+
+      const data: CedarAnalysis =
+        parts.length === 1 ? parts[0] : mergeCedarAnalyses(parts, pasture.acreage);
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Processing results',
+          detail: 'Aggregating cedar / oak / brush / grass / bare fractions for pricing',
+          progressPct: 95,
+          processLines: spectralProcessLines,
+        },
+      });
+
       get().updatePasture(pastureId, { cedarAnalysis: data });
 
-      // Auto-mark all cedar trees as "remove" by default
-      set({ analysisProgress: { active: true, step: 'Generating tree positions...', detail: 'Placing 3D trees based on spectral classification results' } });
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Generating tree positions',
+          detail: 'Placing 3D tree instances from spectral cedar / oak cells',
+          progressPct: 97,
+          processLines: spectralProcessLines,
+        },
+      });
+
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
-        const trees = extractTreesFromAnalysis([{
-          cedarAnalysis: data,
-          density: updatedPasture.density,
-        }]);
+        const trees = extractTreesFromAnalysis([
+          {
+            cedarAnalysis: data,
+            density: updatedPasture.density,
+          },
+        ]);
         const cedarTrees: MarkedTree[] = trees
           .filter((t) => t.species === 'cedar')
           .map((t) => ({
@@ -431,15 +544,38 @@ export const useBidStore = create<BidStore>((set, get) => ({
             canopyDiameter: t.canopyDiameter,
           }));
         if (cedarTrees.length > 0) {
-          set({ analysisProgress: { active: true, step: 'Auto-marking cedars...', detail: `Marking ${cedarTrees.length} cedar trees for removal` } });
+          set({
+            analysisProgress: {
+              active: true,
+              step: 'Auto-marking cedars',
+              detail: `Marking ${cedarTrees.length} cedar trees for removal (you can adjust in the map)`,
+              progressPct: 98,
+              processLines: spectralProcessLines,
+            },
+          });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
       }
-      set({ analysisProgress: { active: true, step: 'Analysis complete!', detail: `Found ${data.summary.cedar.pct}% cedar across ${data.summary.totalSamples} sample points` } });
-      // Clear after a brief moment so user sees the completion
-      setTimeout(() => set({ analysisProgress: null }), 2000);
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Analysis complete',
+          detail: `Cedar ~${data.summary.cedar.pct}% of samples (${data.summary.totalSamples} cells). Estimated cedar acres for mulching: ~${data.summary.estimatedCedarAcres} of ${Math.round(pasture.acreage)} ac pasture.`,
+          progressPct: 100,
+          processLines: undefined,
+        },
+      });
+      setTimeout(() => set({ analysisProgress: null }), 3200);
     } catch {
-      set({ analysisProgress: null });
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Spectral analysis error',
+          detail: 'An unexpected error occurred. Check your connection and try re-drawing the pasture.',
+        },
+      });
+      setTimeout(() => set({ analysisProgress: null }), 5000);
     }
   },
 

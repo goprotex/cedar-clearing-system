@@ -1095,23 +1095,40 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {/* Analysis progress overlay */}
       {analysisProgress?.active && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <div className="bg-slate-900/90 backdrop-blur-sm border border-green-500/30 rounded-xl shadow-2xl px-8 py-6 max-w-sm text-center space-y-3 pointer-events-auto">
-            {/* Spinner */}
+          <div className="bg-slate-900/90 backdrop-blur-sm border border-green-500/30 rounded-xl shadow-2xl px-8 py-6 max-w-md text-left space-y-3 pointer-events-auto">
             <div className="flex justify-center">
               <div className="w-10 h-10 border-3 border-green-500/30 border-t-green-400 rounded-full animate-spin" />
             </div>
-            {/* Step */}
-            <div className="text-green-300 font-semibold text-sm">
+            <div className="text-green-300 font-semibold text-sm text-center">
               {analysisProgress.step}
             </div>
-            {/* Detail */}
-            <div className="text-slate-400 text-xs leading-relaxed">
+            <div className="text-slate-400 text-xs leading-relaxed text-center">
               {analysisProgress.detail}
             </div>
-            {/* Pulse bar */}
-            <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full animate-pulse" style={{ width: '100%' }} />
+            {analysisProgress.processLines && analysisProgress.processLines.length > 0 && (
+              <ul className="text-slate-500 text-[11px] leading-snug space-y-1 border-t border-slate-700/80 pt-3 mt-1 list-disc pl-4">
+                {analysisProgress.processLines.map((line, idx) => (
+                  <li key={idx}>{line}</li>
+                ))}
+              </ul>
+            )}
+            <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-[width] duration-500 ease-out ${
+                  analysisProgress.progressPct === undefined ? 'animate-pulse w-full' : ''
+                }`}
+                style={
+                  analysisProgress.progressPct !== undefined
+                    ? { width: `${analysisProgress.progressPct}%` }
+                    : undefined
+                }
+              />
             </div>
+            {analysisProgress.progressPct !== undefined && (
+              <div className="text-center text-[10px] text-slate-500 tabular-nums">
+                {analysisProgress.progressPct}% complete
+              </div>
+            )}
           </div>
         </div>
       )}
