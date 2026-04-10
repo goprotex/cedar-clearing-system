@@ -3,6 +3,7 @@ import type { CedarAnalysis, CedarAnalysisSummary, CedarVegClass } from '@/types
 import { blobDiameterMeters, metersPerPixel, pixelToLngLat } from '@/lib/cir-object-detect';
 import type { CirBlobFeatures } from '@/lib/cir-blob-features';
 import { classifyCrownFromCirFeatures } from '@/lib/cir-crown-classify';
+import { loadCirCalibration } from '@/lib/cir-calibration';
 
 function squareCellAround(lng: number, lat: number, halfSizeM: number): GeoJSON.Position[][] {
   const km = halfSizeM / 1000;
@@ -47,6 +48,7 @@ export function buildCedarAnalysisFromCirBlobs(
   const [minLng, minLat, maxLng, maxLat] = bbox;
   const pasture = turf.polygon(polygonCoords);
   const mpp = metersPerPixel(minLng, maxLng, minLat, maxLat, imageW, imageH);
+  const calibration = loadCirCalibration();
 
   type Row = {
     lng: number;
@@ -65,7 +67,7 @@ export function buildCedarAnalysisFromCirBlobs(
     const pt = turf.point([lng, lat]);
     if (!turf.booleanPointInPolygon(pt, pasture)) continue;
     const dM = blobDiameterMeters(b.pixelCount, mpp);
-    const { classification, confidence, bandVotes } = classifyCrownFromCirFeatures(b);
+    const { classification, confidence, bandVotes } = classifyCrownFromCirFeatures(b, calibration);
     inside.push({
       lng,
       lat,

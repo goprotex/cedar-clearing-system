@@ -8,6 +8,7 @@ import BidSummary from '@/components/bid/BidSummary';
 import BidDetails from '@/components/bid/BidDetails';
 import BidOptions from '@/components/bid/BidOptions';
 import RateCardSettings from '@/components/bid/RateCardSettings';
+import CedarCalibratorPanel from '@/components/bid/CedarCalibratorPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -303,8 +304,9 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
             </TabsContent>
 
             <TabsContent value="settings" className="flex-1 min-h-0 overflow-y-auto mt-0">
-              <div className="px-3 py-3 pb-4">
+              <div className="px-3 py-3 pb-4 space-y-6">
                 <RateCardSettings />
+                <CedarCalibratorPanel />
               </div>
             </TabsContent>
           </Tabs>
