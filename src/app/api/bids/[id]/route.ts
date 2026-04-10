@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
+import { rowToBid, rowToPasture, type BidRow, type PastureRow } from '@/lib/db';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,16 +13,16 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: bid, error: bidErr } = await supabase
+  const { data: bidRow, error: bidErr } = await supabase
     .from('bids')
     .select('*')
     .eq('id', id)
     .maybeSingle();
 
   if (bidErr) return NextResponse.json({ error: bidErr.message }, { status: 500 });
-  if (!bid) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!bidRow) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: pastures, error: pasturesErr } = await supabase
+  const { data: pastureRows, error: pasturesErr } = await supabase
     .from('pastures')
     .select('*')
     .eq('bid_id', id)
@@ -29,7 +30,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   if (pasturesErr) return NextResponse.json({ error: pasturesErr.message }, { status: 500 });
 
-  return NextResponse.json({ bid, pastures: pastures ?? [] });
+  const pastures = (pastureRows ?? []).map((r: PastureRow) => rowToPasture(r));
+  const bid = rowToBid(bidRow as BidRow, pastures);
+
+  return NextResponse.json({ bid });
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {

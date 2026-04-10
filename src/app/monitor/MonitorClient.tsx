@@ -145,7 +145,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           filter: `job_id=in.(${jobIds.join(',')})`,
         },
         (payload) => {
-          const row = payload.new as { job_id: string; user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string } | null;
+          const row = payload.new as { job_id: string; user_id: string; lng: number; lat: number; heading_deg: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string } | null;
           if (!row) return;
           if (typeof row.job_id !== 'string' || typeof row.user_id !== 'string') return;
           if (typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
@@ -161,7 +161,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               user_id: userId,
               lng: row.lng,
               lat: row.lat,
-              heading: typeof row.heading === 'number' ? row.heading : null,
+              heading: typeof row.heading_deg === 'number' ? row.heading_deg : null,
               speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
               accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
               updated_at: row.updated_at,

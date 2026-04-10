@@ -59,7 +59,15 @@ export async function GET() {
 
   const operatorsByJob: Record<string, unknown[]> = {};
   for (const row of operators ?? []) {
-    (operatorsByJob[row.job_id] ??= []).push(row);
+    (operatorsByJob[row.job_id] ??= []).push({
+      user_id: row.user_id,
+      lng: row.lng,
+      lat: row.lat,
+      heading: row.heading_deg ?? null,
+      speed_mps: row.speed_mps ?? null,
+      accuracy_m: row.accuracy_m ?? null,
+      updated_at: row.updated_at,
+    });
   }
 
   return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], clearedByJob, operatorsByJob });
