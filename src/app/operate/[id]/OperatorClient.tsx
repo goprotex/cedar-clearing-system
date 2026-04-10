@@ -7,6 +7,7 @@ import Link from 'next/link';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
+import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
@@ -354,6 +355,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     let cancelled = false;
     (async () => {
       try {
+        // Avoid noisy 401s when the operator is not logged in.
+        // If unauthenticated, keep shared mode off and use local progress.
+        const supabase = createSupabaseClient();
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (userErr || !userData.user) {
+          setSharedEnabled(false);
+          setSharedStatus('unauth');
+          return;
+        }
+
         setSharedStatus('syncing');
         const jobId = jobIdFromBidId(bidId);
         const res = await fetch(`/api/jobs/${jobId}/cleared-cells`, { cache: 'no-store' });
