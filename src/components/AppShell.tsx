@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/components/AuthProvider';
 
 const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
@@ -27,28 +27,12 @@ const HEADER_NAV = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const { email: authEmail } = useAuth();
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [mobileMenuOpen]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      setAuthEmail(data.user?.email ?? null);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthEmail(session?.user?.email ?? null);
-    });
-    return () => {
-      cancelled = true;
-      sub?.subscription.unsubscribe();
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
