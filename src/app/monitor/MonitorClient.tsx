@@ -92,6 +92,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     cedarAI: true,
     radar: true,
     pastures: true,
+    hologram: false,
   });
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
@@ -108,6 +109,16 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           next.naipNDVI = false;
         }
       }
+      // Hologram on → disable terrain (they conflict), enable cedar + NDVI
+      if (key === 'hologram' && !prev.hologram) {
+        next.terrain3d = false;
+        next.cedarAI = true;
+        next.naipNDVI = true;
+        next.naip = false;
+        next.naipCIR = false;
+      }
+      // Block terrain while hologram active
+      if (key === 'terrain3d' && prev.hologram) return prev;
       next[key] = !prev[key];
       return next;
     });
@@ -256,6 +267,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     { key: 'naipCIR', label: '🔴 CIR', group: 'imagery' },
     { key: 'naipNDVI', label: '🌿 NDVI', group: 'imagery' },
     { key: 'terrain3d', label: '⛰️ 3D Terrain' },
+    { key: 'hologram', label: '🔮 Hologram' },
   ];
 
   return (
