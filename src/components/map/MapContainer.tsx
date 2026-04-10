@@ -1121,6 +1121,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                   {analysisProgress.phase === 'grid' ? 'GRID' :
                    analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
                    analysisProgress.phase === 'consensus' ? 'TILE_CONSENSUS' :
+                   analysisProgress.phase === 'sentinel' ? 'S2_FUSION' :
                    analysisProgress.phase === 'building' ? 'BUILD_GRID' :
                    analysisProgress.phase === 'applying' ? 'APPLY_MAP' :
                    analysisProgress.phase === 'trees' ? 'TREES_3D' :

@@ -135,6 +135,17 @@ export interface CedarAnalysisSummary {
   cellHalfLngDeg?: number;
   cellHalfLatDeg?: number;
   tileConsensus?: TileConsensusStats;
+  /** Cells where NAIP + texture + Sentinel fusion scored trust below threshold */
+  lowTrustCells?: number;
+  lowTrustPct?: number;
+  sentinelFusion?: {
+    used: boolean;
+    pairedSamples: number;
+    winterDate?: string;
+    summerDate?: string;
+    winterSceneId?: string;
+    summerSceneId?: string;
+  };
 }
 
 export interface CedarAnalysis {

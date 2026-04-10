@@ -309,19 +309,20 @@ export function extractTreesFromAnalysis(
         const lng = minLng + rand() * (maxLng - minLng);
         const lat = minLat + rand() * (maxLat - minLat);
 
-        // Scale tree size by NDVI — higher NDVI = taller, wider canopy
-        const ndviScale = 0.7 + Math.min(ndvi, 0.7) * 1.0; // 0.7–1.4
+        // Scale tree size by NDVI — higher NDVI = slightly taller (within species-realistic caps)
+        const ndviScale = 0.72 + Math.min(ndvi, 0.65) * 0.55; // ~0.72–1.08 — avoids cartoon-tall trees
 
         let height: number, canopy: number;
         if (species === 'cedar') {
-          height = (4 + rand() * 8) * ndviScale;    // ~3-17m
-          canopy = (3 + rand() * 5) * ndviScale;    // ~2-11m
+          // Ashe juniper / eastern red cedar: most mature stems ~5–12 m in pasture/woodland; keep distribution there
+          height = (4 + rand() * 4.5) * ndviScale; // ~3–11 m
+          canopy = (2.5 + rand() * 3.2) * ndviScale;
         } else if (species === 'oak') {
-          height = (5 + rand() * 7) * ndviScale;    // ~3.5-17m
-          canopy = (5 + rand() * 7) * ndviScale;    // ~3.5-17m
+          height = (5 + rand() * 7) * ndviScale; // ~3.6–12 m
+          canopy = (4 + rand() * 6) * ndviScale;
         } else {
-          height = (3 + rand() * 5) * ndviScale;    // ~2-11m
-          canopy = (3 + rand() * 4) * ndviScale;    // ~2-10m
+          height = (3 + rand() * 5) * ndviScale;
+          canopy = (3 + rand() * 4) * ndviScale;
         }
 
         trees.push({

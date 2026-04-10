@@ -424,6 +424,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
         body: JSON.stringify({
           coordinates: pasture.polygon.geometry.coordinates,
           acreage: pasture.acreage,
+          month: new Date().getMonth() + 1,
+          latitude: pasture.centroid[1],
         }),
       });
 

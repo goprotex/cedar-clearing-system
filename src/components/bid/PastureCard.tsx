@@ -338,7 +338,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
             {/* Spectral Analysis */}
             <div className="text-[#a98a7d] bg-[#201f1f] border border-[#353534] p-2 space-y-1">
               <div className="font-bold text-[#ffb693] uppercase flex items-center justify-between">
-                <span>📊 SPECTRAL_ANALYSIS (NAIP)</span>
+                <span>📊 SPECTRAL (NAIP + S2 + texture)</span>
                 <Badge variant="outline" className="text-[10px]">
                   {pasture.cedarAnalysis.summary.confidence}% conf
                 </Badge>
@@ -370,6 +370,17 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
               {pasture.cedarAnalysis.summary.tileConsensus && (
                 <div className="text-[10px] text-muted-foreground">
                   Tile consensus: {pasture.cedarAnalysis.summary.tileConsensus.tileCount} tiles ({pasture.cedarAnalysis.summary.tileConsensus.tileSizeM}m, {pasture.cedarAnalysis.summary.tileConsensus.tileOverlapPct}% overlap) · {pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedCells} cells refined ({pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedPct}%)
+                </div>
+              )}
+              {(pasture.cedarAnalysis.summary.lowTrustPct ?? 0) > 0 && (
+                <div className="text-[10px] text-orange-500 font-medium">
+                  Low-trust cells (orange on map): {pasture.cedarAnalysis.summary.lowTrustPct}% ({pasture.cedarAnalysis.summary.lowTrustCells} cells)
+                </div>
+              )}
+              {pasture.cedarAnalysis.summary.sentinelFusion?.used && (
+                <div className="text-[10px] text-muted-foreground">
+                  Sentinel-2: winter {pasture.cedarAnalysis.summary.sentinelFusion.winterDate ?? '—'} · summer{' '}
+                  {pasture.cedarAnalysis.summary.sentinelFusion.summerDate ?? '—'} ({pasture.cedarAnalysis.summary.sentinelFusion.pairedSamples} subsample points)
                 </div>
               )}
             </div>

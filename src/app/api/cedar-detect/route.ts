@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
+import { computeLocalNdviVariance } from '@/lib/spectral-texture';
+import { isCentralTexasHillCountry } from '@/lib/spectral-region';
+import {
+  findSentinelScene,
+  sampleNdviFromSceneItem,
+  sceneMeta,
+} from '@/lib/sentinel-sample-ndvi';
+import {
+  fuseNaipWithTextureAndSentinel,
+  nearestSubsampleSlot,
+  type SpectralVegClass,
+} from '@/lib/spectral-fusion';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 min — thorough spectral analysis
+export const maxDuration = 420; // NAIP + Sentinel-2 paired reads
 
 /** Cap grid points so large pastures stay within serverless time limits (stride-subsample). */
 const MAX_SAMPLE_POINTS = 2800;
@@ -39,6 +51,35 @@ interface SampleResult {
   classification: VegClass;
   confidence: number;
   bandVotes: number; // how many indices agreed on classification (0-4)
+  trustScore?: number;
+  lowTrust?: boolean;
+}
+
+/**
+ * Temperate phenology vs NAIP-style indices: leaf-off oaks need lower GNDVI bars & more NIR:red;
+ * peak leaf season tightens chlorophyll gates to reduce grass mislabeled as oak.
+ */
+interface SeasonTuning {
+  /** Added to oak-path minimum NIR (DN 0–255); negative in dormant = easier oak when canopy is thin */
+  oakMinNirAdjust: number;
+  /** Added to oak-path NIR:red ratio thresholds */
+  oakNirRAdjust: number;
+  /** Multiply oak GNDVI:NDVI cutoffs; &lt;1 in dormant, &gt;1 in full leaf */
+  oakGndviRatioScale: number;
+}
+
+function getSeasonTuning(calendarMonth: number, latitude: number): SeasonTuning {
+  let m = Math.min(12, Math.max(1, Math.round(calendarMonth)));
+  if (latitude < 0) {
+    m = ((m + 5) % 12) + 1;
+  }
+  if (m === 12 || m <= 2) {
+    return { oakMinNirAdjust: -12, oakNirRAdjust: -0.045, oakGndviRatioScale: 0.88 };
+  }
+  if (m === 3 || m === 4 || m === 11) {
+    return { oakMinNirAdjust: -5, oakNirRAdjust: -0.02, oakGndviRatioScale: 0.95 };
+  }
+  return { oakMinNirAdjust: 4, oakNirRAdjust: 0.025, oakGndviRatioScale: 1.05 };
 }
 
 // ── Band index computation ──
@@ -62,7 +103,8 @@ function classifyVegetation(
   g: number,
   b: number,
   nir: number | null,
-  ndvi: number
+  ndvi: number,
+  season: SeasonTuning
 ): { classification: VegClass; confidence: number; bandVotes: number; gndvi: number; savi: number } {
   // RGB-only fallback (no NIR band)
   if (nir === null) {
@@ -75,7 +117,14 @@ function classifyVegetation(
 
   const idx = computeIndices(r, g, b, nir);
   const brightness = (r + g + b) / 3;
-  const redGreenRatio = r / Math.max(g, 1);
+  /** NIR vs red — hardwood canopies often sit ~1.05–1.5+; juniper can be flatter in the red channel. */
+  const nirR = nir / Math.max(r, 1);
+  /** Chlorophyll structure — broadleaf oaks often show a healthier GNDVI:NDVI than needle juniper. */
+  const gndviNdvi = idx.gndvi / Math.max(idx.ndvi, 0.01);
+
+  const mn = (base: number) => Math.max(42, Math.min(245, base + season.oakMinNirAdjust));
+  const mr = (base: number) => base + season.oakNirRAdjust;
+  const mg = (base: number) => base * season.oakGndviRatioScale;
 
   // ── Pass 1: Bare ground — must be VERY BRIGHT + low NDVI ──
   if (idx.ndvi < 0.08 && brightness > 130) {
@@ -90,15 +139,18 @@ function classifyVegetation(
 
   // Low NDVI but not very bright → could be cedar shadow or oak understory
   if (idx.ndvi < 0.08 && brightness <= 130) {
-    // Check for oak first: high NIR + moderate brightness = deciduous canopy even at low NDVI
-    if (nir >= 130 && brightness >= 95) {
+    // Oak: dormant / sparse canopy — rely on NIR:red and chlorophyll ratio, not only raw NIR > 130
+    if (nir >= mn(105) && brightness >= 86) {
       let oakVotes = 0;
-      if (nir >= 160) oakVotes++;
-      if (nir >= 130) oakVotes++;
-      if (r >= 80) oakVotes++;
-      if (brightness >= 110) oakVotes++;
-      if (oakVotes >= 2) {
-        const conf = Math.min(0.65, 0.35 + oakVotes * 0.08);
+      if (nir >= mn(150)) oakVotes += 2;
+      else if (nir >= mn(120)) oakVotes++;
+      if (nirR >= mr(1.14)) oakVotes += 2;
+      else if (nirR >= mr(1.0)) oakVotes++;
+      if (gndviNdvi > mg(0.52)) oakVotes++;
+      if (g > r * 1.02) oakVotes++;
+      if (brightness >= 100) oakVotes++;
+      if (oakVotes >= 3 || (oakVotes >= 2 && nirR >= mr(1.06))) {
+        const conf = Math.min(0.68, 0.34 + oakVotes * 0.07);
         return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
       }
     }
@@ -112,16 +164,19 @@ function classifyVegetation(
 
   // ── Pass 2: Low-moderate NDVI (0.08-0.22) ──
   if (idx.ndvi >= 0.08 && idx.ndvi < 0.22) {
-    // Oak check: bright NIR + moderate-bright canopy = deciduous hardwood
-    if (nir >= 130 && brightness >= 100) {
+    // Oak: leaf-on hardwood — lower NIR floor than before; require NIR:red + GNDVI signal
+    if (nir >= mn(110) && brightness >= 88) {
       let oakVotes = 0;
-      if (nir >= 160) oakVotes++;
-      if (nir >= 130) oakVotes++;
-      if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.80) oakVotes++;
-      if (brightness >= 110) oakVotes++;
-      if (r >= 80) oakVotes++;
-      if (oakVotes >= 3) {
-        const conf = Math.min(0.75, 0.4 + oakVotes * 0.08);
+      if (nir >= mn(150)) oakVotes += 2;
+      else if (nir >= mn(118)) oakVotes++;
+      if (gndviNdvi > mg(0.68)) oakVotes += 2;
+      else if (gndviNdvi > mg(0.55)) oakVotes++;
+      if (nirR >= mr(1.08)) oakVotes += 2;
+      else if (nirR >= mr(0.95)) oakVotes++;
+      if (brightness >= 98) oakVotes++;
+      if (g > r) oakVotes++;
+      if (oakVotes >= 4 || (oakVotes >= 3 && nirR >= mr(1.0))) {
+        const conf = Math.min(0.78, 0.38 + oakVotes * 0.06);
         return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
       }
     }
@@ -151,14 +206,18 @@ function classifyVegetation(
     if (idx.gndvi / Math.max(idx.ndvi, 0.01) < 0.95) cedarVotes++;
     if (idx.savi > 0.15) cedarVotes++;
 
-    // Oak escape hatch FIRST
-    if (nir >= 140 && brightness >= 90) {
-      let oakVotes = 1;
-      if (nir >= 160) oakVotes++;
-      if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.85) oakVotes++;
-      if (brightness >= 105) oakVotes++;
-      if (oakVotes >= 2) {
-        const conf = Math.min(0.75, 0.4 + oakVotes * 0.1);
+    // Oak escape hatch FIRST (moderate NDVI woodland oak vs juniper)
+    if (nir >= mn(115) && brightness >= 84) {
+      let oakVotes = 0;
+      if (nir >= mn(148)) oakVotes += 2;
+      else if (nir >= mn(125)) oakVotes++;
+      if (gndviNdvi > mg(0.72)) oakVotes += 2;
+      else if (gndviNdvi > mg(0.58)) oakVotes++;
+      if (nirR >= mr(1.06)) oakVotes += 2;
+      else if (nirR >= mr(0.92)) oakVotes++;
+      if (brightness >= 96) oakVotes++;
+      if (oakVotes >= 3 || (oakVotes >= 2 && nirR >= mr(1.02) && gndviNdvi > mg(0.62))) {
+        const conf = Math.min(0.78, 0.38 + oakVotes * 0.09);
         return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
       }
     }
@@ -176,16 +235,24 @@ function classifyVegetation(
   }
 
   // ── Pass 4: High NDVI (>= 0.35) — dense vegetation ──
-  // CHECK OAK FIRST
-  if (nir >= 140 && brightness >= 85) {
+  // Oak first: broadleaf full canopy — strong NIR:red + chlorophyll balance (not only nir>140)
+  if (nir >= mn(112) && brightness >= 76 && brightness <= 158) {
     let oakVotes = 0;
-    if (nir >= 170) oakVotes++;
-    if (nir >= 140) oakVotes++;
-    if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.80) oakVotes++;
-    if (brightness >= 100) oakVotes++;
-    if (r >= 80) oakVotes++;
-    if (oakVotes >= 3) {
-      const conf = Math.min(0.85, 0.4 + oakVotes * 0.08);
+    if (nirR >= mr(1.18)) oakVotes += 3;
+    else if (nirR >= mr(1.08)) oakVotes += 2;
+    else if (nirR >= mr(0.98)) oakVotes++;
+    if (gndviNdvi >= mg(0.76)) oakVotes += 2;
+    else if (gndviNdvi >= mg(0.66)) oakVotes++;
+    if (nir >= mn(155)) oakVotes++;
+    if (nir >= mn(128)) oakVotes++;
+    if (g > r * 1.04) oakVotes++;
+    if (brightness >= 88 && brightness <= 138) oakVotes++;
+    if (oakVotes >= 5) {
+      const conf = Math.min(0.88, 0.42 + oakVotes * 0.05);
+      return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
+    }
+    if (oakVotes >= 3 && nirR >= mr(1.05)) {
+      const conf = Math.min(0.82, 0.4 + oakVotes * 0.07);
       return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
     }
   }
@@ -206,8 +273,8 @@ function classifyVegetation(
     return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  if (nir >= 130 && brightness >= 85) {
-    return { classification: 'oak', confidence: 0.45, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
+  if (nir >= mn(118) && brightness >= 82 && (nirR >= mr(0.96) || gndviNdvi > mg(0.58))) {
+    return { classification: 'oak', confidence: 0.48, bandVotes: 2, gndvi: idx.gndvi, savi: idx.savi };
   }
 
   return { classification: 'mixed_brush', confidence: 0.45, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
@@ -353,7 +420,7 @@ function applyTileConsensus(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { coordinates, acreage } = body;
+    const { coordinates, acreage, month: bodyMonth, latitude: bodyLat } = body;
 
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
       return NextResponse.json({ error: 'Polygon coordinates required' }, { status: 400 });
@@ -362,6 +429,17 @@ export async function POST(req: NextRequest) {
     const polygon = turf.polygon(coordinates);
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
+
+    const centerFeat = turf.center(polygon);
+    const analysisLat =
+      typeof bodyLat === 'number' && Number.isFinite(bodyLat)
+        ? bodyLat
+        : (centerFeat.geometry.coordinates[1] as number);
+    const analysisMonth =
+      typeof bodyMonth === 'number' && bodyMonth >= 1 && bodyMonth <= 12
+        ? Math.floor(bodyMonth)
+        : new Date().getUTCMonth() + 1;
+    const season = getSeasonTuning(analysisMonth, analysisLat);
 
     const spacingKm = 0.015;
 
@@ -432,7 +510,14 @@ export async function POST(req: NextRequest) {
           let ndvi = 0;
           if (nir !== null && nir + r > 0) ndvi = (nir - r) / (nir + r);
 
-          const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
+          const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(
+            r,
+            g,
+            b,
+            nir,
+            ndvi,
+            season
+          );
           return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
         } catch {
           if (attempt < maxAttempts - 1) {
@@ -512,12 +597,87 @@ export async function POST(req: NextRequest) {
           message: 'Running tile consensus refinement...',
           totalPoints,
           completed: totalPoints,
-          pct: 90,
+          pct: 88,
         });
 
 
         const { refined, tileCount, consensusImprovedCells } =
           applyTileConsensus(results, spacingKm, bbox);
+
+        send('progress', {
+          phase: 'sentinel',
+          message: 'Sentinel-2 summer / winter + texture fusion (Hill Country)',
+          totalPoints,
+          completed: totalPoints,
+          pct: 91,
+        });
+
+        const hillCountry = isCentralTexasHillCountry(bbox);
+        const S2_SUB_CAP = 52;
+        const subStep = Math.max(1, Math.ceil(samplePoints.length / S2_SUB_CAP));
+        const subPoints: GeoJSON.Feature<GeoJSON.Point>[] = [];
+        const subCoords: { lng: number; lat: number }[] = [];
+        for (let si = 0; si < samplePoints.length; si += subStep) {
+          const f = samplePoints[si] as GeoJSON.Feature<GeoJSON.Point>;
+          subPoints.push(f);
+          const [lng, lat] = f.geometry.coordinates;
+          subCoords.push({ lng, lat });
+          if (subPoints.length >= S2_SUB_CAP) break;
+        }
+
+        const textureVars = computeLocalNdviVariance(
+          refined.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
+          bbox,
+          spacingKm
+        );
+
+        const y = new Date().getFullYear();
+        const winterRange = `${y - 2}-12-01/${y}-03-22`;
+        const summerRange = `${y - 2}-05-18/${y - 1}-09-25`;
+
+        const [wScene, sScene] = await Promise.all([
+          findSentinelScene(bbox, winterRange, 32),
+          findSentinelScene(bbox, summerRange, 32),
+        ]);
+
+        let winterVals: (number | null)[] | null = null;
+        let summerVals: (number | null)[] | null = null;
+        if (subPoints.length > 0) {
+          const [wr, sr] = await Promise.all([
+            wScene ? sampleNdviFromSceneItem(wScene, subPoints, bbox) : null,
+            sScene ? sampleNdviFromSceneItem(sScene, subPoints, bbox) : null,
+          ]);
+          winterVals = wr?.values ?? null;
+          summerVals = sr?.values ?? null;
+        }
+
+        for (let i = 0; i < refined.length; i++) {
+          const r = refined[i];
+          const slot =
+            subCoords.length > 0
+              ? nearestSubsampleSlot(r.lng, r.lat, subCoords)
+              : 0;
+          const wv =
+            subCoords.length && winterVals && winterVals[slot] !== undefined
+              ? winterVals[slot]
+              : null;
+          const sv =
+            subCoords.length && summerVals && summerVals[slot] !== undefined
+              ? summerVals[slot]
+              : null;
+          const fused = fuseNaipWithTextureAndSentinel(
+            r.classification as SpectralVegClass,
+            r.confidence,
+            textureVars[i] ?? 0,
+            wv,
+            sv,
+            { hillCountry }
+          );
+          refined[i].classification = fused.classification as VegClass;
+          refined[i].confidence = fused.confidence;
+          refined[i].trustScore = fused.trustScore;
+          refined[i].lowTrust = fused.lowTrust;
+        }
 
         send('progress', {
           phase: 'building',
@@ -552,6 +712,8 @@ export async function POST(req: NextRequest) {
         const avgSavi = refined.reduce((sum, r) => sum + r.savi, 0) / total;
         const highConfCedar = refined.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
 
+        const lowTrustCount = refined.filter((r) => r.lowTrust).length;
+
         const summary = {
           totalSamples: total,
           cedar: { count: cedarCount, pct: Math.round(cedarPct * 100) },
@@ -566,9 +728,19 @@ export async function POST(req: NextRequest) {
           confidence: Math.round(avgConf * 100),
           avgBandVotes: Math.round(avgBandVotes * 10) / 10,
           highConfidenceCedarCells: highConfCedar,
+          lowTrustCells: lowTrustCount,
+          lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
           gridSpacingM: Math.round(spacingKm * 1000),
           cellHalfLngDeg: halfLngDeg,
           cellHalfLatDeg: halfLatDeg,
+          sentinelFusion: {
+            used: Boolean(wScene && sScene && subPoints.length),
+            pairedSamples: subCoords.length,
+            winterDate: wScene ? sceneMeta(wScene).datetime : undefined,
+            summerDate: sScene ? sceneMeta(sScene).datetime : undefined,
+            winterSceneId: wScene?.id,
+            summerSceneId: sScene?.id,
+          },
           tileConsensus: {
             tileCount,
             tileOverlapPct: 60,
@@ -591,6 +763,8 @@ export async function POST(req: NextRequest) {
           classification: s.classification,
           confidence: s.confidence,
           bandVotes: s.bandVotes,
+          trustScore: s.trustScore,
+          lowTrust: s.lowTrust,
         }));
 
         send('result', { summary, samples });

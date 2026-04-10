@@ -10,6 +10,8 @@ export interface SpectralSamplePayload {
   classification: string;
   confidence: number;
   bandVotes: number;
+  trustScore?: number;
+  lowTrust?: boolean;
 }
 
 function spectralCellColor(classification: string, ndvi: number): string {
@@ -60,7 +62,9 @@ export function samplesToGridCells(
         savi: Math.round(s.savi * 1000) / 1000,
         confidence: Math.round(s.confidence * 100) / 100,
         bandVotes: s.bandVotes,
-        color: spectralCellColor(s.classification, s.ndvi),
+        trustScore: s.trustScore,
+        lowTrust: s.lowTrust ?? false,
+        color: s.lowTrust ? '#ea580c' : spectralCellColor(s.classification, s.ndvi),
       },
     })),
   };
