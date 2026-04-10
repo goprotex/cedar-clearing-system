@@ -29,6 +29,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     .limit(50000);
   if (cellsErr) return NextResponse.json({ error: cellsErr.message }, { status: 500 });
 
-  return NextResponse.json({ cells: cells ?? [] });
+  const rows = cells ?? [];
+  const cellIds = rows.map((c) => c.cell_id).filter((id): id is string => typeof id === 'string');
+
+  return NextResponse.json({ cells: rows, cellIds });
 }
 

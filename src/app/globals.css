@@ -170,6 +170,14 @@
   border: 1px solid rgba(0, 255, 200, 0.12);
 }
 
+/* Operator mode: map canvas stays under vignette + scanlines (see OperatorClient operate-mode-root) */
+.operate-mode-root.hologram-mode::after {
+  z-index: 2;
+}
+.operate-mode-root .holo-scanlines {
+  z-index: 3;
+}
+
 /* Animated scan lines */
 .holo-scanlines {
   position: absolute;

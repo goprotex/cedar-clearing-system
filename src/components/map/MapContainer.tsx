@@ -94,7 +94,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         const next = { ...prev };
         preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
         next.hologram = true;
-        next.terrain3d = false;
+        next.terrain3d = true;
         next.naip = false;
         next.naipCIR = false;
         next.naipNDVI = true;
@@ -433,8 +433,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // Toggle 3D terrain (disabled when hologram is on)
-    if (layers.terrain3d && !layers.hologram) {
+    // 3D terrain (works with hologram: DEM + pitched camera + Three.js trees share the same globe)
+    if (layers.terrain3d) {
       map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
       if (!map.getLayer('sky')) {
         map.addLayer({
@@ -682,10 +682,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram: disable 3D terrain, switch to NDVI base map, keep cedar AI visible
+      // Hologram: NDVI base + cedar AI; enable 3D terrain by default so relief matches trees
       if (key === 'hologram' && !prev.hologram) {
         preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
-        next.terrain3d = false;
+        next.terrain3d = true;
         next.naip = false;
         next.naipCIR = false;
         next.naipNDVI = true;
@@ -694,10 +694,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         if (map) {
           map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
         }
-      }
-      // Block 3D terrain while hologram is active
-      if (key === 'terrain3d' && prev.hologram) {
-        return prev;
       }
       // Restore previous state when hologram turns off
       if (key === 'hologram' && prev.hologram) {
@@ -972,14 +968,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
 
             <LayerRow
-              label={layers.hologram ? '⛰️ 3D (off in hologram)' : '⛰️ 3D'}
+              label="⛰️ 3D terrain"
               active={layers.terrain3d}
               opacity={opacities.terrain3d}
               opacityRange={[0.5, 2.5]}
               opacityStep={0.1}
               onToggle={() => toggleLayer('terrain3d')}
               onOpacity={(v) => setOpacities((p) => ({ ...p, terrain3d: v }))}
-              disabled={layers.hologram}
               holoMode={layers.hologram}
             />
 
@@ -1105,30 +1100,37 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             <div className="text-slate-400 text-xs leading-relaxed text-center">
               {analysisProgress.detail}
             </div>
-            {analysisProgress.processLines && analysisProgress.processLines.length > 0 && (
+            {'processLines' in analysisProgress &&
+              analysisProgress.processLines &&
+              analysisProgress.processLines.length > 0 && (
               <ul className="text-slate-500 text-[11px] leading-snug space-y-1 border-t border-slate-700/80 pt-3 mt-1 list-disc pl-4">
                 {analysisProgress.processLines.map((line, idx) => (
                   <li key={idx}>{line}</li>
                 ))}
               </ul>
             )}
-            <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-[width] duration-500 ease-out ${
-                  analysisProgress.progressPct === undefined ? 'animate-pulse w-full' : ''
-                }`}
-                style={
-                  analysisProgress.progressPct !== undefined
-                    ? { width: `${analysisProgress.progressPct}%` }
-                    : undefined
-                }
-              />
-            </div>
-            {analysisProgress.progressPct !== undefined && (
-              <div className="text-center text-[10px] text-slate-500 tabular-nums">
-                {analysisProgress.progressPct}% complete
-              </div>
-            )}
+            {(() => {
+              const ap = analysisProgress as { pct?: number; percent?: number; progressPct?: number };
+              const p = ap.progressPct ?? ap.percent ?? ap.pct;
+              const known = typeof p === 'number' && !Number.isNaN(p);
+              return (
+                <>
+                  <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-[width] duration-500 ease-out ${
+                        !known ? 'animate-pulse w-full' : ''
+                      }`}
+                      style={known ? { width: `${Math.min(100, Math.max(0, p))}%` } : undefined}
+                    />
+                  </div>
+                  {known && (
+                    <div className="text-center text-[10px] text-slate-500 tabular-nums">
+                      {Math.round(p)}% complete
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

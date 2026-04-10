@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
+import { SPECTRAL_GRID_SPACING_KM } from '@/lib/spectral-grid';
 
 export const maxDuration = 300; // 5 min — thorough spectral analysis
 
@@ -14,7 +15,25 @@ interface BandIndices {
   savi: number;   // ((NIR-R)/(NIR+R+0.5))*1.5 — soil-adjusted vegetation
   exg: number;    // 2*G - R - B (normalized) — excess green
   nirRatio: number; // NIR / brightness — canopy density indicator
+  /** GNDVI − NDVI: broadleaf (oak) usually ≥ small positive; juniper needles often flatter or lower */
+  broadleafIndex: number;
+  /** (G−R)/(G+R): oak canopies lean greener vs red than juniper */
+  greenRedBalance: number;
 }
+
+/** Tunable separation — Ashe juniper (“cedar”) vs live oak in NAIP RGB+NIR (single date). */
+const CEDAR_OAK = {
+  /** Oak lean when broadleafIndex exceeds this (GNDVI runs ahead of NDVI). */
+  oakBroadleafMin: 0.028,
+  /** Cedar lean when broadleafIndex is below this. */
+  cedarBroadleafMax: 0.012,
+  /** Oak lean when visible green clearly exceeds red (normalized). */
+  oakGreenRedMin: 0.045,
+  /** Cedar lean when canopy looks reddish vs green. */
+  cedarGreenRedMax: -0.02,
+  /** |oakMinusCedarScore| must exceed this to label oak/cedar (else mixed_brush in treed cells). */
+  tieMargin: 0.075,
+} as const;
 
 interface SampleResult {
   lng: number;
@@ -32,13 +51,76 @@ interface SampleResult {
 function computeIndices(r: number, g: number, b: number, nir: number): BandIndices {
   const brightness = (r + g + b) / 3;
   const L = 0.5; // SAVI soil adjustment factor
+  const ndvi = (nir + r) > 0 ? (nir - r) / (nir + r) : 0;
+  const gndvi = (nir + g) > 0 ? (nir - g) / (nir + g) : 0;
+  const gr = g + r;
   return {
-    ndvi: (nir + r) > 0 ? (nir - r) / (nir + r) : 0,
-    gndvi: (nir + g) > 0 ? (nir - g) / (nir + g) : 0,
+    ndvi,
+    gndvi,
     savi: (nir + r + L) > 0 ? ((nir - r) / (nir + r + L)) * (1 + L) : 0,
     exg: brightness > 0 ? (2 * g - r - b) / (r + g + b) : 0,
     nirRatio: brightness > 0 ? nir / brightness : 0,
+    broadleafIndex: gndvi - ndvi,
+    greenRedBalance: gr > 0 ? (g - r) / gr : 0,
   };
+}
+
+/**
+ * Oak vs juniper (“cedar”) score difference in roughly −1…1.
+ * Positive ⇒ oak; negative ⇒ cedar. Uses traits that separate broadleaf from needle/scale foliage in 4-band NAIP.
+ */
+function oakMinusCedarScore(
+  idx: BandIndices,
+  r: number,
+  g: number,
+  nir: number,
+  brightness: number,
+): number {
+  const { ndvi, gndvi, broadleafIndex, greenRedBalance, exg, nirRatio } = idx;
+  let s = 0;
+  // Primary: chlorophyll structure — oaks typically show higher GNDVI relative to NDVI than juniper.
+  s += broadleafIndex * 5.5;
+  // Visible green vs red — oak crowns are often greener; juniper can read more gray–red.
+  s += greenRedBalance * 3.5;
+  // Excess green (normalized) reinforces broadleaf signal when NDVI is already in the treed range.
+  s += (exg - 0.08) * 2.0;
+  // NIR density: both can be high; slight lean to oak when NIR is strong with moderate greenness ratio.
+  s += (nirRatio - 1.35) * 0.3;
+  // Very dark canopies (low brightness) with moderate NDVI often read as juniper thickets in NAIP.
+  if (brightness < 100 && ndvi >= 0.12) s -= 0.14;
+  // High red channel relative to green pushes toward juniper.
+  const rg = r / Math.max(g, 1);
+  if (rg > 1.02) s -= (rg - 1.0) * 0.5;
+  else if (rg < 0.92) s += 0.1;
+  // Mature oak: high NIR with measurably higher GNDVI than NDVI.
+  if (nir >= 155 && gndvi > ndvi + 0.02) s += 0.12;
+  return Math.max(-1, Math.min(1, s));
+}
+
+function classifyTreedOakVsCedar(
+  idx: BandIndices,
+  r: number,
+  g: number,
+  nir: number,
+  brightness: number,
+): { classification: Extract<VegClass, 'cedar' | 'oak' | 'mixed_brush'>; confidence: number; bandVotes: number } {
+  const diff = oakMinusCedarScore(idx, r, g, nir, brightness);
+  let bandVotes = 1;
+  if (idx.broadleafIndex > CEDAR_OAK.oakBroadleafMin) bandVotes++;
+  if (idx.broadleafIndex < CEDAR_OAK.cedarBroadleafMax) bandVotes++;
+  if (idx.greenRedBalance > CEDAR_OAK.oakGreenRedMin) bandVotes++;
+  if (idx.greenRedBalance < CEDAR_OAK.cedarGreenRedMax) bandVotes++;
+
+  const mag = Math.min(1, Math.abs(diff));
+  if (diff > CEDAR_OAK.tieMargin) {
+    const conf = Math.min(0.92, 0.44 + mag * 0.38 + (bandVotes >= 3 ? 0.06 : 0));
+    return { classification: 'oak', confidence: conf, bandVotes };
+  }
+  if (diff < -CEDAR_OAK.tieMargin) {
+    const conf = Math.min(0.92, 0.44 + mag * 0.38 + (bandVotes >= 3 ? 0.06 : 0));
+    return { classification: 'cedar', confidence: conf, bandVotes };
+  }
+  return { classification: 'mixed_brush', confidence: 0.48, bandVotes: Math.max(1, bandVotes - 1) };
 }
 
 // ── Multi-band classification with cross-verification ──
@@ -48,7 +130,6 @@ function classifyVegetation(
   g: number,
   b: number,
   nir: number | null,
-  ndvi: number
 ): { classification: VegClass; confidence: number; bandVotes: number; gndvi: number; savi: number } {
   // RGB-only fallback (no NIR band)
   if (nir === null) {
@@ -61,7 +142,6 @@ function classifyVegetation(
 
   const idx = computeIndices(r, g, b, nir);
   const brightness = (r + g + b) / 3;
-  const redGreenRatio = r / Math.max(g, 1);
 
   // ── Pass 1: Bare ground — must be VERY BRIGHT + low NDVI ──
   if (idx.ndvi < 0.08 && brightness > 130) {
@@ -74,129 +154,65 @@ function classifyVegetation(
     return { classification: 'bare', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // Low NDVI but not very bright → could be cedar shadow or oak understory
+  // Low NDVI, not bare: shadow / sparse canopy — use same oak–cedar score when NIR is informative
   if (idx.ndvi < 0.08 && brightness <= 130) {
-    // Check for oak first: high NIR + moderate brightness = deciduous canopy even at low NDVI
-    if (nir >= 130 && brightness >= 95) {
-      let oakVotes = 0;
-      if (nir >= 160) oakVotes++;
-      if (nir >= 130) oakVotes++;
-      if (r >= 80) oakVotes++;
-      if (brightness >= 110) oakVotes++;
-      if (oakVotes >= 2) {
-        const conf = Math.min(0.65, 0.35 + oakVotes * 0.08);
-        return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
+    if (nir >= 115) {
+      const t = classifyTreedOakVsCedar(idx, r, g, nir, brightness);
+      if (t.classification !== 'mixed_brush') {
+        return { ...t, gndvi: idx.gndvi, savi: idx.savi };
       }
     }
     let votes = 1;
     if (brightness < 90) votes++;
     if (nir > 60) votes++;
     if (r < 100) votes++;
-    const conf = Math.min(0.7, 0.35 + votes * 0.1);
+    const conf = Math.min(0.68, 0.34 + votes * 0.09);
     return { classification: 'cedar', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // ── Pass 2: Low-moderate NDVI (0.08-0.22) ──
+  // ── Pass 2: Low-moderate NDVI (0.08–0.22) — grass vs sparse trees ──
   if (idx.ndvi >= 0.08 && idx.ndvi < 0.22) {
-    // Oak check: bright NIR + moderate-bright canopy = deciduous hardwood
-    if (nir >= 130 && brightness >= 100) {
-      let oakVotes = 0;
-      if (nir >= 160) oakVotes++;
-      if (nir >= 130) oakVotes++;
-      if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.80) oakVotes++;
-      if (brightness >= 110) oakVotes++;
-      if (r >= 80) oakVotes++;
-      if (oakVotes >= 3) {
-        const conf = Math.min(0.75, 0.4 + oakVotes * 0.08);
-        return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
-      }
-    }
-    if (brightness < 115) {
+    // Require genuinely low NDVI for “turf / herbaceous” — sparse woody can sit 0.14–0.20
+    const likelyGrass =
+      idx.ndvi < 0.165 &&
+      brightness >= 125 &&
+      idx.exg > 0.04 &&
+      idx.exg < 0.18 &&
+      idx.savi >= 0.05 &&
+      idx.savi < 0.28 &&
+      nir < 145;
+
+    if (likelyGrass) {
       let votes = 1;
-      if (idx.nirRatio > 1.1) votes++;
-      if (r < 90) votes++;
-      if (brightness < 80) votes++;
-      if (nir > 60) votes++;
-      const conf = Math.min(0.75, 0.35 + votes * 0.08);
-      return { classification: 'cedar', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
+      if (idx.savi >= 0.05 && idx.savi < 0.25) votes++;
+      if (idx.exg > 0 && idx.exg < 0.15) votes++;
+      if (brightness >= 130) votes++;
+      const conf = Math.min(0.8, 0.5 + votes * 0.07);
+      return { classification: 'grass', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
     }
-    let votes = 1;
-    if (idx.savi >= 0.05 && idx.savi < 0.25) votes++;
-    if (idx.exg > 0 && idx.exg < 0.15) votes++;
-    if (brightness >= 130) votes++;
-    const conf = Math.min(0.8, 0.5 + votes * 0.07);
+
+    const t = classifyTreedOakVsCedar(idx, r, g, nir, brightness);
+    return { ...t, gndvi: idx.gndvi, savi: idx.savi };
+  }
+
+  // ── Pass 3: “Bright turf” only in a narrow NDVI band — avoid labeling scattered juniper / oak as lawn
+  if (
+    idx.ndvi >= 0.22 &&
+    idx.ndvi < 0.31 &&
+    brightness >= 132 &&
+    idx.exg > 0.11 &&
+    nir < 148 &&
+    idx.nirRatio < 1.4 &&
+    idx.broadleafIndex < 0.028
+  ) {
+    let votes = 2;
+    if (idx.savi >= 0.08 && idx.savi < 0.32) votes++;
+    const conf = Math.min(0.78, 0.48 + votes * 0.06);
     return { classification: 'grass', confidence: conf, bandVotes: votes, gndvi: idx.gndvi, savi: idx.savi };
   }
 
-  // ── Pass 3: Moderate NDVI (0.22-0.35) — transitional zone ──
-  if (idx.ndvi >= 0.22 && idx.ndvi < 0.35) {
-    let cedarVotes = 0;
-    if (brightness < 110) cedarVotes++;
-    if (nir < 160) cedarVotes++;
-    if (r < 100) cedarVotes++;
-    if (idx.gndvi / Math.max(idx.ndvi, 0.01) < 0.95) cedarVotes++;
-    if (idx.savi > 0.15) cedarVotes++;
-
-    // Oak escape hatch FIRST
-    if (nir >= 140 && brightness >= 90) {
-      let oakVotes = 1;
-      if (nir >= 160) oakVotes++;
-      if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.85) oakVotes++;
-      if (brightness >= 105) oakVotes++;
-      if (oakVotes >= 2) {
-        const conf = Math.min(0.75, 0.4 + oakVotes * 0.1);
-        return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
-      }
-    }
-
-    if (cedarVotes >= 2) {
-      const conf = Math.min(0.8, 0.35 + cedarVotes * 0.1 + (idx.ndvi - 0.22) * 0.5);
-      return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
-    }
-
-    if (cedarVotes === 1 && brightness < 90) {
-      return { classification: 'cedar', confidence: 0.4, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
-    }
-
-    return { classification: 'grass', confidence: 0.5, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
-  }
-
-  // ── Pass 4: High NDVI (>= 0.35) — dense vegetation ──
-  // CHECK OAK FIRST
-  if (nir >= 140 && brightness >= 85) {
-    let oakVotes = 0;
-    if (nir >= 170) oakVotes++;
-    if (nir >= 140) oakVotes++;
-    if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.80) oakVotes++;
-    if (brightness >= 100) oakVotes++;
-    if (r >= 80) oakVotes++;
-    if (oakVotes >= 3) {
-      const conf = Math.min(0.85, 0.4 + oakVotes * 0.08);
-      return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
-    }
-  }
-
-  // Cedar vote accumulator
-  let cedarVotes = 0;
-  const totalChecks = 5;
-
-  if (nir < 150) cedarVotes++;
-  if (brightness < 110) cedarVotes++;
-  if (idx.gndvi > 0.10 && (idx.gndvi / Math.max(idx.ndvi, 0.01)) < 0.88) cedarVotes++;
-  if (idx.savi > 0.25) cedarVotes++;
-  if (r < 90) cedarVotes++;
-
-  if (cedarVotes >= 2) {
-    const voteRatio = cedarVotes / totalChecks;
-    const conf = Math.min(0.95, 0.5 + voteRatio * 0.3 + (idx.ndvi - 0.35) * 0.3);
-    return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
-  }
-
-  if (nir >= 130 && brightness >= 85) {
-    return { classification: 'oak', confidence: 0.45, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
-  }
-
-  return { classification: 'mixed_brush', confidence: 0.45, bandVotes: 1, gndvi: idx.gndvi, savi: idx.savi };
+  const t = classifyTreedOakVsCedar(idx, r, g, nir, brightness);
+  return { ...t, gndvi: idx.gndvi, savi: idx.savi };
 }
 
 function getClassColor(classification: VegClass, ndvi: number): string {
@@ -366,8 +382,8 @@ export async function POST(req: NextRequest) {
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
 
-    // 15m uniform grid — dense wall-to-wall coverage, no gaps
-    const spacingKm = 0.015; // 15m between sample points
+    // ~10 m grid — better crown sampling than 15 m (sparse trees were blending to grass/bare)
+    const spacingKm = SPECTRAL_GRID_SPACING_KM;
 
     const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
@@ -409,7 +425,7 @@ export async function POST(req: NextRequest) {
           let ndvi = 0;
           if (nir !== null && nir + r > 0) ndvi = (nir - r) / (nir + r);
 
-          const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
+          const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir);
           return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
         } catch {
           if (attempt < retries) await new Promise(r => setTimeout(r, 500 * (attempt + 1)));

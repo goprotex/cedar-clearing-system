@@ -406,7 +406,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
       'Partition pasture into regions sized for reliable NAIP sampling',
       'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
       'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
-      'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
+      'Tree split: broadleaf index (GNDVI−NDVI), green/red balance, scored vs Ashe juniper',
+      'Classes: cedar vs oak vs mixed brush vs grass vs bare; tile consensus smooths edges',
       'Overlapping-tile consensus to stabilize class boundaries',
     ];
 

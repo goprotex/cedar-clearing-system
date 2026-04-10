@@ -1,8 +1,8 @@
 import * as turf from '@turf/turf';
 import type { Feature, Polygon, MultiPolygon, Position } from 'geojson';
+import { SPECTRAL_GRID_SPACING_M } from '@/lib/spectral-grid';
 
-/** Matches cedar-detect route: 15 m point grid → ~225 m² per sample cell */
-const SAMPLE_SPACING_M = 15;
+const SAMPLE_SPACING_M = SPECTRAL_GRID_SPACING_M;
 const SAMPLES_PER_CELL_EST = SAMPLE_SPACING_M * SAMPLE_SPACING_M;
 
 /**
