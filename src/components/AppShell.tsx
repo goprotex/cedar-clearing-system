@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
+  { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
   { href: '/map-radar', label: 'MAP_RADAR', icon: '🛰️' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
 
 const HEADER_NAV = [
   { href: '/bids', label: 'ESTIMATOR' },
+  { href: '/monitor', label: 'MONITOR' },
   { href: '/fleet', label: 'FLEET' },
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
