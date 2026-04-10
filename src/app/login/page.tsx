@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>('magic');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -58,6 +60,27 @@ export default function LoginPage() {
           />
         </div>
 
+        {(mode === 'password-signin' || mode === 'password-signup') && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">
+              Password
+            </label>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              autoComplete={mode === 'password-signup' ? 'new-password' : 'current-password'}
+              placeholder="••••••••"
+              className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono text-[#e5e2e1] placeholder:text-[#5a4136] focus:border-[#FF6B00] outline-none"
+            />
+            {mode === 'password-signup' && (
+              <div className="text-[10px] font-mono text-[#a98a7d]">
+                Password auth must be enabled in Supabase Auth settings.
+              </div>
+            )}
+          </div>
+        )}
+
         {err && (
           <div className="border border-red-500/50 bg-red-950/40 p-3 text-sm">
             {err}
@@ -69,8 +92,43 @@ export default function LoginPage() {
           </div>
         )}
 
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => { setMode('magic'); setErr(null); setMessage(null); }}
+            className={`px-2 py-1 text-[10px] font-black uppercase tracking-widest border transition-colors ${
+              mode === 'magic' ? 'border-[#FF6B00] text-[#FFB693]' : 'border-[#353534] text-[#a98a7d] hover:text-white'
+            }`}
+          >
+            MAGIC_LINK
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('password-signin'); setErr(null); setMessage(null); }}
+            className={`px-2 py-1 text-[10px] font-black uppercase tracking-widest border transition-colors ${
+              mode === 'password-signin' ? 'border-[#FF6B00] text-[#FFB693]' : 'border-[#353534] text-[#a98a7d] hover:text-white'
+            }`}
+          >
+            SIGN_IN
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('password-signup'); setErr(null); setMessage(null); }}
+            className={`px-2 py-1 text-[10px] font-black uppercase tracking-widest border transition-colors ${
+              mode === 'password-signup' ? 'border-[#FF6B00] text-[#FFB693]' : 'border-[#353534] text-[#a98a7d] hover:text-white'
+            }`}
+          >
+            SIGN_UP
+          </button>
+        </div>
+
         <button
-          disabled={envMissing || busy || !email.trim()}
+          disabled={
+            envMissing ||
+            busy ||
+            !email.trim() ||
+            ((mode === 'password-signin' || mode === 'password-signup') && password.length < 6)
+          }
           onClick={async () => {
             try {
               setBusy(true);
@@ -78,24 +136,47 @@ export default function LoginPage() {
               setMessage(null);
               if (envMissing) throw new Error('Supabase env vars are missing.');
               const supabase = createClient();
-              const redirectTo = `${window.location.origin}/auth/callback`;
-              const { error } = await supabase.auth.signInWithOtp({
-                email: email.trim(),
-                options: {
-                  emailRedirectTo: redirectTo,
-                },
-              });
-              if (error) throw error;
-              setMessage('Magic link sent. Check your email to finish signing in.');
+
+              if (mode === 'magic') {
+                const redirectTo = `${window.location.origin}/auth/callback`;
+                const { error } = await supabase.auth.signInWithOtp({
+                  email: email.trim(),
+                  options: { emailRedirectTo: redirectTo },
+                });
+                if (error) throw error;
+                setMessage('Magic link sent. Check your email to finish signing in.');
+              } else if (mode === 'password-signin') {
+                const { error } = await supabase.auth.signInWithPassword({
+                  email: email.trim(),
+                  password,
+                });
+                if (error) throw error;
+                window.location.href = '/bids';
+              } else {
+                const redirectTo = `${window.location.origin}/auth/callback`;
+                const { error } = await supabase.auth.signUp({
+                  email: email.trim(),
+                  password,
+                  options: { emailRedirectTo: redirectTo },
+                });
+                if (error) throw error;
+                setMessage('Account created. Check your email to confirm, then sign in.');
+              }
             } catch (e) {
-              setErr(e instanceof Error ? e.message : 'Failed to send magic link.');
+              setErr(e instanceof Error ? e.message : 'Auth failed.');
             } finally {
               setBusy(false);
             }
           }}
           className="w-full bg-[#FF6B00] text-black font-black py-2 text-xs uppercase tracking-widest hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {busy ? 'SENDING…' : 'SEND_MAGIC_LINK'}
+          {busy
+            ? 'WORKING…'
+            : mode === 'magic'
+              ? 'SEND_MAGIC_LINK'
+              : mode === 'password-signin'
+                ? 'SIGN_IN'
+                : 'CREATE_ACCOUNT'}
         </button>
 
         <div className="flex items-center justify-between text-[11px] text-[#a98a7d]">

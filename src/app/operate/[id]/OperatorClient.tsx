@@ -209,7 +209,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(pointer: coarse)').matches;
-    setLowPowerMode(coarsePointer);
 
     let map: mapboxgl.Map;
     try {
