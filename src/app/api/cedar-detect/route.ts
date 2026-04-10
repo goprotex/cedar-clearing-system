@@ -6,6 +6,7 @@ import {
   findSentinelScene,
   sampleNdviFromSceneItem,
   sceneMeta,
+  type STACItem,
 } from '@/lib/sentinel-sample-ndvi';
 import {
   fuseNaipWithTextureAndSentinel,
@@ -14,10 +15,10 @@ import {
 } from '@/lib/spectral-fusion';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 420; // NAIP + Sentinel-2 paired reads
+export const maxDuration = 300; // Vercel Pro cap — must not exceed 300
 
 /** Cap grid points so large pastures stay within serverless time limits (stride-subsample). */
-const MAX_SAMPLE_POINTS = 2800;
+const MAX_SAMPLE_POINTS = 2400;
 
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
@@ -25,12 +26,20 @@ const NAIP_IDENTIFY =
 /** Throttle NAIP `identify` calls to reduce burst traffic and rate-limit / HTTP 429 risk. */
 const NAIP_WAVE_CONCURRENCY = 9;
 /** Pause after each wave completes (before starting the next wave). */
-const NAIP_WAVE_COOLDOWN_MS = 320;
+const NAIP_WAVE_COOLDOWN_MS = 250;
 /** Random extra delay so concurrent users don’t retry in lockstep. */
-const NAIP_COOLDOWN_JITTER_MS = 120;
+const NAIP_COOLDOWN_JITTER_MS = 80;
 /** Stagger start times within a wave so connections don’t open in one tick. */
-const NAIP_STAGGER_MS = 48;
-const NAIP_IDENTIFY_TIMEOUT_MS = 18_000;
+const NAIP_STAGGER_MS = 40;
+const NAIP_IDENTIFY_TIMEOUT_MS = 12_000;
+
+/**
+ * Leave this much wall-clock headroom (ms) before the hard Vercel timeout.
+ * Used for Sentinel-2 fusion, consensus, and final SSE emit.
+ */
+const DEADLINE_RESERVE_MS = 38_000;
+/** Minimum time (ms) needed for the Sentinel-2 phase; skip if less remains. */
+const SENTINEL_MIN_MS = 22_000;
 
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
 
@@ -468,29 +477,33 @@ export async function POST(req: NextRequest) {
       return new Promise((r) => setTimeout(r, ms));
     }
 
-    // Fetch a single NAIP pixel with retry; backs off on HTTP 429 / 503 (rate limits / overload).
-    async function fetchPixel(lng: number, lat: number): Promise<SampleResult> {
+    async function fetchPixel(lng: number, lat: number, deadline: number): Promise<SampleResult> {
       const geom = JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } });
       const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
 
-      const maxAttempts = 6;
+      const maxAttempts = 4;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (Date.now() >= deadline) break;
         try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(NAIP_IDENTIFY_TIMEOUT_MS) });
+          const timeLeft = deadline - Date.now();
+          const timeout = Math.min(NAIP_IDENTIFY_TIMEOUT_MS, Math.max(3000, timeLeft - 500));
+          const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
 
           if (res.status === 429 || res.status === 503) {
             const ra = res.headers.get('retry-after');
             const sec =
               ra && /^\d+$/.test(ra.trim())
-                ? Math.min(60, parseInt(ra.trim(), 10))
-                : Math.min(45, 4 + attempt * 3);
-            await new Promise((r) => setTimeout(r, sec * 1000 + Math.random() * 600));
+                ? Math.min(20, parseInt(ra.trim(), 10))
+                : Math.min(12, 3 + attempt * 2);
+            const waitMs = Math.min(sec * 1000 + Math.random() * 400, deadline - Date.now() - 500);
+            if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
             continue;
           }
 
           if (!res.ok) {
             if (attempt < maxAttempts - 1) {
-              await new Promise((r) => setTimeout(r, 450 * (attempt + 1) + Math.random() * 200));
+              const waitMs = Math.min(350 * (attempt + 1), deadline - Date.now() - 500);
+              if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
             }
             continue;
           }
@@ -520,8 +533,9 @@ export async function POST(req: NextRequest) {
           );
           return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
         } catch {
-          if (attempt < maxAttempts - 1) {
-            await new Promise((r) => setTimeout(r, 550 * (attempt + 1) + Math.random() * 250));
+          if (attempt < maxAttempts - 1 && Date.now() < deadline) {
+            const waitMs = Math.min(400 * (attempt + 1), deadline - Date.now() - 500);
+            if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
           }
         }
       }
@@ -531,7 +545,10 @@ export async function POST(req: NextRequest) {
     const totalPoints = samplePoints.length;
     const totalWaves = Math.ceil(totalPoints / NAIP_WAVE_CONCURRENCY);
 
-    // Stream progress via SSE
+    const fnStartMs = Date.now();
+    const hardDeadline = fnStartMs + maxDuration * 1000 - DEADLINE_RESERVE_MS;
+    const naipDeadline = hardDeadline - SENTINEL_MIN_MS;
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -552,8 +569,14 @@ export async function POST(req: NextRequest) {
         const results: SampleResult[] = [];
         let cedarSoFar = 0;
         let oakSoFar = 0;
+        let earlyStop = false;
 
         for (let w = 0; w < totalWaves; w++) {
+          if (Date.now() >= naipDeadline) {
+            earlyStop = true;
+            break;
+          }
+
           const start = w * NAIP_WAVE_CONCURRENCY;
           const wave = samplePoints.slice(start, start + NAIP_WAVE_CONCURRENCY);
           const waveResults = await Promise.all(
@@ -562,7 +585,7 @@ export async function POST(req: NextRequest) {
                 if (NAIP_STAGGER_MS > 0 && i > 0) {
                   await new Promise((r) => setTimeout(r, i * NAIP_STAGGER_MS));
                 }
-                return fetchPixel(pt.geometry.coordinates[0], pt.geometry.coordinates[1]);
+                return fetchPixel(pt.geometry.coordinates[0], pt.geometry.coordinates[1], naipDeadline);
               })()
             )
           );
@@ -574,7 +597,6 @@ export async function POST(req: NextRequest) {
           }
 
           const completed = results.length;
-          // Map sampling to ~4–88% so later phases can advance smoothly (avoids 88→95 jumps).
           const pct = Math.min(88, 4 + Math.round((completed / totalPoints) * 84));
           send('progress', {
             phase: 'sampling',
@@ -587,103 +609,146 @@ export async function POST(req: NextRequest) {
             oakCount: oakSoFar,
           });
 
-          if (w < totalWaves - 1) {
+          if (w < totalWaves - 1 && Date.now() < naipDeadline) {
             await naipWaveCooldown();
           }
         }
 
+        if (earlyStop && results.length < totalPoints) {
+          send('progress', {
+            phase: 'sampling',
+            message: `Time budget reached — finalizing with ${results.length}/${totalPoints} samples`,
+            totalPoints,
+            completed: results.length,
+            pct: 88,
+            cedarCount: cedarSoFar,
+            oakCount: oakSoFar,
+          });
+        }
+
+        const sampledCount = results.length;
+
         send('progress', {
           phase: 'consensus',
           message: 'Running tile consensus refinement...',
-          totalPoints,
-          completed: totalPoints,
+          totalPoints: sampledCount,
+          completed: sampledCount,
           pct: 88,
         });
-
 
         const { refined, tileCount, consensusImprovedCells } =
           applyTileConsensus(results, spacingKm, bbox);
 
-        send('progress', {
-          phase: 'sentinel',
-          message: 'Sentinel-2 summer / winter + texture fusion (Hill Country)',
-          totalPoints,
-          completed: totalPoints,
-          pct: 91,
-        });
-
-        const hillCountry = isCentralTexasHillCountry(bbox);
-        const S2_SUB_CAP = 52;
-        const subStep = Math.max(1, Math.ceil(samplePoints.length / S2_SUB_CAP));
-        const subPoints: GeoJSON.Feature<GeoJSON.Point>[] = [];
+        let sentinelUsed = false;
+        let wScene: STACItem | null = null;
+        let sScene: STACItem | null = null;
         const subCoords: { lng: number; lat: number }[] = [];
-        for (let si = 0; si < samplePoints.length; si += subStep) {
-          const f = samplePoints[si] as GeoJSON.Feature<GeoJSON.Point>;
-          subPoints.push(f);
-          const [lng, lat] = f.geometry.coordinates;
-          subCoords.push({ lng, lat });
-          if (subPoints.length >= S2_SUB_CAP) break;
-        }
+        const subPoints: GeoJSON.Feature<GeoJSON.Point>[] = [];
 
-        const textureVars = computeLocalNdviVariance(
-          refined.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
-          bbox,
-          spacingKm
-        );
+        const timeForSentinel = hardDeadline - Date.now() > SENTINEL_MIN_MS;
 
-        const y = new Date().getFullYear();
-        const winterRange = `${y - 2}-12-01/${y}-03-22`;
-        const summerRange = `${y - 2}-05-18/${y - 1}-09-25`;
+        if (timeForSentinel) {
+          send('progress', {
+            phase: 'sentinel',
+            message: 'Sentinel-2 summer / winter + texture fusion (Hill Country)',
+            totalPoints: sampledCount,
+            completed: sampledCount,
+            pct: 91,
+          });
 
-        const [wScene, sScene] = await Promise.all([
-          findSentinelScene(bbox, winterRange, 32),
-          findSentinelScene(bbox, summerRange, 32),
-        ]);
+          const hillCountry = isCentralTexasHillCountry(bbox);
+          const S2_SUB_CAP = 52;
+          const subStep = Math.max(1, Math.ceil(samplePoints.length / S2_SUB_CAP));
+          for (let si = 0; si < samplePoints.length; si += subStep) {
+            const f = samplePoints[si] as GeoJSON.Feature<GeoJSON.Point>;
+            subPoints.push(f);
+            const [lng, lat] = f.geometry.coordinates;
+            subCoords.push({ lng, lat });
+            if (subPoints.length >= S2_SUB_CAP) break;
+          }
 
-        let winterVals: (number | null)[] | null = null;
-        let summerVals: (number | null)[] | null = null;
-        if (subPoints.length > 0) {
-          const [wr, sr] = await Promise.all([
-            wScene ? sampleNdviFromSceneItem(wScene, subPoints, bbox) : null,
-            sScene ? sampleNdviFromSceneItem(sScene, subPoints, bbox) : null,
-          ]);
-          winterVals = wr?.values ?? null;
-          summerVals = sr?.values ?? null;
-        }
-
-        for (let i = 0; i < refined.length; i++) {
-          const r = refined[i];
-          const slot =
-            subCoords.length > 0
-              ? nearestSubsampleSlot(r.lng, r.lat, subCoords)
-              : 0;
-          const wv =
-            subCoords.length && winterVals && winterVals[slot] !== undefined
-              ? winterVals[slot]
-              : null;
-          const sv =
-            subCoords.length && summerVals && summerVals[slot] !== undefined
-              ? summerVals[slot]
-              : null;
-          const fused = fuseNaipWithTextureAndSentinel(
-            r.classification as SpectralVegClass,
-            r.confidence,
-            textureVars[i] ?? 0,
-            wv,
-            sv,
-            { hillCountry }
+          const textureVars = computeLocalNdviVariance(
+            refined.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
+            bbox,
+            spacingKm
           );
-          refined[i].classification = fused.classification as VegClass;
-          refined[i].confidence = fused.confidence;
-          refined[i].trustScore = fused.trustScore;
-          refined[i].lowTrust = fused.lowTrust;
+
+          const y = new Date().getFullYear();
+          const winterRange = `${y - 2}-12-01/${y}-03-22`;
+          const summerRange = `${y - 2}-05-18/${y - 1}-09-25`;
+
+          [wScene, sScene] = await Promise.all([
+            findSentinelScene(bbox, winterRange, 32),
+            findSentinelScene(bbox, summerRange, 32),
+          ]);
+
+          let winterVals: (number | null)[] | null = null;
+          let summerVals: (number | null)[] | null = null;
+          if (subPoints.length > 0 && hardDeadline - Date.now() > 10_000) {
+            const [wr, sr] = await Promise.all([
+              wScene ? sampleNdviFromSceneItem(wScene, subPoints, bbox) : null,
+              sScene ? sampleNdviFromSceneItem(sScene, subPoints, bbox) : null,
+            ]);
+            winterVals = wr?.values ?? null;
+            summerVals = sr?.values ?? null;
+          }
+
+          for (let i = 0; i < refined.length; i++) {
+            const r = refined[i];
+            const slot =
+              subCoords.length > 0
+                ? nearestSubsampleSlot(r.lng, r.lat, subCoords)
+                : 0;
+            const wv =
+              subCoords.length && winterVals && winterVals[slot] !== undefined
+                ? winterVals[slot]
+                : null;
+            const sv =
+              subCoords.length && summerVals && summerVals[slot] !== undefined
+                ? summerVals[slot]
+                : null;
+            const fused = fuseNaipWithTextureAndSentinel(
+              r.classification as SpectralVegClass,
+              r.confidence,
+              textureVars[i] ?? 0,
+              wv,
+              sv,
+              { hillCountry }
+            );
+            refined[i].classification = fused.classification as VegClass;
+            refined[i].confidence = fused.confidence;
+            refined[i].trustScore = fused.trustScore;
+            refined[i].lowTrust = fused.lowTrust;
+          }
+          sentinelUsed = Boolean(wScene && sScene && subPoints.length);
+        } else {
+          const textureVars = computeLocalNdviVariance(
+            refined.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
+            bbox,
+            spacingKm
+          );
+          const hillCountry = isCentralTexasHillCountry(bbox);
+          for (let i = 0; i < refined.length; i++) {
+            const fused = fuseNaipWithTextureAndSentinel(
+              refined[i].classification as SpectralVegClass,
+              refined[i].confidence,
+              textureVars[i] ?? 0,
+              null,
+              null,
+              { hillCountry }
+            );
+            refined[i].classification = fused.classification as VegClass;
+            refined[i].confidence = fused.confidence;
+            refined[i].trustScore = fused.trustScore;
+            refined[i].lowTrust = fused.lowTrust;
+          }
         }
 
         send('progress', {
           phase: 'building',
           message: 'Building classification grid...',
-          totalPoints,
-          completed: totalPoints,
+          totalPoints: sampledCount,
+          completed: sampledCount,
           pct: 94,
         });
 
@@ -734,7 +799,7 @@ export async function POST(req: NextRequest) {
           cellHalfLngDeg: halfLngDeg,
           cellHalfLatDeg: halfLatDeg,
           sentinelFusion: {
-            used: Boolean(wScene && sScene && subPoints.length),
+            used: sentinelUsed,
             pairedSamples: subCoords.length,
             winterDate: wScene ? sceneMeta(wScene).datetime : undefined,
             summerDate: sScene ? sceneMeta(sScene).datetime : undefined,
@@ -751,9 +816,9 @@ export async function POST(req: NextRequest) {
             consensusImprovedCells,
             consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
           },
+          ...(earlyStop ? { earlyStopSampled: sampledCount, earlyStopTotal: totalPoints } : {}),
         };
 
-        // Compact `samples` keeps the final SSE line small (full GeoJSON grid was exceeding serverless limits).
         const samples = refined.map((s) => ({
           lng: s.lng,
           lat: s.lat,
