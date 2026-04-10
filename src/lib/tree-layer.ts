@@ -347,6 +347,74 @@ export function extractTreesFromAnalysis(
   return trees;
 }
 
+// ─── Cedar tree geometry: multi-tier upright pyramid ───
+// Real eastern red cedar / Ashe juniper has a pyramidal silhouette with
+// dense branches that start near the ground and taper to a narrow crown.
+// We approximate this with three stacked cones of decreasing radius,
+// each overlapping slightly to create a layered "skirt" effect.
+
+function buildCedarGeometry(): THREE.BufferGeometry {
+  const tiers = [
+    { radius: 1.0,  height: 0.45, yBase: 0.0  },
+    { radius: 0.72, height: 0.40, yBase: 0.30 },
+    { radius: 0.42, height: 0.35, yBase: 0.55 },
+  ];
+
+  const geos: THREE.ConeGeometry[] = [];
+  for (const t of tiers) {
+    const cone = new THREE.ConeGeometry(t.radius, t.height, 8);
+    cone.translate(0, t.yBase + t.height / 2, 0);
+    geos.push(cone);
+  }
+
+  const merged = mergeGeometries(geos);
+  for (const g of geos) g.dispose();
+  return merged;
+}
+
+function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  let totalVerts = 0;
+  let totalIdx = 0;
+  for (const g of geometries) {
+    totalVerts += g.getAttribute('position').count;
+    totalIdx += g.index ? g.index.count : 0;
+  }
+
+  const pos = new Float32Array(totalVerts * 3);
+  const norm = new Float32Array(totalVerts * 3);
+  const idx = new Uint32Array(totalIdx);
+
+  let vOffset = 0;
+  let iOffset = 0;
+  for (const g of geometries) {
+    const gPos = g.getAttribute('position') as THREE.BufferAttribute;
+    const gNorm = g.getAttribute('normal') as THREE.BufferAttribute;
+    const gIdx = g.index!;
+
+    for (let i = 0; i < gPos.count; i++) {
+      pos[(vOffset + i) * 3]     = gPos.getX(i);
+      pos[(vOffset + i) * 3 + 1] = gPos.getY(i);
+      pos[(vOffset + i) * 3 + 2] = gPos.getZ(i);
+      norm[(vOffset + i) * 3]     = gNorm.getX(i);
+      norm[(vOffset + i) * 3 + 1] = gNorm.getY(i);
+      norm[(vOffset + i) * 3 + 2] = gNorm.getZ(i);
+    }
+
+    for (let i = 0; i < gIdx.count; i++) {
+      idx[iOffset + i] = gIdx.getX(i) + vOffset;
+    }
+
+    vOffset += gPos.count;
+    iOffset += gIdx.count;
+  }
+
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+  merged.setIndex(new THREE.BufferAttribute(idx, 1));
+  return merged;
+}
+
 // ─── TreeLayer3D: Mapbox Custom Layer ───
 
 export class TreeLayer3D {
@@ -667,10 +735,10 @@ export class TreeLayer3D {
     const grouped: Record<Species, TreePosition[]> = { cedar: [], oak: [], mixed: [] };
     for (const t of this.trees) grouped[t.species].push(t);
 
-    // Geometries — cedar = inverted cone (point down), oak = sphere on cylinder trunk
-    const cedarGeo = new THREE.ConeGeometry(1, 1, 8);
-    cedarGeo.rotateZ(Math.PI); // flip upside down — point facing ground
-    cedarGeo.translate(0, 0.5, 0); // base at origin
+    // Cedar geometry: multi-tier upright cone resembling actual eastern red cedar /
+    // Ashe juniper — pyramidal silhouette, wider at the base, narrow at the crown.
+    // Three stacked cones of decreasing radius create the layered branch tiers.
+    const cedarGeo = buildCedarGeometry();
 
     // Oak canopy = sphere (upper half)
     const oakGeo = new THREE.SphereGeometry(1, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
