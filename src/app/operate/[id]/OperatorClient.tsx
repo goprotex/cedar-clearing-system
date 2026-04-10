@@ -432,6 +432,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
           return;
         }
+
+        // Auto-center on pasture polygons so the operator sees their work area
+        const bounds = new mapboxgl.LngLatBounds();
+        let hasBounds = false;
+        for (const p of bid.pastures) {
+          const ring = p.polygon?.geometry?.coordinates?.[0];
+          if (!ring || ring.length < 3) continue;
+          for (const c of ring) {
+            if (Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+              bounds.extend(c as [number, number]);
+              hasBounds = true;
+            }
+          }
+        }
+        if (hasBounds) {
+          map.fitBounds(bounds, {
+            padding: { top: 60, bottom: 80, left: 20, right: 20 },
+            maxZoom: 17,
+            duration: 1200,
+          });
+        }
+
         bumpResize();
         setTimeout(bumpResize, 100);
       });

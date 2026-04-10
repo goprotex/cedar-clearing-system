@@ -18,9 +18,12 @@ export async function GET() {
   const supabase = createClient(cookieStore);
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
-  if (authErr) return NextResponse.json({ error: authErr.message }, { status: 401 });
-  const userId = auth.user?.id;
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (authErr || !auth.user?.id) {
+    // No auth session — return empty data so the monitor page still renders
+    // the map and UI.  Jobs/cleared-cells will be empty until the user signs in.
+    return NextResponse.json({ jobs: [], cleared: {} as Record<string, string[]>, operators: {} as Record<string, unknown[]> });
+  }
+  const userId = auth.user.id;
 
   const { data: memberships, error: memErr } = await supabase
     .from('job_members')
@@ -30,7 +33,7 @@ export async function GET() {
 
   const jobIds = (memberships ?? []).map((m) => m.job_id);
   if (jobIds.length === 0) {
-    return NextResponse.json({ jobs: [], clearedByJob: {} as Record<string, string[]>, operatorsByJob: {} as Record<string, unknown[]> });
+    return NextResponse.json({ jobs: [], cleared: {} as Record<string, string[]>, operators: {} as Record<string, unknown[]> });
   }
 
   const { data: jobs, error: jobsErr } = await supabase
@@ -46,9 +49,9 @@ export async function GET() {
     .in('job_id', jobIds);
   if (clearedErr) return NextResponse.json({ error: clearedErr.message }, { status: 500 });
 
-  const clearedByJob: Record<string, string[]> = {};
+  const clearedMap: Record<string, string[]> = {};
   for (const row of cleared ?? []) {
-    (clearedByJob[row.job_id] ??= []).push(row.cell_id);
+    (clearedMap[row.job_id] ??= []).push(row.cell_id);
   }
 
   const { data: operators, error: opErr } = await supabase
@@ -57,11 +60,11 @@ export async function GET() {
     .in('job_id', jobIds);
   if (opErr) return NextResponse.json({ error: opErr.message }, { status: 500 });
 
-  const operatorsByJob: Record<string, unknown[]> = {};
+  const operatorsMap: Record<string, unknown[]> = {};
   for (const row of operators ?? []) {
-    (operatorsByJob[row.job_id] ??= []).push(row);
+    (operatorsMap[row.job_id] ??= []).push(row);
   }
 
-  return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], clearedByJob, operatorsByJob });
+  return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], cleared: clearedMap, operators: operatorsMap });
 }
 
