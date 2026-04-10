@@ -1,0 +1,14 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/ai-populate/route": "/api/ai-populate",
+  "/api/cedar-detect/route": "/api/cedar-detect",
+  "/api/elevation/route": "/api/elevation",
+  "/api/seasonal/route": "/api/seasonal",
+  "/api/soil/route": "/api/soil",
+  "/api/soilweb/route": "/api/soilweb",
+  "/bid/[id]/page": "/bid/[id]",
+  "/bids/page": "/bids",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/"
+}

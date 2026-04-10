@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/ai-populate": {
+      "maxDuration": 30
+    },
+    "/api/cedar-detect": {
+      "maxDuration": 300
+    },
+    "/api/seasonal": {
+      "maxDuration": 55
+    },
+    "/api/soil": {
+      "maxDuration": 25
+    }
+  }
+}

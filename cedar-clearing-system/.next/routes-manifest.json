@@ -1,0 +1,120 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/bid/[id]",
+      "regex": "^/bid/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/bid/(?<nxtPid>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/ai-populate",
+      "regex": "^/api/ai\\-populate(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai\\-populate(?:/)?$"
+    },
+    {
+      "page": "/api/cedar-detect",
+      "regex": "^/api/cedar\\-detect(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cedar\\-detect(?:/)?$"
+    },
+    {
+      "page": "/api/elevation",
+      "regex": "^/api/elevation(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/elevation(?:/)?$"
+    },
+    {
+      "page": "/api/seasonal",
+      "regex": "^/api/seasonal(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/seasonal(?:/)?$"
+    },
+    {
+      "page": "/api/soil",
+      "regex": "^/api/soil(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/soil(?:/)?$"
+    },
+    {
+      "page": "/api/soilweb",
+      "regex": "^/api/soilweb(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/soilweb(?:/)?$"
+    },
+    {
+      "page": "/bids",
+      "regex": "^/bids(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/bids(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

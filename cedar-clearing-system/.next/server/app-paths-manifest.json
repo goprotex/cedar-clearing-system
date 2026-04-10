@@ -1,0 +1,14 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/ai-populate/route": "app/api/ai-populate/route.js",
+  "/api/cedar-detect/route": "app/api/cedar-detect/route.js",
+  "/api/elevation/route": "app/api/elevation/route.js",
+  "/api/seasonal/route": "app/api/seasonal/route.js",
+  "/api/soil/route": "app/api/soil/route.js",
+  "/api/soilweb/route": "app/api/soilweb/route.js",
+  "/bid/[id]/page": "app/bid/[id]/page.js",
+  "/bids/page": "app/bids/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js"
+}
