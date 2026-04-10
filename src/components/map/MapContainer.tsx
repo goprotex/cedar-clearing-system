@@ -23,7 +23,16 @@ interface MapContainerProps {
   accessToken: string;
 }
 
-type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI' | 'hologram';
+type LayerKey =
+  | 'soil'
+  | 'naip'
+  | 'naipCIR'
+  | 'naipNDVI'
+  | 'sentinel2'
+  | 'kerrParcels'
+  | 'terrain3d'
+  | 'cedarAI'
+  | 'hologram';
 type Species = 'cedar' | 'oak' | 'mixed';
 
 export default function MapContainer({ accessToken }: MapContainerProps) {
@@ -35,11 +44,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const rotationFrameRef = useRef<number | null>(null);
   const treeLayerRef = useRef<TreeLayer3D | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
+  /** Kerr parcels GeoJSON loaded from /gis/kerr-county-parcels.geojson (valid FeatureCollection). */
+  const [kerrParcelsSupported, setKerrParcelsSupported] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
     naip: false,
     naipCIR: false,
     naipNDVI: false,
+    sentinel2: false,
+    kerrParcels: false,
     terrain3d: false,
     cedarAI: false,
     hologram: false,
@@ -49,6 +62,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     naip: 0.85,
     naipCIR: 0.85,
     naipNDVI: 0.75,
+    sentinel2: 0.75,
+    kerrParcels: 0.9,
     terrain3d: 1.3, // terrain exaggeration (0.5–2.5)
     cedarAI: 0.7,
     hologram: 1.0,
@@ -92,7 +107,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       setLayers((prev) => {
         if (prev.hologram) return prev;
         const next = { ...prev };
-        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
+        preHoloLayersRef.current = {
+          naip: prev.naip,
+          naipCIR: prev.naipCIR,
+          naipNDVI: prev.naipNDVI,
+          sentinel2: prev.sentinel2,
+          kerrParcels: prev.kerrParcels,
+          terrain3d: prev.terrain3d,
+          cedarAI: prev.cedarAI,
+        };
         next.hologram = true;
         next.terrain3d = true;
         next.naip = false;
@@ -209,6 +232,29 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         paint: { 'raster-opacity': 0.75 },
         layout: { visibility: 'none' },
       });
+
+      // ── Sentinel-2 cloudless (EOX, ~10 m effective; annual mosaic) — WMTS xyz ──
+      map.addSource('sentinel2-eox', {
+        type: 'raster',
+        tiles: [
+          'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+        ],
+        tileSize: 256,
+        maxzoom: 16,
+        attribution:
+          '<a href="https://s2maps.eu/" target="_blank" rel="noopener">EOX Sentinel-2 cloudless</a> (Copernicus data)',
+      });
+
+      map.addLayer(
+        {
+          id: 'sentinel2-overlay',
+          type: 'raster',
+          source: 'sentinel2-eox',
+          paint: { 'raster-opacity': 0.75 },
+          layout: { visibility: 'none' },
+        },
+        'pastures-fill'
+      );
 
       // ── Pasture polygons source ──
       map.addSource('pastures', {
@@ -341,6 +387,40 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.on('mouseleave', 'pastures-fill', () => {
         map.getCanvas().style.cursor = '';
       });
+
+      void (async () => {
+        try {
+          const r = await fetch('/gis/kerr-county-parcels.geojson');
+          if (!r.ok) return;
+          const data = (await r.json()) as GeoJSON.FeatureCollection;
+          if (!data?.features) return;
+          if (map.getSource('kerr-parcels')) return;
+          map.addSource('kerr-parcels', { type: 'geojson', data });
+          map.addLayer(
+            {
+              id: 'kerr-parcels-fill',
+              type: 'fill',
+              source: 'kerr-parcels',
+              paint: { 'fill-color': '#facc15', 'fill-opacity': 0.12 },
+              layout: { visibility: 'none' },
+            },
+            'pastures-fill'
+          );
+          map.addLayer(
+            {
+              id: 'kerr-parcels-line',
+              type: 'line',
+              source: 'kerr-parcels',
+              paint: { 'line-color': '#fde047', 'line-width': 1 },
+              layout: { visibility: 'none' },
+            },
+            'pastures-fill'
+          );
+          setKerrParcelsSupported(true);
+        } catch {
+          /* optional */
+        }
+      })();
     });
 
     mapRef.current = map;
@@ -364,6 +444,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       naip: 'naip-overlay',
       naipCIR: 'naip-cir-overlay',
       naipNDVI: 'naip-ndvi-overlay',
+      sentinel2: 'sentinel2-overlay',
+      kerrParcels: '', // line + fill below
       terrain3d: '', // handled separately
       cedarAI: '',   // handled below (two layers)
       hologram: '',  // handled separately (3D tree layer)
@@ -380,6 +462,20 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           layers[key as LayerKey] ? 'visible' : 'none'
         );
         map.setPaintProperty(layerId, 'raster-opacity', opacities[key as LayerKey]);
+      }
+    }
+
+    const kerrVis = layers.kerrParcels ? 'visible' : 'none';
+    const ko = opacities.kerrParcels;
+    for (const kid of ['kerr-parcels-fill', 'kerr-parcels-line'] as const) {
+      const kl = map.getLayer(kid);
+      if (kl) {
+        map.setLayoutProperty(kid, 'visibility', kerrVis);
+        if (kid === 'kerr-parcels-fill') {
+          map.setPaintProperty('kerr-parcels-fill', 'fill-opacity', 0.06 + ko * 0.14);
+        } else {
+          map.setPaintProperty('kerr-parcels-line', 'line-opacity', 0.35 + ko * 0.55);
+        }
       }
     }
 
@@ -621,7 +717,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
+  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter, kerrParcelsSupported]);
 
   // Pause rotation on user interaction, resume after 3s idle
   useEffect(() => {
@@ -684,7 +780,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
       // Hologram: NDVI base + cedar AI; enable 3D terrain by default so relief matches trees
       if (key === 'hologram' && !prev.hologram) {
-        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
+        preHoloLayersRef.current = {
+          naip: prev.naip,
+          naipCIR: prev.naipCIR,
+          naipNDVI: prev.naipNDVI,
+          sentinel2: prev.sentinel2,
+          kerrParcels: prev.kerrParcels,
+          terrain3d: prev.terrain3d,
+          cedarAI: prev.cedarAI,
+        };
         next.terrain3d = true;
         next.naip = false;
         next.naipCIR = false;
@@ -699,11 +803,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       if (key === 'hologram' && prev.hologram) {
         const saved = preHoloLayersRef.current;
         if (saved) {
-          next.naip = saved.naip;
-          next.naipCIR = saved.naipCIR;
-          next.naipNDVI = saved.naipNDVI;
-          next.terrain3d = saved.terrain3d;
-          next.cedarAI = saved.cedarAI;
+          next.naip = !!saved.naip;
+          next.naipCIR = !!saved.naipCIR;
+          next.naipNDVI = !!saved.naipNDVI;
+          next.sentinel2 = !!saved.sentinel2;
+          next.kerrParcels = !!saved.kerrParcels;
+          next.terrain3d = !!saved.terrain3d;
+          next.cedarAI = !!saved.cedarAI;
           preHoloLayersRef.current = null;
         }
         const map = mapRef.current;
@@ -964,6 +1070,32 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               onOpacity={(v) => setOpacities((p) => ({ ...p, naipNDVI: v }))}
               holoMode={layers.hologram}
             />
+            <LayerRow
+              label="🛰️ Sentinel-2"
+              active={layers.sentinel2}
+              opacity={opacities.sentinel2}
+              onToggle={() => toggleLayer('sentinel2')}
+              onOpacity={(v) => setOpacities((p) => ({ ...p, sentinel2: v }))}
+              holoMode={layers.hologram}
+              title="EOX Sentinel-2 cloudless mosaic (10 m class). Compare season/look vs NAIP. Non‑commercial use under CC BY‑NC‑SA; commercial apps need an EOX license (see s2maps.eu)."
+            />
+            <p className="text-[9px] text-slate-500 px-2 -mt-0.5 pb-0.5 leading-tight">
+              Attribution: EOX / Copernicus — see{' '}
+              <a href="https://s2maps.eu/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-300">
+                s2maps.eu
+              </a>
+            </p>
+            {kerrParcelsSupported && (
+              <LayerRow
+                label="📐 Kerr parcels"
+                active={layers.kerrParcels}
+                opacity={opacities.kerrParcels}
+                onToggle={() => toggleLayer('kerrParcels')}
+                onOpacity={(v) => setOpacities((p) => ({ ...p, kerrParcels: v }))}
+                holoMode={layers.hologram}
+                title="Kerr County parcel boundaries from public/gis/kerr-county-parcels.geojson (replace with your export)."
+              />
+            )}
 
             <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
 
@@ -1148,6 +1280,7 @@ function LayerRow({
   onOpacity,
   holoMode = false,
   disabled = false,
+  title,
 }: {
   label: string;
   active: boolean;
@@ -1158,10 +1291,13 @@ function LayerRow({
   onOpacity: (v: number) => void;
   holoMode?: boolean;
   disabled?: boolean;
+  title?: string;
 }) {
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
+        title={title}
         onClick={disabled ? undefined : onToggle}
         className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
           disabled
