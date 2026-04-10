@@ -40,13 +40,14 @@ function pct(cleared: number, total: number) {
   return Math.max(0, Math.min(100, Math.round((cleared / total) * 100)));
 }
 
-export default function MonitorClient() {
+export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscreen?: boolean } = {}) {
   const [jobs, setJobs] = useState<BootstrapJob[]>([]);
   const [clearedByJob, setClearedByJob] = useState<Record<string, Set<string>>>({});
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [radarOn, setRadarOn] = useState(true);
   const [cedarOn, setCedarOn] = useState(true);
+  const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
   const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
@@ -185,8 +186,8 @@ export default function MonitorClient() {
   }, [jobs]);
 
   return (
-    <div className="min-h-screen bg-[#131313] text-[#e5e2e1]">
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6">
+    <div className={`min-h-screen bg-[#131313] text-[#e5e2e1] ${fullscreen ? 'fixed inset-0 z-[60] p-0 overflow-hidden' : ''}`}>
+      <div className={`${fullscreen ? 'hidden' : 'flex'} justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6`}>
         <div>
           <h1 className="text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
           <p className="text-[#ffb693] text-xs font-mono">
@@ -205,8 +206,8 @@ export default function MonitorClient() {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-1 border-2 border-[#353534] relative" style={{ minHeight: '70vh' }}>
+      <div className={`flex ${fullscreen ? 'flex-col' : 'flex-col lg:flex-row'} gap-6 ${fullscreen ? 'h-full' : ''}`}>
+        <div className={`flex-1 border-2 border-[#353534] relative ${fullscreen ? 'h-full' : ''}`} style={fullscreen ? undefined : { minHeight: '70vh' }}>
           {mapboxToken ? (
             <MapboxMap
               accessToken={mapboxToken}
@@ -232,9 +233,43 @@ export default function MonitorClient() {
               LOADING_JOBS…
             </div>
           )}
+
+          {/* TV overlay */}
+          {fullscreen && (
+            <div className="absolute top-3 left-3 z-20 holo-panel backdrop-blur-sm rounded-lg px-4 py-3 space-y-2">
+              <div className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Office Monitor</div>
+              <div className="flex items-center gap-3">
+                <div className="text-xs font-mono text-[#a98a7d]">ALL_JOBS</div>
+                <div className="text-xl font-black text-[#13ff43] tabular-nums">{totals.pct}%</div>
+                <div className="text-[10px] font-mono text-[#a98a7d] tabular-nums">
+                  {totals.cleared}/{totals.total}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setRadarOn((v) => !v)}
+                  className="holo-button px-3 py-2 rounded text-[10px] font-bold uppercase tracking-widest"
+                >
+                  RADAR {radarOn ? 'ON' : 'OFF'}
+                </button>
+                <button
+                  onClick={() => setCedarOn((v) => !v)}
+                  className="holo-button px-3 py-2 rounded text-[10px] font-bold uppercase tracking-widest"
+                >
+                  CEDAR {cedarOn ? 'ON' : 'OFF'}
+                </button>
+                <button
+                  onClick={() => setFullscreen(false)}
+                  className="px-3 py-2 rounded bg-[#FF6B00] text-black text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all"
+                >
+                  EXIT_FULL
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="w-full lg:w-96 shrink-0 space-y-4">
+        <div className={`w-full lg:w-96 shrink-0 space-y-4 ${fullscreen ? 'hidden' : ''}`}>
           <div className="border-2 border-[#353534] p-4 space-y-3">
             <div className="text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest">LAYERS</div>
             <div className="flex items-center justify-between">
@@ -257,6 +292,15 @@ export default function MonitorClient() {
                 }`}
               >
                 {cedarOn ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono text-[#e5e2e1]">FULLSCREEN_TV</span>
+              <button
+                onClick={() => setFullscreen(true)}
+                className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-[#13ff43] text-[#13ff43] hover:bg-[#13ff43] hover:text-black transition-all"
+              >
+                LAUNCH
               </button>
             </div>
           </div>
