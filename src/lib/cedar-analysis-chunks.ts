@@ -9,7 +9,7 @@ const SAMPLES_PER_CELL_EST = SAMPLE_SPACING_M * SAMPLE_SPACING_M;
  * Target max samples per /api/cedar-detect invocation so each chunk finishes
  * comfortably within serverless limits (many sequential NAIP HTTP calls per chunk).
  */
-export const TARGET_SAMPLES_PER_CHUNK = 520;
+export const TARGET_SAMPLES_PER_CHUNK = 420;
 
 const MAX_SPLIT_DEPTH = 24;
 const MIN_SPLIT_DEG = 1e-7;
