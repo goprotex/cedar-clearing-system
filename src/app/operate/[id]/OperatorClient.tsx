@@ -10,6 +10,8 @@ import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
+const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
+const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
 const OPERATOR_PUBLISH_MS = 2500;
 
 interface ClearedCell {
@@ -201,16 +203,30 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
 
-    const map = new mapboxgl.Map({
-      container,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: bid.propertyCenter,
-      zoom: bid.mapZoom,
-      pitch: 45,
-      antialias: true,
-      preserveDrawingBuffer: true,
-      failIfMajorPerformanceCaveat: false,
-    });
+    // iPad / in-cab devices often struggle with heavy terrain/3D layers.
+    // Default to a lighter rendering path on coarse-pointer devices.
+    const coarsePointer =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches;
+    setLowPowerMode(coarsePointer);
+
+    let map: mapboxgl.Map;
+    try {
+      map = new mapboxgl.Map({
+        container,
+        style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
+        center: bid.propertyCenter,
+        zoom: bid.mapZoom,
+        pitch: coarsePointer ? 0 : 45,
+        antialias: true,
+        preserveDrawingBuffer: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (e) {
+      setMapError(e instanceof Error ? e.message : 'Map failed to initialize.');
+      return;
+    }
 
     map.on('error', (e) => {
       const msg =
@@ -230,27 +246,40 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     });
 
     map.on('load', () => {
-      map.addSource('mapbox-dem', {
-        type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
-      });
-      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
-      map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+      // High fidelity terrain/sky only on non-coarse pointer devices.
+      if (!coarsePointer) {
+        try {
+          map.addSource('mapbox-dem', {
+            type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
+          });
+          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
+          map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+        } catch {
+          // If terrain fails, keep going with base map only.
+        }
+      }
 
       // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
-      map.addSource('naip-ndvi', {
-        type: 'raster',
-        tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
-        ],
-        tileSize: 256,
-      });
-      map.addLayer({
-        id: 'naip-ndvi-overlay',
-        type: 'raster',
-        source: 'naip-ndvi',
-        paint: { 'raster-opacity': 0.85 },
-        layout: { visibility: 'none' },
-      });
+      if (!coarsePointer) {
+        try {
+          map.addSource('naip-ndvi', {
+            type: 'raster',
+            tiles: [
+              'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+            ],
+            tileSize: 256,
+          });
+          map.addLayer({
+            id: 'naip-ndvi-overlay',
+            type: 'raster',
+            source: 'naip-ndvi',
+            paint: { 'raster-opacity': 0.85 },
+            layout: { visibility: 'none' },
+          });
+        } catch {
+          // Optional overlay; ignore if it fails.
+        }
+      }
 
       // Pasture polygon outlines with holographic green glow
       const pastureFeatures: GeoJSON.Feature[] = bid.pastures
@@ -283,15 +312,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
 
-      map.addLayer({
-        id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
-        paint: {
-          'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
-          'fill-extrusion-opacity': 0.55,
-          'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
-          'fill-extrusion-base': 0,
-        },
-      });
+      if (coarsePointer) {
+        // 2D fill on iPad/field devices for stability/perf
+        map.addLayer({
+          id: 'cedar-cells-fill-2d',
+          type: 'fill',
+          source: 'cedar-cells',
+          paint: {
+            'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
+            'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
+          },
+        });
+      } else {
+        map.addLayer({
+          id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
+          paint: {
+            'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
+            'fill-extrusion-opacity': 0.55,
+            'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
+            'fill-extrusion-base': 0,
+          },
+        });
+      }
 
       map.addLayer({
         id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
@@ -320,6 +362,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     if (!map.getLayer(layerId)) return;
     map.setLayoutProperty(layerId, 'visibility', ndviEnabled ? 'visible' : 'none');
   }, [ndviEnabled]);
+
+  // Resize on orientation change / viewport changes (iPad/Safari)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const onResize = () => {
+      try { map.resize(); } catch { /* ignore */ }
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, [state.bid]);
 
   // Process GPS position — check cedar cells for clearing
   const updateCedarSource = useCallback(() => {
