@@ -21,6 +21,33 @@ function squareCellAround(lng: number, lat: number, halfSizeM: number): GeoJSON.
   ];
 }
 
+/**
+ * Blob “equivalent diameter” often blows up when components merge or grass patches are large.
+ * Ashe juniper crowns are usually a narrow size band; oaks can be wider. Weakly scale from
+ * raw detection, clamp to realistic ranges for 3D / markup.
+ */
+function canopyDiameterFromBlob(cls: CedarVegClass, blobEquivDiameterM: number): number {
+  const d = Math.max(2, Math.min(28, blobEquivDiameterM));
+  let m: number;
+  if (cls === 'cedar') {
+    m = 4.4 + (d - 5) * 0.14;
+    m = Math.max(3.4, Math.min(6.5, m));
+  } else if (cls === 'oak') {
+    m = 6 + (d - 6.5) * 0.36;
+    m = Math.max(5, Math.min(13, m));
+  } else {
+    m = 4.5 + (d - 5.5) * 0.28;
+    m = Math.max(3.6, Math.min(8.5, m));
+  }
+  return Math.round(m * 10) / 10;
+}
+
+function heightFromCanopy(cls: CedarVegClass, canopyM: number): number {
+  if (cls === 'oak') return Math.round(Math.min(17, 5 + canopyM * 0.55) * 10) / 10;
+  if (cls === 'mixed_brush') return Math.round(Math.min(12, 4.3 + canopyM * 0.48) * 10) / 10;
+  return Math.round(Math.min(10.5, 4.2 + canopyM * 0.52) * 10) / 10;
+}
+
 function classColor(c: CedarVegClass): string {
   switch (c) {
     case 'cedar':
@@ -69,8 +96,9 @@ export function buildCedarAnalysisFromCirBlobs(
     const [lng, lat] = pixelToLngLat(b.centroidXPx, b.centroidYPx, imageW, imageH, minLng, minLat, maxLng, maxLat);
     const pt = turf.point([lng, lat]);
     if (!turf.booleanPointInPolygon(pt, pasture)) continue;
-    const dM = blobDiameterMeters(b.pixelCount, mpp);
+    const rawDiamM = blobDiameterMeters(b.pixelCount, mpp);
     const { classification, confidence, bandVotes } = classifyCrownFromCirFeatures(b, calibration);
+    const dM = canopyDiameterFromBlob(classification, rawDiamM);
     inside.push({
       lng,
       lat,
@@ -141,10 +169,7 @@ export function buildCedarAnalysisFromCirBlobs(
         color: classColor(r.classification),
         detectionMethod: 'cir_objects',
         canopyDiameterM: r.dM,
-        heightM:
-          r.classification === 'oak'
-            ? Math.min(18, 5 + r.dM * 0.5)
-            : Math.min(14, 4 + r.dM * 0.45),
+        heightM: heightFromCanopy(r.classification, r.dM),
         blobPixels: r.pixels,
         ndviStd: Math.round(f.ndviStd * 1000) / 1000,
         cellNdvi20m: Math.round(f.cellNdvi20m * 1000) / 1000,

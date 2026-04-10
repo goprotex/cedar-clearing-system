@@ -22,17 +22,51 @@ const DEFAULT_OPTS: CirDetectOptions = {
 };
 
 /**
- * Vegetation in false-color CIR (R≈NIR, G≈red, B≈green): woody crowns read as strong red/magenta.
- * Exported for richer feature extraction on the same raster.
+ * Woody / tree crown candidates in NAIP CIR (R=NIR, G=red, B=green).
+ * - Bright pink / red: live oak, sunlit canopy (strong NIR vs visible).
+ * - Dark maroon: Ashe juniper in tight clusters — relax NIR dominance so they are not skipped.
+ * - Grey (balanced RGB): grass/herbaceous — reject.
+ * - Near-white: caliche / bright soil — reject.
  */
 export function vegetationMask(r: number, g: number, b: number): boolean {
   const sum = r + g + b + 1;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const chroma = mx - mn;
+  const lum = (r + g + b) / 3;
+
+  if (r < 20 && g < 20 && b < 20) return false;
+
+  // Caliche / bright bare ground: high, flat RGB
+  if (mx > 232 && mn > 198 && chroma < 42) return false;
+  if (lum > 218 && chroma < 35) return false;
+
+  // Grey grass / senescent flat cover: mid luminance, very low chroma (below maroon wood)
+  if (lum > 42 && lum < 188 && chroma < 18) return false;
+
   const rn = r / sum;
   const gn = g / sum;
   const bn = b / sum;
-  if (r < 55 && g < 55 && b < 55) return false;
-  if (r > 245 && g > 245 && b > 245) return false;
-  return rn > gn + 0.04 && rn > bn + 0.04 && r > g * 0.72 && r > b * 0.72;
+
+  // Classic bright pink / magenta woody (oak, sunlit cedar)
+  const brightWoody =
+    rn > gn + 0.038 &&
+    rn > bn + 0.038 &&
+    r > g * 0.68 &&
+    r > b * 0.68 &&
+    lum < 248;
+
+  // Dark maroon juniper / shaded red canopy: NIR still leads G/B but absolute levels are lower
+  const maroonWoody =
+    chroma >= 18 &&
+    r >= 38 &&
+    r >= g * 0.5 &&
+    r >= b * 0.54 &&
+    (rn > gn + 0.012 || r > g + 8) &&
+    (rn > bn + 0.016 || r > b + 8) &&
+    lum < 200;
+
+  return brightWoody || maroonWoody;
 }
 
 /**

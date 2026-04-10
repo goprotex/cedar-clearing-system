@@ -494,7 +494,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         'match', ['get', 'classification'],
         'cedar', '#00ff41',
         'oak', '#ffaa00',
-        'mixed_brush', '#22dd44',
+        'mixed_brush', '#d4923a',
         '#00ff41',
       ] as mapboxgl.Expression;
 
@@ -1141,7 +1141,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 </span>
                 <SpeciesToggle label="Cedar" color="#00ff41" active={speciesVisible.cedar} onToggle={() => setSpeciesVisible(v => ({ ...v, cedar: !v.cedar }))} />
                 <SpeciesToggle label="Oak" color="#ffaa00" active={speciesVisible.oak} onToggle={() => setSpeciesVisible(v => ({ ...v, oak: !v.oak }))} />
-                <SpeciesToggle label="Mixed" color="#22dd44" active={speciesVisible.mixed} onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))} />
+                <SpeciesToggle label="Mixed" color="#d4923a" active={speciesVisible.mixed} onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))} />
               </div>
             )}
 

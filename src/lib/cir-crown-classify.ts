@@ -35,6 +35,12 @@ export function classifyCrownFromCirFeatures(
   const ar = f.aspectRatio;
   const tex = f.ndviStd;
   const sh = f.shadowSideContrast;
+  const nir = f.meanNir;
+
+  /** CIR appearance: bright pink ≈ live oak; dark maroon ≈ juniper (user field guide). */
+  const cirBrightPink = nir > 0.36 && f.ndvi > 0.2 && broad > 0.015;
+  const cirMaroonWood =
+    nir >= 0.16 && nir <= 0.52 && f.ndvi > 0.055 && f.ndvi < 0.4 && !(nir > 0.34 && broad > 0.028);
 
   /** Uniform turf: symmetric brightness (no strong cast shadow). */
   const turfLike =
@@ -42,7 +48,8 @@ export function classifyCrownFromCirFeatures(
     f.ndvi < 0.38 &&
     tex < 0.095 &&
     broad < 0.024 &&
-    f.ndvi + broad * 4 < 0.42;
+    f.ndvi + broad * 4 < 0.42 &&
+    !(nir > 0.2 && f.ndvi > 0.08);
 
   let cedarScore = 0;
   let oakScore = 0;
@@ -70,6 +77,9 @@ export function classifyCrownFromCirFeatures(
   }
 
   if (tex > cal.mixedTexGt && f.ndvi > cal.mixedNdviGt) mixedScore += 1.5;
+
+  if (cirBrightPink) oakScore += 1.35;
+  if (cirMaroonWood) cedarScore += 1.25;
 
   // Cast shadow on one side (NAIP sun angle): broad spreading crowns → oak-lean; compact → cedar-lean.
   if (sh > 0.11) {

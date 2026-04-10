@@ -192,6 +192,216 @@ type Accum = {
   maxY: number;
 };
 
+function bboxOfIndices(indices: number[], width: number): { bw: number; bh: number } {
+  let minX = Infinity;
+  let maxX = 0;
+  let minY = Infinity;
+  let maxY = 0;
+  for (const i of indices) {
+    const x = i % width;
+    const y = (i / width) | 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  return { bw: maxX - minX + 1, bh: maxY - minY + 1 };
+}
+
+/** How many spatial clusters to try inside one merged 8-connected blob (tight cedar thickets). */
+function estimateClusterK(pixelCount: number, bw: number, bh: number, mPerPx: number, minPx: number): number {
+  const maxDm = Math.max(bw, bh) * mPerPx;
+  const crownM = 3.9;
+  if (pixelCount < 68) return 1;
+  if (pixelCount < minPx * 2.4 && maxDm < crownM * 1.25) return 1;
+  const bySpan = Math.max(1, Math.round(maxDm / crownM));
+  const areaM2 = pixelCount * mPerPx * mPerPx;
+  const byArea = Math.max(1, Math.round(areaM2 / (Math.PI * (crownM / 2) ** 2)));
+  const k = Math.round(Math.min(bySpan * bySpan * 0.38 + 1, byArea * 0.85));
+  return Math.max(2, Math.min(24, k));
+}
+
+/**
+ * Split merged mask component into ~one feature per crown using k-means on (x,y),
+ * seeded from high-NDVI pixels so dark maroon clusters still get multiple centers.
+ */
+function kmeansSplitBlobPixels(
+  blobPixels: number[],
+  ndvi: Float32Array,
+  width: number,
+  k: number,
+  minCluster: number
+): number[][] {
+  const nPts = blobPixels.length;
+  if (k <= 1 || nPts < minCluster * 2) return [blobPixels];
+
+  type Pt = { idx: number; x: number; y: number; nd: number };
+  const pts: Pt[] = blobPixels.map((i) => ({
+    idx: i,
+    x: i % width,
+    y: (i / width) | 0,
+    nd: ndvi[i],
+  }));
+
+  const minSeedDistSq = 12; // px — separate nearby crown peaks in a thicket
+  const sorted = [...pts].sort((a, b) => b.nd - a.nd);
+  const seeds: { x: number; y: number }[] = [];
+  for (const p of sorted) {
+    if (seeds.length >= k) break;
+    if (seeds.every((s) => (s.x - p.x) ** 2 + (s.y - p.y) ** 2 >= minSeedDistSq)) {
+      seeds.push({ x: p.x, y: p.y });
+    }
+  }
+  let s = 0;
+  while (seeds.length < k && s < nPts * 2) {
+    const p = pts[s % nPts];
+    s++;
+    if (seeds.every((c) => (c.x - p.x) ** 2 + (c.y - p.y) ** 2 >= 6)) seeds.push({ x: p.x, y: p.y });
+  }
+  if (seeds.length < 2) return [blobPixels];
+
+  const useK = seeds.length;
+  const cx = seeds.map((c) => c.x);
+  const cy = seeds.map((c) => c.y);
+  const label = new Int16Array(nPts);
+
+  for (let it = 0; it < 14; it++) {
+    for (let j = 0; j < nPts; j++) {
+      const { x, y } = pts[j];
+      let best = 0;
+      let bestD = (x - cx[0]) ** 2 + (y - cy[0]) ** 2;
+      for (let c = 1; c < useK; c++) {
+        const d = (x - cx[c]) ** 2 + (y - cy[c]) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = c;
+        }
+      }
+      label[j] = best;
+    }
+    const sx = new Float64Array(useK);
+    const sy = new Float64Array(useK);
+    const cnt = new Int32Array(useK);
+    for (let j = 0; j < nPts; j++) {
+      const c = label[j];
+      sx[c] += pts[j].x;
+      sy[c] += pts[j].y;
+      cnt[c]++;
+    }
+    for (let c = 0; c < useK; c++) {
+      if (cnt[c] > 0) {
+        cx[c] = sx[c] / cnt[c];
+        cy[c] = sy[c] / cnt[c];
+      }
+    }
+  }
+
+  const groups: number[][] = Array.from({ length: useK }, () => []);
+  for (let j = 0; j < nPts; j++) {
+    groups[label[j]].push(pts[j].idx);
+  }
+  const valid = groups.filter((g) => g.length >= minCluster);
+  return valid.length > 0 ? valid : [blobPixels];
+}
+
+function accumulateFromIndices(indices: number[], data: Uint8ClampedArray, ndvi: Float32Array, width: number): Accum {
+  const acc: Accum = {
+    sumX: 0,
+    sumY: 0,
+    count: 0,
+    sumR: 0,
+    sumG: 0,
+    sumB: 0,
+    sumNdvi: 0,
+    sumNdviSq: 0,
+    minX: width,
+    maxX: 0,
+    minY: Infinity,
+    maxY: 0,
+  };
+  for (const cur of indices) {
+    const x = cur % width;
+    const y = (cur / width) | 0;
+    const p = cur * 4;
+    const r = data[p];
+    const g = data[p + 1];
+    const b = data[p + 2];
+    acc.sumX += x;
+    acc.sumY += y;
+    acc.count++;
+    acc.sumR += r;
+    acc.sumG += g;
+    acc.sumB += b;
+    const nv = ndvi[cur];
+    acc.sumNdvi += nv;
+    acc.sumNdviSq += nv * nv;
+    if (x < acc.minX) acc.minX = x;
+    if (x > acc.maxX) acc.maxX = x;
+    if (y < acc.minY) acc.minY = y;
+    if (y > acc.maxY) acc.maxY = y;
+  }
+  return acc;
+}
+
+function featureFromAccum(
+  acc: Accum,
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  gridCtx: ReturnType<typeof buildMeanNdviGrid>,
+  blobPixels: number[]
+): CirBlobFeatures {
+  const count = acc.count;
+  const inv = 1 / count;
+  const meanR = acc.sumR * inv;
+  const meanG = acc.sumG * inv;
+  const meanB = acc.sumB * inv;
+  const { nir, red, green } = cirRgbToReflectance(meanR, meanG, meanB);
+  const { ndvi: meanNdvi, gndvi, savi, excessGreen } = spectralIndices(nir, red, green);
+  const meanNdviForVar = acc.sumNdvi * inv;
+  const varNdvi = Math.max(0, acc.sumNdviSq * inv - meanNdviForVar * meanNdviForVar);
+  const ndviStd = Math.sqrt(varNdvi);
+
+  const bw = acc.maxX - acc.minX + 1;
+  const bh = acc.maxY - acc.minY + 1;
+  const aspectRatio = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
+
+  const cx = acc.sumX * inv;
+  const cy = acc.sumY * inv;
+
+  const cellNdvi20m = sampleGrid(cx, cy, gridCtx.mean, gridCtx.gw, gridCtx.gh, gridCtx.cellPx);
+
+  const blobSet = new Set(blobPixels);
+  const shadowSideContrast = shadowContrastFourSides(
+    data,
+    width,
+    height,
+    acc.minX,
+    acc.maxX,
+    acc.minY,
+    acc.maxY,
+    blobSet
+  );
+
+  return {
+    centroidXPx: cx,
+    centroidYPx: cy,
+    pixelCount: count,
+    meanNir: nir,
+    meanRed: red,
+    meanGreen: green,
+    ndvi: meanNdvi,
+    gndvi,
+    savi,
+    excessGreen,
+    ndviStd,
+    aspectRatio,
+    cellNdvi20m,
+    isolationVs20m: meanNdvi - cellNdvi20m,
+    shadowSideContrast,
+  };
+}
+
 /**
  * Full pipeline: mask → connected components with per-blob stats + multi-scale NDVI context.
  */
@@ -229,21 +439,6 @@ export function extractCirBlobFeaturesFromRgba(
   for (let idx = 0; idx < n; idx++) {
     if (!mask[idx] || visited[idx]) continue;
 
-    const acc: Accum = {
-      sumX: 0,
-      sumY: 0,
-      count: 0,
-      sumR: 0,
-      sumG: 0,
-      sumB: 0,
-      sumNdvi: 0,
-      sumNdviSq: 0,
-      minX: width,
-      maxX: 0,
-      minY: height,
-      maxY: 0,
-    };
-
     const stack = [idx];
     visited[idx] = 1;
     const blobPixels: number[] = [];
@@ -253,24 +448,6 @@ export function extractCirBlobFeaturesFromRgba(
       blobPixels.push(cur);
       const x = cur % width;
       const y = (cur / width) | 0;
-      const p = cur * 4;
-      const r = data[p];
-      const g = data[p + 1];
-      const b = data[p + 2];
-
-      acc.sumX += x;
-      acc.sumY += y;
-      acc.count++;
-      acc.sumR += r;
-      acc.sumG += g;
-      acc.sumB += b;
-      const nv = ndvi[cur];
-      acc.sumNdvi += nv;
-      acc.sumNdviSq += nv * nv;
-      if (x < acc.minX) acc.minX = x;
-      if (x > acc.maxX) acc.maxX = x;
-      if (y < acc.minY) acc.minY = y;
-      if (y > acc.maxY) acc.maxY = y;
 
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
@@ -286,57 +463,19 @@ export function extractCirBlobFeaturesFromRgba(
       }
     }
 
-    const count = acc.count;
+    const count = blobPixels.length;
     if (count < minPixels || count > maxPixels) continue;
 
-    const inv = 1 / count;
-    const meanR = acc.sumR * inv;
-    const meanG = acc.sumG * inv;
-    const meanB = acc.sumB * inv;
-    const { nir, red, green } = cirRgbToReflectance(meanR, meanG, meanB);
-    const { ndvi: meanNdvi, gndvi, savi, excessGreen } = spectralIndices(nir, red, green);
-    const meanNdviForVar = acc.sumNdvi * inv;
-    const varNdvi = Math.max(0, acc.sumNdviSq * inv - meanNdviForVar * meanNdviForVar);
-    const ndviStd = Math.sqrt(varNdvi);
+    const { bw, bh } = bboxOfIndices(blobPixels, width);
+    const k = estimateClusterK(count, bw, bh, mPerPx, minPixels);
+    const minSub = Math.max(4, minPixels - 1);
+    const groups = k <= 1 ? [blobPixels] : kmeansSplitBlobPixels(blobPixels, ndvi, width, k, minSub);
 
-    const bw = acc.maxX - acc.minX + 1;
-    const bh = acc.maxY - acc.minY + 1;
-    const aspectRatio = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
-
-    const cx = acc.sumX * inv;
-    const cy = acc.sumY * inv;
-
-    const cellNdvi20m = sampleGrid(cx, cy, gridCtx.mean, gridCtx.gw, gridCtx.gh, gridCtx.cellPx);
-
-    const blobSet = new Set(blobPixels);
-    const shadowSideContrast = shadowContrastFourSides(
-      data,
-      width,
-      height,
-      acc.minX,
-      acc.maxX,
-      acc.minY,
-      acc.maxY,
-      blobSet
-    );
-
-    out.push({
-      centroidXPx: cx,
-      centroidYPx: cy,
-      pixelCount: count,
-      meanNir: nir,
-      meanRed: red,
-      meanGreen: green,
-      ndvi: meanNdvi,
-      gndvi,
-      savi,
-      excessGreen,
-      ndviStd,
-      aspectRatio,
-      cellNdvi20m,
-      isolationVs20m: meanNdvi - cellNdvi20m,
-      shadowSideContrast,
-    });
+    for (const group of groups) {
+      if (group.length < minPixels) continue;
+      const acc = accumulateFromIndices(group, data, ndvi, width);
+      out.push(featureFromAccum(acc, data, width, height, gridCtx, group));
+    }
   }
 
   return out;

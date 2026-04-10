@@ -1,6 +1,6 @@
 // ─── 3D Holographic Tree Layer for Mapbox GL JS ───
 // Uses Three.js with Mapbox CustomLayerInterface for synchronized 3D rendering.
-// Renders cedar (green cones) and oak (amber domes) as InstancedMesh with
+// Renders cedar (green domes), oak (amber domes), mixed (small orange–green cones) as InstancedMesh with
 // holographic shader materials, animated ground grid, floating particles,
 // and extruded polygon walls.
 
@@ -31,7 +31,7 @@ type Species = 'cedar' | 'oak' | 'mixed';
 const HOLO = {
   cedar:  { base: new THREE.Color(0x00ff41), glow: new THREE.Color(0x33ff66) },
   oak:    { base: new THREE.Color(0xffaa00), glow: new THREE.Color(0xffcc44) },
-  mixed:  { base: new THREE.Color(0x22dd44), glow: new THREE.Color(0x55ff77) },
+  mixed:  { base: new THREE.Color(0xd4923a), glow: new THREE.Color(0x6ecf7a) },
   grid:   new THREE.Color(0x00ff41),
   wall:   new THREE.Color(0x00ff41),
   particle: new THREE.Color(0x33ff55),
@@ -685,17 +685,17 @@ export class TreeLayer3D {
     const grouped: Record<Species, TreePosition[]> = { cedar: [], oak: [], mixed: [] };
     for (const t of this.trees) grouped[t.species].push(t);
 
-    // Geometries — cedar = inverted cone (point down), oak = sphere on cylinder trunk
-    const cedarGeo = new THREE.ConeGeometry(1, 1, 8);
-    cedarGeo.rotateZ(Math.PI); // flip upside down — point facing ground
-    cedarGeo.translate(0, 0.5, 0); // base at origin
+    // Geometries — cedar = canopy dome (same mesh formerly used for mixed), oak = sphere on trunk
+    const cedarGeo = new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    cedarGeo.translate(0, 0.4, 0);
 
-    // Oak canopy = sphere (upper half)
     const oakGeo = new THREE.SphereGeometry(1, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
     oakGeo.translate(0, 0.5, 0);
 
-    const mixedGeo = new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    mixedGeo.translate(0, 0.4, 0);
+    // Mixed = compact inverted cone (shrub / brush marker)
+    const mixedGeo = new THREE.ConeGeometry(1, 1, 5);
+    mixedGeo.rotateZ(Math.PI);
+    mixedGeo.translate(0, 0.5, 0);
 
     const dotGeo = new THREE.CircleGeometry(1, 8);
     dotGeo.rotateX(-Math.PI / 2);
@@ -714,20 +714,19 @@ export class TreeLayer3D {
       cedar: cedarGeo, oak: oakGeo, mixed: mixedGeo,
     };
 
-    // Shadow material (dark translucent green glow)
-    const shadowMat = new THREE.MeshBasicMaterial({
-      color: HOLO.cedar.base,
-      transparent: true,
-      opacity: 0.12,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-
     const dummy = new THREE.Object3D();
 
     for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
       const arr = grouped[sp];
       if (arr.length === 0) continue;
+
+      const shadowMat = new THREE.MeshBasicMaterial({
+        color: sp === 'oak' ? HOLO.oak.base : sp === 'mixed' ? HOLO.mixed.base : HOLO.cedar.base,
+        transparent: true,
+        opacity: 0.12,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
 
       // Full geometry mesh (canopy)
       const mesh = new THREE.InstancedMesh(geos[sp], this.materials[sp], arr.length);
@@ -736,10 +735,22 @@ export class TreeLayer3D {
         const pos = this.lngLatToScene(t.lng, t.lat);
         const radiusX = t.canopyDiameter / 2;
         const radiusZ = t.canopyDiameter / 2;
-        // Oak: raise canopy above trunk
-        const baseY = sp === 'oak' ? t.height * 0.4 : 0;
+        // Oak: raise canopy above trunk; cedar dome sits slightly lifted like former mixed
+        const baseY =
+          sp === 'oak' ? t.height * 0.4 : sp === 'cedar' ? t.height * 0.08 : 0;
+        let sx = radiusX;
+        let sy = t.height * (sp === 'oak' ? 0.6 : 1);
+        let sz = radiusZ;
+        if (sp === 'mixed') {
+          sx *= 0.48;
+          sy *= 0.48;
+          sz *= 0.48;
+        }
+        if (sp === 'cedar') {
+          sy *= 0.88;
+        }
         dummy.position.set(pos.x, baseY, pos.z);
-        dummy.scale.set(radiusX, t.height * (sp === 'oak' ? 0.6 : 1), radiusZ);
+        dummy.scale.set(sx, sy, sz);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
       }
@@ -753,9 +764,12 @@ export class TreeLayer3D {
       for (let i = 0; i < arr.length; i++) {
         const t = arr[i];
         const pos = this.lngLatToScene(t.lng, t.lat);
-        const trunkH = sp === 'oak' ? t.height * 0.5 : t.height * 0.3;
+        const trunkH =
+          sp === 'oak' ? t.height * 0.5 : sp === 'mixed' ? t.height * 0.22 : t.height * 0.3;
+        const trunkW =
+          t.canopyDiameter * (sp === 'mixed' ? 0.09 : 0.15);
         dummy.position.set(pos.x, 0, pos.z);
-        dummy.scale.set(t.canopyDiameter * 0.15, trunkH, t.canopyDiameter * 0.15);
+        dummy.scale.set(trunkW, trunkH, trunkW);
         dummy.updateMatrix();
         trunk.setMatrixAt(i, dummy.matrix);
       }
@@ -769,7 +783,7 @@ export class TreeLayer3D {
       for (let i = 0; i < arr.length; i++) {
         const t = arr[i];
         const pos = this.lngLatToScene(t.lng, t.lat);
-        const r = t.canopyDiameter * 0.6;
+        const r = t.canopyDiameter * (sp === 'mixed' ? 0.36 : 0.6);
         dummy.position.set(pos.x, 0, pos.z);
         dummy.scale.set(r, 1, r);
         dummy.updateMatrix();
@@ -779,6 +793,7 @@ export class TreeLayer3D {
       shadow.frustumCulled = false;
       this.scene.add(shadow);
       this.shadowMeshes[sp] = shadow;
+      shadowMat.dispose();
 
       // Dot mesh (for far zoom)
       const dot = new THREE.InstancedMesh(dotGeo, this.dotMaterials[sp], arr.length);
@@ -786,7 +801,8 @@ export class TreeLayer3D {
         const t = arr[i];
         const pos = this.lngLatToScene(t.lng, t.lat);
         dummy.position.set(pos.x, 0, pos.z);
-        dummy.scale.set(3, 1, 3);
+        const dotR = sp === 'mixed' ? 2.2 : 3;
+        dummy.scale.set(dotR, 1, dotR);
         dummy.updateMatrix();
         dot.setMatrixAt(i, dummy.matrix);
       }
@@ -803,7 +819,6 @@ export class TreeLayer3D {
     dotGeo.dispose();
     trunkGeo.dispose();
     shadowGeo.dispose();
-    shadowMat.dispose();
   }
 
   // ─── Internal: LOD switching ───
