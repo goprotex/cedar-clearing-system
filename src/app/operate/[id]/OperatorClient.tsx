@@ -6,6 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
+import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
@@ -75,6 +76,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const [ndviEnabled, setNdviEnabled] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [sharedEnabled, setSharedEnabled] = useState(false);
+  const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
   const [state, setState] = useState<OperatorState>({
     bid: null, trees: [], clearedCellIds: new Set(), clearedCells: [],
@@ -98,6 +101,46 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
   }, [bidId]);
+
+  // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
+  useEffect(() => {
+    if (!state.bid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setSharedStatus('syncing');
+        const jobId = jobIdFromBidId(bidId);
+        const res = await fetch(`/api/jobs/${jobId}/cleared-cells`, { cache: 'no-store' });
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            if (!cancelled) {
+              setSharedEnabled(false);
+              setSharedStatus('unauth');
+            }
+            return;
+          }
+          throw new Error(await res.text().catch(() => 'Failed to load shared progress.'));
+        }
+        const data = (await res.json()) as { cellIds: string[] };
+        if (cancelled) return;
+        setSharedEnabled(true);
+        setSharedStatus('ready');
+        setState((prev) => {
+          const merged = mergeClearedCellIds(prev.clearedCellIds, data.cellIds ?? []);
+          if (merged.size === prev.clearedCellIds.size) return prev;
+          saveOperatorSession(bidId, Array.from(merged), prev.clearedCells);
+          return { ...prev, clearedCellIds: merged };
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setSharedEnabled(false);
+          setSharedStatus('error');
+          console.error('Shared progress sync failed:', e);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [bidId, state.bid]);
 
   // Compute cedar stats
   const cedarStats = useCallback(() => {
@@ -316,19 +359,42 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     }
 
     if (newlyCleared.length > 0) {
+      const ts = Date.now();
       setState(prev => {
         const nextIds = new Set(prev.clearedCellIds);
         const nextCells = [...prev.clearedCells];
         for (const id of newlyCleared) {
           nextIds.add(id);
           const parts = id.split(':');
-          nextCells.push({ cellIndex: parseInt(parts[1]), pastureId: parts[0], timestamp: Date.now() });
+          nextCells.push({ cellIndex: parseInt(parts[1]), pastureId: parts[0], timestamp: ts });
         }
         saveOperatorSession(bidId, Array.from(nextIds), nextCells);
         return { ...prev, clearedCellIds: nextIds, clearedCells: nextCells };
       });
 
       updateCedarSource();
+
+      // Best-effort: if shared progress is enabled, append events so other users/devices see progress.
+      if (sharedEnabled) {
+        const jobId = jobIdFromBidId(bidId);
+        void Promise.allSettled(
+          newlyCleared.map((cellId) =>
+            fetch(`/api/jobs/${jobId}/events`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'operator_cell_cleared', data: { cellId, timestamp: ts } }),
+            })
+          )
+        ).then((results) => {
+          const anyAuth = results.some((r) => r.status === 'fulfilled' && 'value' in r && (r.value as Response).status === 401);
+          if (anyAuth) {
+            setSharedEnabled(false);
+            setSharedStatus('unauth');
+          }
+        }).catch(() => {
+          // ignore (best-effort)
+        });
+      }
     }
 
     trailCoordsRef.current.push([lng, lat]);
@@ -339,7 +405,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         trailSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailCoordsRef.current }, properties: {} });
       }
     }
-  }, [bidId, updateCedarSource]);
+  }, [bidId, updateCedarSource, sharedEnabled]);
 
   // Start/stop GPS
   const toggleGPS = useCallback(() => {

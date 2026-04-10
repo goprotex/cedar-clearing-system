@@ -4,6 +4,18 @@ import { createClient } from '@/utils/supabase/server';
 import { cookies } from 'next/headers';
 import { jobIdFromBidId } from '@/lib/jobs';
 
+function countCedarCells(bid: Bid): number {
+  let total = 0;
+  for (const p of bid.pastures) {
+    const feats = p.cedarAnalysis?.gridCells?.features ?? [];
+    for (const f of feats) {
+      const cls = f.properties?.classification;
+      if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') total++;
+    }
+  }
+  return total;
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as { bidId?: string; bid?: Bid };
@@ -25,6 +37,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     const jobId = jobIdFromBidId(bidId);
+    const cedar_total_cells = countCedarCells(bid);
 
     // Create job (idempotent) and ensure the caller is a member (owner)
     const { error: jobErr } = await supabase.from('jobs').upsert({
@@ -33,6 +46,7 @@ export async function POST(req: Request) {
       bid_snapshot: bid,
       title: `${bid.propertyName || 'Untitled Property'} — ${bid.bidNumber}`,
       status: 'active',
+      cedar_total_cells,
     });
     if (jobErr) return NextResponse.json({ error: jobErr.message }, { status: 500 });
 

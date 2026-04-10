@@ -47,6 +47,13 @@ export function saveJobProgress(jobId: string, clearedCells: ClearedCell[]) {
   localStorage.setItem(jobProgressKey(jobId), JSON.stringify(clearedCells));
 }
 
+export function mergeClearedCellIds(existing: Set<string>, incoming: string[]) {
+  if (!incoming || incoming.length === 0) return existing;
+  const next = new Set(existing);
+  for (const id of incoming) next.add(id);
+  return next;
+}
+
 export async function parseJsonBody(req: Request): Promise<unknown> {
   try {
     return await req.json();
