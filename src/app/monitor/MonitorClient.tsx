@@ -175,25 +175,80 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     return () => { cancelled = true; };
   }, []);
 
-  // Also load operator sessions from localStorage for local jobs
+  // Load operator cleared-cell sessions from localStorage.
+  // Operate mode stores at ccc_operator_${bidId} (raw bid ID).
+  // Job IDs are job_${bidId}, so we derive the bid ID to find the data.
   useEffect(() => {
     if (!jobs.length) return;
     const nextCleared: Record<string, Set<string>> = { ...clearedByJob };
     let changed = false;
     for (const job of jobs) {
       if (nextCleared[job.id]?.size) continue;
-      try {
-        const raw = localStorage.getItem(`ccc_operator_${job.id}`);
-        if (!raw) continue;
-        const data = JSON.parse(raw) as { clearedCellIds?: string[] };
-        if (data.clearedCellIds?.length) {
-          nextCleared[job.id] = new Set(data.clearedCellIds);
-          changed = true;
-        }
-      } catch { /* ignore */ }
+      // Derive bid ID from job ID (job_${bidId} → bidId)
+      const bidId = job.id.startsWith('job_') ? job.id.slice(4) : job.id;
+      for (const key of [`ccc_operator_${bidId}`, `ccc_operator_${job.id}`]) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const data = JSON.parse(raw) as { clearedCellIds?: string[] };
+          if (data.clearedCellIds?.length) {
+            nextCleared[job.id] = new Set(data.clearedCellIds);
+            changed = true;
+            break;
+          }
+        } catch { /* ignore */ }
+      }
     }
     if (changed) setClearedByJob(nextCleared);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs]);
+
+  // Poll localStorage for operator positions (written by operate mode)
+  useEffect(() => {
+    if (!jobs.length) return;
+    const poll = () => {
+      const next: typeof operatorsByJob = {};
+      for (const job of jobs) {
+        const bidId = job.id.startsWith('job_') ? job.id.slice(4) : job.id;
+        // Check both job ID and bid ID keys
+        for (const key of [`ccc_operator_pos_${job.id}`, `ccc_operator_pos_job_${bidId}`]) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+            const pos = JSON.parse(raw) as { lng: number; lat: number; accuracy_m: number | null; heading_deg: number | null; speed_mps: number | null; timestamp: number };
+            if (typeof pos.lng !== 'number' || typeof pos.lat !== 'number') continue;
+            // Only show if position is recent (last 5 minutes)
+            if (pos.timestamp && Date.now() - pos.timestamp > 5 * 60 * 1000) continue;
+            next[job.id] = [{
+              user_id: 'operator',
+              lng: pos.lng,
+              lat: pos.lat,
+              heading: pos.heading_deg,
+              speed_mps: pos.speed_mps,
+              accuracy_m: pos.accuracy_m,
+              updated_at: new Date(pos.timestamp).toISOString(),
+            }];
+            break;
+          } catch { /* ignore */ }
+        }
+      }
+      // Merge with any existing Supabase-sourced operators
+      setOperatorsByJob(prev => {
+        const merged = { ...prev };
+        for (const [jobId, ops] of Object.entries(next)) {
+          const existing = merged[jobId] ?? [];
+          // Only add local operator if no Supabase operators exist for this job
+          if (existing.length === 0) {
+            merged[jobId] = ops;
+          }
+        }
+        return merged;
+      });
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
   }, [jobs]);
 
   // Realtime: cleared cells

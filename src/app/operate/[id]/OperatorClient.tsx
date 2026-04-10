@@ -595,26 +595,32 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
     }
 
-    // Best-effort: publish operator position periodically for live monitor.
-    if (sharedEnabled) {
-      const now = Date.now();
-      if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
-        lastPublishRef.current = now;
-        const jobId = jobIdFromBidId(bidId);
+    // Publish operator position for live monitor.
+    const now = Date.now();
+    if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
+      lastPublishRef.current = now;
+      const jobId = jobIdFromBidId(bidId);
+      const posData = {
+        lng,
+        lat,
+        accuracy_m: stateRef.current.accuracy,
+        heading_deg: stateRef.current.heading,
+        speed_mps: stateRef.current.speed,
+        timestamp: now,
+      };
+
+      // Always write to localStorage so monitor can pick it up locally
+      try {
+        localStorage.setItem(`ccc_operator_pos_${jobId}`, JSON.stringify(posData));
+      } catch { /* storage full — ignore */ }
+
+      // Also push to Supabase if authed
+      if (sharedEnabled) {
         void fetch(`/api/jobs/${jobId}/operator-positions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lng,
-            lat,
-            accuracy_m: stateRef.current.accuracy,
-            heading_deg: stateRef.current.heading,
-            speed_mps: stateRef.current.speed,
-            timestamp: now,
-          }),
-        }).catch(() => {
-          // best-effort
-        });
+          body: JSON.stringify(posData),
+        }).catch(() => { /* best-effort */ });
       }
     }
 
