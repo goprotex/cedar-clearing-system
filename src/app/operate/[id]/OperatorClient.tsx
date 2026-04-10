@@ -15,7 +15,11 @@ const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 200
 const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
 const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
 const OPERATOR_PUBLISH_MS = 2500;
+const ROTATION_SPEED = 0.0375;
+const ROTATION_RESUME_MS = 3000;
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
+
+type OperatorLayerKey = 'soil' | 'naipNDVI' | 'naipCIR' | 'terrain3d';
 
 function isValidLngLat(pair: [number, number]): boolean {
   const [lng, lat] = pair;
@@ -134,12 +138,19 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const trailCoordsRef = useRef<[number, number][]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [ndviEnabled, setNdviEnabled] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
+  const [layerPanelOpen, setLayerPanelOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
   const lastPublishRef = useRef<number>(0);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
+  const rotationFrameRef = useRef<number | null>(null);
+  const [operatorLayers, setOperatorLayers] = useState<Record<OperatorLayerKey, boolean>>({
+    soil: false,
+    naipNDVI: false,
+    naipCIR: false,
+    terrain3d: false,
+  });
 
   const [state, setState] = useState<OperatorState>({
     bid: null, trees: [], clearedCellIds: new Set(), clearedCells: [],
@@ -367,26 +378,59 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             }
           }
 
-          if (!coarsePointer) {
-            try {
-              map.addSource('naip-ndvi', {
-                type: 'raster',
-                tiles: [
-                  'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
-                ],
-                tileSize: 256,
-              });
-              map.addLayer({
-                id: 'naip-ndvi-overlay',
-                type: 'raster',
-                source: 'naip-ndvi',
-                paint: { 'raster-opacity': 0.85 },
-                layout: { visibility: 'none' },
-              });
-            } catch {
-              // optional overlay
-            }
-          }
+          // Soil WMS overlay
+          try {
+            map.addSource('soil-wms', {
+              type: 'raster',
+              tiles: [
+                'https://SDMDataAccess.sc.egov.usda.gov/Spatial/SDM.wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mapunitpoly&BBOX={bbox-epsg-3857}&SRS=EPSG:3857&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'soil-overlay',
+              type: 'raster',
+              source: 'soil-wms',
+              paint: { 'raster-opacity': 0.45 },
+              layout: { visibility: 'none' },
+            });
+          } catch { /* optional */ }
+
+          // NAIP CIR (False Color Composite)
+          try {
+            map.addSource('naip-cir', {
+              type: 'raster',
+              tiles: [
+                'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&bandIds=3,0,1&f=image',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'naip-cir-overlay',
+              type: 'raster',
+              source: 'naip-cir',
+              paint: { 'raster-opacity': 0.85 },
+              layout: { visibility: 'none' },
+            });
+          } catch { /* optional */ }
+
+          // NAIP NDVI overlay
+          try {
+            map.addSource('naip-ndvi', {
+              type: 'raster',
+              tiles: [
+                'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'naip-ndvi-overlay',
+              type: 'raster',
+              source: 'naip-ndvi',
+              paint: { 'raster-opacity': 0.85 },
+              layout: { visibility: 'none' },
+            });
+          } catch { /* optional */ }
 
           const pastureFeatures: GeoJSON.Feature[] = bid.pastures
             .filter((p) => (p.polygon?.geometry?.coordinates?.length ?? 0) > 0)
@@ -478,6 +522,33 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
         bumpResize();
         setTimeout(bumpResize, 100);
+
+        // Start slow rotation (matching hologram mode)
+        if (!coarsePointer) {
+          const startRotation = () => {
+            if (rotationFrameRef.current) return;
+            const rotate = () => {
+              if (!mapRef.current) return;
+              mapRef.current.setBearing(mapRef.current.getBearing() + ROTATION_SPEED);
+              rotationFrameRef.current = requestAnimationFrame(rotate);
+            };
+            rotationFrameRef.current = requestAnimationFrame(rotate);
+          };
+          startRotation();
+
+          let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+          const pauseRotation = () => {
+            if (rotationFrameRef.current) {
+              cancelAnimationFrame(rotationFrameRef.current);
+              rotationFrameRef.current = null;
+            }
+            if (resumeTimer) clearTimeout(resumeTimer);
+            resumeTimer = setTimeout(startRotation, ROTATION_RESUME_MS);
+          };
+          map.on('mousedown', pauseRotation);
+          map.on('touchstart', pauseRotation);
+          map.on('wheel', pauseRotation);
+        }
       });
 
       mapRef.current = map;
@@ -486,6 +557,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     return () => {
       cancelled = true;
       clearTimeout(initTimer);
+      if (rotationFrameRef.current) {
+        cancelAnimationFrame(rotationFrameRef.current);
+        rotationFrameRef.current = null;
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -493,14 +568,33 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     };
   }, [state.bid]);
 
-  // Toggle NDVI overlay visibility
+  // Toggle layer visibility
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const layerId = 'naip-ndvi-overlay';
-    if (!map.getLayer(layerId)) return;
-    map.setLayoutProperty(layerId, 'visibility', ndviEnabled ? 'visible' : 'none');
-  }, [ndviEnabled]);
+
+    const layerMap: Record<OperatorLayerKey, string> = {
+      soil: 'soil-overlay',
+      naipNDVI: 'naip-ndvi-overlay',
+      naipCIR: 'naip-cir-overlay',
+      terrain3d: '',
+    };
+
+    for (const [key, layerId] of Object.entries(layerMap)) {
+      if (layerId && map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', operatorLayers[key as OperatorLayerKey] ? 'visible' : 'none');
+      }
+    }
+
+    // 3D terrain toggle
+    if (operatorLayers.terrain3d) {
+      if (map.getSource('mapbox-dem')) {
+        try { map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 }); } catch { /* */ }
+      }
+    } else {
+      try { map.setTerrain(null as unknown as mapboxgl.TerrainSpecification); } catch { /* */ }
+    }
+  }, [operatorLayers]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -595,29 +689,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
     }
 
-    // Best-effort: publish operator position periodically for live monitor.
-    if (sharedEnabled) {
-      const now = Date.now();
-      if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
-        lastPublishRef.current = now;
-        const jobId = jobIdFromBidId(bidId);
-        void fetch(`/api/jobs/${jobId}/operator-positions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lng,
-            lat,
-            accuracy_m: stateRef.current.accuracy,
-            heading_deg: stateRef.current.heading,
-            speed_mps: stateRef.current.speed,
-            timestamp: now,
-          }),
-        }).catch(() => {
-          // best-effort
-        });
-      }
-    }
-
     trailCoordsRef.current.push([lng, lat]);
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -667,6 +738,26 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         }
 
         processPosition(lng, lat);
+
+        // Publish operator position to scout monitor (best-effort, throttled)
+        if (sharedEnabled) {
+          const now = Date.now();
+          if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
+            lastPublishRef.current = now;
+            const jobId = jobIdFromBidId(bidId);
+            void fetch(`/api/jobs/${jobId}/operator-positions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                lng,
+                lat,
+                accuracy_m: pos.coords.accuracy,
+                heading_deg: pos.coords.heading,
+                speed_mps: pos.coords.speed,
+              }),
+            }).catch(() => { /* best-effort */ });
+          }
+        }
       },
       (err) => {
         console.error('GPS error:', err);
@@ -677,7 +768,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     watchIdRef.current = id;
     setState(prev => ({ ...prev, gpsActive: true, sessionStart: prev.clearedCells.length === 0 ? Date.now() : prev.sessionStart }));
-  }, [processPosition]);
+  }, [processPosition, sharedEnabled, bidId]);
 
   // Recenter on operator
   const recenter = useCallback(() => {
@@ -793,17 +884,48 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setNdviEnabled((v) => !v)}
-              className="text-[10px] font-mono text-[#a98a7d] hover:text-white border border-green-900/40 px-2 py-1 rounded"
-              title="Toggle NDVI overlay"
+              onClick={() => setLayerPanelOpen((v) => !v)}
+              className={`text-[10px] font-mono hover:text-white border border-green-900/40 px-2 py-1 rounded ${
+                Object.values(operatorLayers).some(Boolean) ? 'text-[#13ff43] border-[#13ff43]/40' : 'text-[#a98a7d]'
+              }`}
+              title="Toggle map layers"
             >
-              {ndviEnabled ? 'NDVI_ON' : 'NDVI_OFF'}
+              LAYERS
             </button>
             <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[10px] font-mono text-[#a98a7d]">
               {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Layer panel */}
+      {bid && layerPanelOpen && (
+        <div className="absolute top-14 right-3 z-10 holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[180px] space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Layers</span>
+            <button onClick={() => setLayerPanelOpen(false)} className="text-[#a98a7d] hover:text-white text-xs">&times;</button>
+          </div>
+          {([
+            ['naipNDVI', 'NAIP NDVI'],
+            ['naipCIR', 'NAIP CIR'],
+            ['soil', 'SOIL MAP'],
+            ['terrain3d', '3D TERRAIN'],
+          ] as [OperatorLayerKey, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setOperatorLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+              className={`w-full flex items-center justify-between text-[10px] font-mono uppercase tracking-wider px-2 py-1.5 rounded border transition-colors ${
+                operatorLayers[key]
+                  ? 'border-[#13ff43]/50 text-[#13ff43] bg-[#13ff43]/10'
+                  : 'border-[#353534] text-[#a98a7d] hover:text-white hover:border-[#555]'
+              }`}
+            >
+              <span>{label}</span>
+              <span>{operatorLayers[key] ? 'ON' : 'OFF'}</span>
+            </button>
+          ))}
         </div>
       )}
 
