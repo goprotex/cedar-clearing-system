@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
   { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
-  { href: '/map-radar', label: 'MAP_RADAR', icon: '🛰️' },
+  { href: '/map-radar', label: 'RADAR', icon: '🛰️' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
   { href: '/archive', label: 'ARCHIVE', icon: '📦' },
