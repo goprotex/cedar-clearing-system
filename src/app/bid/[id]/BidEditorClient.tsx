@@ -9,12 +9,12 @@ import BidDetails from '@/components/bid/BidDetails';
 import BidOptions from '@/components/bid/BidOptions';
 import RateCardSettings from '@/components/bid/RateCardSettings';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import type { BidStatus } from '@/types';
+import { createLocalJobFromBid } from '@/lib/jobs';
 
 const STATUS_OPTIONS: { value: BidStatus; label: string }[] = [
   { value: 'draft', label: 'Draft' },
@@ -52,6 +52,8 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     updateBidField,
   } = useBidStore();
 
+  const [convertBusy, setConvertBusy] = useState(false);
+
   // Prevent hydration mismatch: Zustand generates random IDs/bid numbers
   // on server vs client. Delay rendering until client is mounted.
   const [mounted, setMounted] = useState(false);
@@ -60,8 +62,14 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUpdatedAt = useRef(currentBid.updatedAt);
 
-  // Load bid from localStorage on mount
+  // Mark mounted client-side (prevents hydration mismatch).
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Load bid from localStorage after mount
+  useEffect(() => {
+    if (!mounted) return;
     loadBid(bidId);
     // If no saved data was found for this ID, the store still holds
     // the previous (stale) bid. Reset to a fresh bid keyed to this ID.
@@ -69,8 +77,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     if (state.currentBid.id !== bidId) {
       useBidStore.getState().newBidWithId(bidId);
     }
-    setMounted(true);
-  }, [bidId, loadBid]);
+  }, [bidId, loadBid, mounted]);
 
   useEffect(() => {
     if (currentBid.updatedAt !== lastUpdatedAt.current && currentBid.pastures.length > 0) {
@@ -88,6 +95,39 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     saveBid();
     toast.success('Bid saved');
   }, [saveBid]);
+
+  const convertToJob = useCallback(async () => {
+    try {
+      setConvertBusy(true);
+      handleSave();
+      const res = await fetch('/api/jobs/from-bid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bidId, bid: currentBid }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { jobId: string };
+        toast.success('Job created');
+        window.location.href = `/job/${data.jobId}`;
+        return;
+      }
+
+      // Local-only fallback when Supabase auth isn’t available yet.
+      if (res.status === 401) {
+        const job = createLocalJobFromBid(currentBid);
+        toast.success('Job created (local)');
+        window.location.href = `/job/${job.id}`;
+        return;
+      }
+
+      const msg = await res.text().catch(() => '');
+      throw new Error(msg || 'Failed to convert bid to job.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to convert bid to job.');
+    } finally {
+      setConvertBusy(false);
+    }
+  }, [bidId, handleSave, currentBid]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
@@ -127,7 +167,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
             </SelectContent>
           </Select>
           <span className="text-[10px] text-[#5a4136] font-mono hidden lg:inline truncate">
-            // {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
+            {'//'} {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -138,6 +178,16 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
           >
             🚜 OPERATE
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs border-[#353534] text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-black uppercase tracking-widest hidden sm:inline-flex"
+            onClick={convertToJob}
+            disabled={convertBusy}
+            title="Convert this bid into a shared job for multi-user progress tracking"
+          >
+            {convertBusy ? 'CREATING_JOB…' : 'CONVERT_TO_JOB'}
+          </Button>
           <Button
             variant="outline"
             size="sm"

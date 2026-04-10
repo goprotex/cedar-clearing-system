@@ -65,6 +65,9 @@ const HOLO_FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
   uniform vec3 uGlow;
   uniform float uOpacity;
+  uniform float uIntensity;
+  uniform float uFresnelStrength;
+  uniform float uScanStrength;
 
   varying vec3 vNormal;
   varying vec3 vViewPos;
@@ -73,7 +76,7 @@ const HOLO_FRAGMENT = /* glsl */ `
   void main() {
     vec3 viewDir = normalize(-vViewPos);
     float fresnel = 1.0 - abs(dot(viewDir, vNormal));
-    fresnel = pow(fresnel, 2.5);
+    fresnel = pow(fresnel, 3.2);
 
     // Animated scan lines
     float scan = sin(vElevation * 40.0 + uTime * 3.0) * 0.5 + 0.5;
@@ -82,11 +85,12 @@ const HOLO_FRAGMENT = /* glsl */ `
     // Breathe pulse
     float pulse = 0.85 + 0.15 * sin(uTime * 1.2);
 
-    vec3 color = mix(uColor, uGlow, fresnel * 0.6 + scan * 0.2);
-    float alpha = (uOpacity + fresnel * 0.45) * pulse;
-    alpha *= (0.85 + scan * 0.15);
+    float glowMix = clamp(fresnel * uFresnelStrength + scan * uScanStrength, 0.0, 1.0);
+    vec3 color = mix(uColor, uGlow, glowMix);
+    float alpha = (uOpacity + fresnel * 0.25) * pulse;
+    alpha *= (0.9 + scan * 0.1);
 
-    gl_FragColor = vec4(color * 1.6, alpha);
+    gl_FragColor = vec4(color * uIntensity, alpha);
   }
 `;
 
@@ -229,14 +233,18 @@ function createHoloMaterial(base: THREE.Color, glow: THREE.Color): THREE.ShaderM
       uTime: { value: 0 },
       uColor: { value: base },
       uGlow: { value: glow },
-      uOpacity: { value: 0.75 },
+      // Dialed down to feel less neon/overbright (especially on TV / satellite).
+      uOpacity: { value: 0.55 },
+      uIntensity: { value: 0.85 },
+      uFresnelStrength: { value: 0.45 },
+      uScanStrength: { value: 0.12 },
     },
     vertexShader: HOLO_VERTEX,
     fragmentShader: HOLO_FRAGMENT,
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
 }
 

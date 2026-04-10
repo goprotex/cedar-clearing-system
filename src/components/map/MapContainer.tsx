@@ -561,7 +561,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       if (!rotationFrameRef.current) {
         const rotate = () => {
           if (!mapRef.current) return;
-          const bearing = mapRef.current.getBearing() + 0.15;
+          const bearing = mapRef.current.getBearing() + 0.0375;
           mapRef.current.setBearing(bearing);
           rotationFrameRef.current = requestAnimationFrame(rotate);
         };
@@ -640,7 +640,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         if (!mapRef.current || !rotationFrameRef.current) {
           const rotate = () => {
             if (!mapRef.current) return;
-            mapRef.current.setBearing(mapRef.current.getBearing() + 0.15);
+            mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
             rotationFrameRef.current = requestAnimationFrame(rotate);
           };
           rotationFrameRef.current = requestAnimationFrame(rotate);

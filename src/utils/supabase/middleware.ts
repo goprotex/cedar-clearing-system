@@ -5,6 +5,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
 export const createClient = (request: NextRequest) => {
+  if (!supabaseUrl || !supabaseKey) {
+    return { supabase: null as unknown as ReturnType<typeof createServerClient>, response: NextResponse.next({ request: { headers: request.headers } }) };
+  }
   // Create an unmodified response
   let supabaseResponse = NextResponse.next({
     request: {
