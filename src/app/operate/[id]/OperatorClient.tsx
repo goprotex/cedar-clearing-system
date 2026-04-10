@@ -684,8 +684,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   }
 
   return (
-    <div className="min-h-[100dvh] h-[100dvh] w-screen bg-[#131313] relative overflow-hidden hologram-mode operate-mode-root isolate">
-      {/* Map container — z-0 so hologram vignette/scanlines (see globals.css) do not cover the WebGL canvas */}
+    <div className="min-h-[100dvh] h-[100dvh] w-screen bg-[#131313] relative overflow-hidden operate-mode-root isolate">
+      {/* Map container — must be lowest z-layer; do NOT apply hologram-mode on the
+          root because its ::after pseudo-element (z-index:5) occludes the WebGL
+          canvas on iPad / Safari, causing the map to appear invisible. */}
       <div ref={mapContainerRef} className="absolute inset-0 z-0 min-h-0" />
 
       {/* No-bid overlay */}
@@ -702,7 +704,18 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       )}
 
-      {/* Holographic scan-line overlay */}
+      {/* Holographic vignette + scan-line overlays — rendered as separate divs
+          instead of via .hologram-mode::after so they never block the WebGL canvas
+          on iPad / Safari (pointer-events:none keeps touch passthrough). */}
+      {bid && (
+        <div
+          className="absolute inset-0 pointer-events-none z-[5]"
+          style={{
+            boxShadow: 'inset 0 0 60px rgba(0,255,180,0.06), inset 0 0 120px rgba(0,0,0,0.3)',
+            border: '1px solid rgba(0,255,200,0.12)',
+          }}
+        />
+      )}
       {bid && <div className="holo-scanlines" />}
 
       {/* Map error overlay */}
