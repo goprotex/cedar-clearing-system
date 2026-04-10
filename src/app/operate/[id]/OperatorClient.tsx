@@ -684,11 +684,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   }
 
   return (
-    <div className="min-h-[100dvh] h-[100dvh] w-screen bg-[#131313] relative overflow-hidden operate-mode-root isolate">
-      {/* Map container — must be lowest z-layer; do NOT apply hologram-mode on the
-          root because its ::after pseudo-element (z-index:5) occludes the WebGL
-          canvas on iPad / Safari, causing the map to appear invisible. */}
-      <div ref={mapContainerRef} className="absolute inset-0 z-0 min-h-0" />
+    <div className="min-h-[100dvh] h-[100dvh] w-screen bg-[#131313] relative overflow-hidden operate-mode-root">
+      {/* Map container — forced onto its own GPU compositing layer so that
+          Safari/WebKit actually paints the WebGL canvas on iPad. The
+          translateZ(0) hack is necessary; without it overlapping positioned
+          elements (HUD, scanlines) prevent the canvas from compositing. */}
+      <div
+        ref={mapContainerRef}
+        className="absolute inset-0 min-h-0"
+        style={{ zIndex: 0, transform: 'translateZ(0)', willChange: 'transform' }}
+      />
 
       {/* No-bid overlay */}
       {!bid && (
@@ -704,19 +709,36 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       )}
 
-      {/* Holographic vignette + scan-line overlays — rendered as separate divs
-          instead of via .hologram-mode::after so they never block the WebGL canvas
-          on iPad / Safari (pointer-events:none keeps touch passthrough). */}
+      {/* Holographic decorative overlays — use border-only elements that don't
+          create full-viewport compositing surfaces above the WebGL canvas.
+          On iPad/Safari, full-area overlays (even pointer-events:none) prevent
+          the canvas from painting. Edge-only borders avoid this. */}
       {bid && (
-        <div
-          className="absolute inset-0 pointer-events-none z-[5]"
-          style={{
-            boxShadow: 'inset 0 0 60px rgba(0,255,180,0.06), inset 0 0 120px rgba(0,0,0,0.3)',
-            border: '1px solid rgba(0,255,200,0.12)',
-          }}
-        />
+        <>
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              zIndex: 5,
+              border: '1px solid rgba(0,255,200,0.12)',
+              transform: 'translateZ(0)',
+            }}
+          />
+          <div
+            className="absolute left-0 right-0 top-0 h-16 pointer-events-none"
+            style={{
+              zIndex: 4,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), transparent)',
+            }}
+          />
+          <div
+            className="absolute left-0 right-0 bottom-0 h-16 pointer-events-none"
+            style={{
+              zIndex: 4,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.3), transparent)',
+            }}
+          />
+        </>
       )}
-      {bid && <div className="holo-scanlines" />}
 
       {/* Map error overlay */}
       {bid && mapError && (
