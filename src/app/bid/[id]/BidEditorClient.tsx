@@ -67,16 +67,19 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     setMounted(true);
   }, []);
 
-  // Load bid from localStorage after mount
+  // Load bid from storage (Supabase or localStorage) after mount
   useEffect(() => {
     if (!mounted) return;
-    loadBid(bidId);
-    // If no saved data was found for this ID, the store still holds
-    // the previous (stale) bid. Reset to a fresh bid keyed to this ID.
-    const state = useBidStore.getState();
-    if (state.currentBid.id !== bidId) {
-      useBidStore.getState().newBidWithId(bidId);
-    }
+    let cancelled = false;
+    (async () => {
+      await loadBid(bidId);
+      if (cancelled) return;
+      const state = useBidStore.getState();
+      if (state.currentBid.id !== bidId) {
+        useBidStore.getState().newBidWithId(bidId);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [bidId, loadBid, mounted]);
 
   useEffect(() => {

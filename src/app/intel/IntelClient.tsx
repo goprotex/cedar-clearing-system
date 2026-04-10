@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import AppShell from '@/components/AppShell';
+import { useBidStore } from '@/lib/store';
 import type { BidSummary, BidStatus } from '@/types';
 
 interface IntelMetrics {
@@ -63,14 +64,14 @@ const STATUS_COLORS: Record<BidStatus, string> = {
   expired: '#f59e0b',
 };
 
-function loadBidsFromStorage(): BidSummary[] {
-  if (typeof window === 'undefined') return [];
-  const raw = localStorage.getItem('ccc_bid_list');
-  return raw ? JSON.parse(raw) : [];
-}
-
 export default function IntelClient() {
-  const [bids] = useState<BidSummary[]>(loadBidsFromStorage);
+  const { savedBids, loadBidList } = useBidStore();
+
+  useEffect(() => {
+    loadBidList();
+  }, [loadBidList]);
+
+  const bids = savedBids;
   const metrics = useMemo(() => computeMetrics(bids), [bids]);
 
   const maxRevenue = Math.max(...metrics.monthlyData.map((d) => d.revenue), 1);

@@ -13,6 +13,8 @@ import { extractTreesFromAnalysis } from '@/lib/tree-layer';
 import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
 import { readCedarDetectSse, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
+import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
+import { saveBidToSupabase, loadBidFromSupabase, loadBidListFromSupabase, deleteBidFromSupabase, getAuthUserId } from '@/lib/db';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -155,11 +157,15 @@ interface BidStore {
   // Rate card
   updateRateCard: (updates: Partial<RateCard>) => void;
 
-  // Persistence (local storage for Phase 1)
+  // Persistence (Supabase when authenticated, localStorage fallback)
   saveBid: () => void;
-  loadBid: (id: string) => void;
-  deleteBid: (id: string) => void;
-  loadBidList: () => void;
+  loadBid: (id: string) => Promise<void>;
+  deleteBid: (id: string) => Promise<void>;
+  loadBidList: () => Promise<void>;
+
+  // Auth state
+  isAuthenticated: boolean;
+  setAuthenticated: (val: boolean) => void;
 }
 
 export const useBidStore = create<BidStore>((set, get) => ({
@@ -169,6 +175,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
   drawingMode: false,
   analysisProgress: null,
   savedBids: [],
+  isAuthenticated: false,
+
+  setAuthenticated: (val) => set({ isAuthenticated: val }),
 
   setCurrentBid: (bid) => set({ currentBid: bid }),
 
@@ -333,55 +342,127 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
   saveBid: () => {
     const { currentBid } = get();
+    if (typeof window === 'undefined') return;
+
+    // Always save to localStorage as offline cache
     const key = `ccc_bid_${currentBid.id}`;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(currentBid));
-      // Update list
-      const listKey = 'ccc_bid_list';
-      const existingList: BidSummary[] = JSON.parse(localStorage.getItem(listKey) || '[]');
-      const summary: BidSummary = {
-        id: currentBid.id,
-        bidNumber: currentBid.bidNumber,
-        status: currentBid.status,
-        clientName: currentBid.clientName,
-        propertyName: currentBid.propertyName,
-        totalAcreage: currentBid.totalAcreage,
-        totalAmount: currentBid.totalAmount,
-        createdAt: currentBid.createdAt,
-        updatedAt: currentBid.updatedAt,
-      };
-      const updated = existingList.filter((b) => b.id !== currentBid.id);
-      updated.unshift(summary);
-      localStorage.setItem(listKey, JSON.stringify(updated));
-      set({ savedBids: updated });
+    localStorage.setItem(key, JSON.stringify(currentBid));
+    const listKey = 'ccc_bid_list';
+    const existingList: BidSummary[] = JSON.parse(localStorage.getItem(listKey) || '[]');
+    const summary: BidSummary = {
+      id: currentBid.id,
+      bidNumber: currentBid.bidNumber,
+      status: currentBid.status,
+      clientName: currentBid.clientName,
+      propertyName: currentBid.propertyName,
+      totalAcreage: currentBid.totalAcreage,
+      totalAmount: currentBid.totalAmount,
+      createdAt: currentBid.createdAt,
+      updatedAt: currentBid.updatedAt,
+    };
+    const updated = existingList.filter((b) => b.id !== currentBid.id);
+    updated.unshift(summary);
+    localStorage.setItem(listKey, JSON.stringify(updated));
+    set({ savedBids: updated });
+
+    // Persist to Supabase if authenticated
+    if (isSupabaseConfigured) {
+      const sb = createSupabaseBrowser();
+      getAuthUserId(sb).then((userId) => {
+        if (!userId) return;
+        set({ isAuthenticated: true });
+        saveBidToSupabase(sb, currentBid, userId).then(({ error }) => {
+          if (error) console.warn('[db] Supabase save failed, localStorage is still valid:', error);
+        });
+      });
     }
   },
 
-  loadBid: (id) => {
-    if (typeof window !== 'undefined') {
-      const data = localStorage.getItem(`ccc_bid_${id}`);
-      if (data) {
-        set({ currentBid: JSON.parse(data), selectedPastureId: null, drawingMode: false });
+  loadBid: async (id) => {
+    if (typeof window === 'undefined') return;
+
+    // Try Supabase first when configured
+    if (isSupabaseConfigured) {
+      try {
+        const sb = createSupabaseBrowser();
+        const userId = await getAuthUserId(sb);
+        if (userId) {
+          set({ isAuthenticated: true });
+          const { bid, error } = await loadBidFromSupabase(sb, id);
+          if (!error && bid) {
+            set({ currentBid: bid, selectedPastureId: null, drawingMode: false });
+            // Update localStorage cache
+            localStorage.setItem(`ccc_bid_${id}`, JSON.stringify(bid));
+            return;
+          }
+        }
+      } catch {
+        // Fall through to localStorage
+      }
+    }
+
+    // Fallback to localStorage
+    const data = localStorage.getItem(`ccc_bid_${id}`);
+    if (data) {
+      set({ currentBid: JSON.parse(data), selectedPastureId: null, drawingMode: false });
+    }
+  },
+
+  deleteBid: async (id) => {
+    if (typeof window === 'undefined') return;
+
+    // Remove from localStorage
+    localStorage.removeItem(`ccc_bid_${id}`);
+    const listKey = 'ccc_bid_list';
+    const existingList: BidSummary[] = JSON.parse(localStorage.getItem(listKey) || '[]');
+    const updatedList = existingList.filter((b) => b.id !== id);
+    localStorage.setItem(listKey, JSON.stringify(updatedList));
+    set({ savedBids: updatedList });
+
+    // Remove from Supabase if authenticated
+    if (isSupabaseConfigured) {
+      try {
+        const sb = createSupabaseBrowser();
+        const userId = await getAuthUserId(sb);
+        if (userId) {
+          await deleteBidFromSupabase(sb, id);
+        }
+      } catch {
+        // localStorage already cleaned up
       }
     }
   },
 
-  deleteBid: (id) => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`ccc_bid_${id}`);
-      const listKey = 'ccc_bid_list';
-      const existingList: BidSummary[] = JSON.parse(localStorage.getItem(listKey) || '[]');
-      const updated = existingList.filter((b) => b.id !== id);
-      localStorage.setItem(listKey, JSON.stringify(updated));
-      set({ savedBids: updated });
-    }
-  },
+  loadBidList: async () => {
+    if (typeof window === 'undefined') return;
 
-  loadBidList: () => {
-    if (typeof window !== 'undefined') {
-      const data = localStorage.getItem('ccc_bid_list');
-      set({ savedBids: data ? JSON.parse(data) : [] });
+    // Try Supabase first
+    if (isSupabaseConfigured) {
+      try {
+        const sb = createSupabaseBrowser();
+        const userId = await getAuthUserId(sb);
+        if (userId) {
+          set({ isAuthenticated: true });
+          const { bids, error } = await loadBidListFromSupabase(sb);
+          if (!error && bids.length > 0) {
+            // Merge with localStorage bids (local-only bids stay visible)
+            const localData = localStorage.getItem('ccc_bid_list');
+            const localBids: BidSummary[] = localData ? JSON.parse(localData) : [];
+            const supabaseIds = new Set(bids.map((b) => b.id));
+            const localOnly = localBids.filter((b) => !supabaseIds.has(b.id));
+            const merged = [...bids, ...localOnly];
+            set({ savedBids: merged });
+            return;
+          }
+        }
+      } catch {
+        // Fall through to localStorage
+      }
     }
+
+    // Fallback to localStorage
+    const data = localStorage.getItem('ccc_bid_list');
+    set({ savedBids: data ? JSON.parse(data) : [] });
   },
 
   fetchSoilData: async (pastureId, lon, lat) => {
