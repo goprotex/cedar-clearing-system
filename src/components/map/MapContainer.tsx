@@ -87,24 +87,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       if (drawRef.current) {
         drawRef.current.deleteAll();
       }
-
-      // Auto-enable hologram mode after drawing a pasture
-      setLayers((prev) => {
-        if (prev.hologram) return prev;
-        const next = { ...prev };
-        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
-        next.hologram = true;
-        next.terrain3d = false;
-        next.naip = false;
-        next.naipCIR = false;
-        next.naipNDVI = true;
-        next.cedarAI = true;
-        return next;
-      });
-      const map = mapRef.current;
-      if (map) {
-        map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
-      }
     },
     [selectedPastureId, setPasturePolygon]
   );
