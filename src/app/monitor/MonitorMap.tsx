@@ -217,11 +217,18 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    const rasterMap: Record<string, string> = { soil: 'soil-overlay', naip: 'naip-overlay', naipCIR: 'naip-cir-overlay', naipNDVI: 'naip-ndvi-overlay' };
+    const rasterMap: Record<string, string> = { naip: 'naip-overlay', naipCIR: 'naip-cir-overlay', naipNDVI: 'naip-ndvi-overlay' };
     for (const [key, layerId] of Object.entries(rasterMap)) {
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, 'visibility', layers[key as LayerKey] ? 'visible' : 'none');
       }
+    }
+
+    // Soil: always on top at 100% opacity when selected
+    if (map.getLayer('soil-overlay')) {
+      map.setLayoutProperty('soil-overlay', 'visibility', layers.soil ? 'visible' : 'none');
+      map.setPaintProperty('soil-overlay', 'raster-opacity', 1.0);
+      if (layers.soil) map.moveLayer('soil-overlay');
     }
 
     // Radar
@@ -229,13 +236,14 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.setLayoutProperty('radar-layer', 'visibility', layers.radar ? 'visible' : 'none');
     }
 
-    // 3D terrain
+    // 3D terrain — exaggeration 2x
     if (layers.terrain3d && !layers.hologram) {
       try {
-        map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.3 });
+        map.setTerrain({ source: 'mapbox-dem', exaggeration: 2.0 });
         if (!map.getLayer('sky')) {
           map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
         }
+        if (map.getPitch() < 30) map.easeTo({ pitch: 50, duration: 800 });
       } catch { /* optional */ }
     } else {
       map.setTerrain(null);
@@ -305,22 +313,8 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
 
       // Camera pitch
       map.easeTo({ pitch: 55, bearing: map.getBearing() || -20, duration: 1200 });
-
-      // Slow auto-rotation
-      if (!rotationRef.current) {
-        const rotate = () => {
-          if (!mapRef.current) return;
-          mapRef.current.setBearing(mapRef.current.getBearing() + 0.03);
-          rotationRef.current = requestAnimationFrame(rotate);
-        };
-        rotationRef.current = requestAnimationFrame(rotate);
-      }
     } else {
       // Undo hologram
-      if (rotationRef.current) {
-        cancelAnimationFrame(rotationRef.current);
-        rotationRef.current = null;
-      }
 
       if (map.getLayer('holo-mask-fill')) map.setLayoutProperty('holo-mask-fill', 'visibility', 'none');
 
@@ -362,37 +356,55 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
         map.setPaintProperty('monitor-pastures-fill', 'fill-opacity', 0.08);
       }
 
-      // Reset camera
-      map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+      // Reset camera (but keep pitch if terrain is on)
+      if (!layers.terrain3d) {
+        map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+      } else {
+        map.easeTo({ bearing: 0, duration: 800 });
+      }
     }
   }, [layers, mapLoaded]);
 
-  // Pause hologram rotation on user interaction
+  // Hologram auto-rotation: start when hologram on, stop when off.
+  // Pauses for 3s on user interaction then resumes.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !layers.hologram) return;
+    if (!map || !mapLoaded) return;
+
+    if (!layers.hologram) {
+      if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
+      return;
+    }
+
+    const startRotation = () => {
+      if (rotationRef.current) return;
+      const spin = () => {
+        if (!mapRef.current) return;
+        mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
+        rotationRef.current = requestAnimationFrame(spin);
+      };
+      rotationRef.current = requestAnimationFrame(spin);
+    };
+
+    startRotation();
+
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
     const pause = () => {
       if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
       if (resumeTimer) clearTimeout(resumeTimer);
-      resumeTimer = setTimeout(() => {
-        if (!mapRef.current || rotationRef.current) return;
-        const rotate = () => {
-          if (!mapRef.current) return;
-          mapRef.current.setBearing(mapRef.current.getBearing() + 0.03);
-          rotationRef.current = requestAnimationFrame(rotate);
-        };
-        rotationRef.current = requestAnimationFrame(rotate);
-      }, 3000);
+      resumeTimer = setTimeout(startRotation, 3000);
     };
+
     map.on('mousedown', pause);
     map.on('touchstart', pause);
     map.on('wheel', pause);
+
     return () => {
+      if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
+      if (resumeTimer) clearTimeout(resumeTimer);
       map.off('mousedown', pause);
       map.off('touchstart', pause);
       map.off('wheel', pause);
-      if (resumeTimer) clearTimeout(resumeTimer);
     };
   }, [layers.hologram, mapLoaded]);
 
