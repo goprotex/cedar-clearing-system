@@ -845,7 +845,13 @@ export async function POST(req: NextRequest) {
           lowTrust: s.lowTrust,
         }));
 
-        send('result', { summary, samples });
+        const BATCH_SIZE = 200;
+        send('result_summary', { summary, totalBatches: Math.ceil(samples.length / BATCH_SIZE) });
+        for (let b = 0; b < samples.length; b += BATCH_SIZE) {
+          send('result_samples', { batch: Math.floor(b / BATCH_SIZE), samples: samples.slice(b, b + BATCH_SIZE) });
+        }
+        send('result_done', { totalSamples: samples.length });
+
         stopHeartbeat();
         controller.close();
         } catch (streamErr) {
