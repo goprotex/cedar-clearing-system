@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Property Boundary" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-98.489, 29.426],
+          [-98.487, 29.426],
+          [-98.487, 29.424],
+          [-98.489, 29.424],
+          [-98.489, 29.426]
+        ]
+      }
+    }
+  ]
+}

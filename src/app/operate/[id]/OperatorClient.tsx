@@ -22,6 +22,14 @@ type OperatorLayerPrefs = {
   terrain3d: boolean;
   sky: boolean;
   ndvi: boolean;
+  hillshade: boolean;
+  topo: boolean;
+  hydro: boolean;
+  soils: boolean;
+  naipTrueColor: boolean;
+  naipCIR: boolean;
+  wetlands: boolean;
+  myData: boolean;
   hideLabels: boolean;
   hideRoads: boolean;
 };
@@ -36,6 +44,14 @@ function defaultPrefs(coarsePointer: boolean): OperatorLayerPrefs {
     terrain3d: !coarsePointer,
     sky: !coarsePointer,
     ndvi: false,
+    hillshade: !coarsePointer,
+    topo: false,
+    hydro: false,
+    soils: false,
+    naipTrueColor: false,
+    naipCIR: false,
+    wetlands: false,
+    myData: true,
     hideLabels: false,
     hideRoads: false,
   };
@@ -53,6 +69,14 @@ function loadPrefs(bidId: string, coarsePointer: boolean): OperatorLayerPrefs {
       terrain3d: typeof parsed.terrain3d === 'boolean' ? parsed.terrain3d : base.terrain3d,
       sky: typeof parsed.sky === 'boolean' ? parsed.sky : base.sky,
       ndvi: typeof parsed.ndvi === 'boolean' ? parsed.ndvi : base.ndvi,
+      hillshade: typeof parsed.hillshade === 'boolean' ? parsed.hillshade : base.hillshade,
+      topo: typeof parsed.topo === 'boolean' ? parsed.topo : base.topo,
+      hydro: typeof parsed.hydro === 'boolean' ? parsed.hydro : base.hydro,
+      soils: typeof parsed.soils === 'boolean' ? parsed.soils : base.soils,
+      naipTrueColor: typeof parsed.naipTrueColor === 'boolean' ? parsed.naipTrueColor : base.naipTrueColor,
+      naipCIR: typeof parsed.naipCIR === 'boolean' ? parsed.naipCIR : base.naipCIR,
+      wetlands: typeof parsed.wetlands === 'boolean' ? parsed.wetlands : base.wetlands,
+      myData: typeof parsed.myData === 'boolean' ? parsed.myData : base.myData,
       hideLabels: typeof parsed.hideLabels === 'boolean' ? parsed.hideLabels : base.hideLabels,
       hideRoads: typeof parsed.hideRoads === 'boolean' ? parsed.hideRoads : base.hideRoads,
     };
@@ -64,6 +88,13 @@ function loadPrefs(bidId: string, coarsePointer: boolean): OperatorLayerPrefs {
 function savePrefs(bidId: string, prefs: OperatorLayerPrefs) {
   localStorage.setItem(prefsKey(bidId), JSON.stringify(prefs));
 }
+
+const TILE_USGS_TOPO = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}';
+const TILE_USGS_HYDRO = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSHydroCached/MapServer/tile/{z}/{y}/{x}';
+const TILE_SSURGO_SOILS = 'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Soils_Map_Units_Tiles_v6/MapServer/tile/{z}/{y}/{x}?cacheKey=81d68046345c13a6';
+// NOTE: Wetlands overlay uses exportImage (not cached tiles) because the public cached endpoint is often slow/unavailable.
+const TILE_NWI_WETLANDS_EXPORT =
+  'https://fwsprimary.wim.usgs.gov/server/rest/services/Wetlands_Raster/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image';
 
 function styleUrl(style: OperatorBaseStyle): string {
   if (style === 'satellite') return 'mapbox://styles/mapbox/satellite-v9';
@@ -135,6 +166,71 @@ function setSkyEnabledSafe(map: mapboxgl.Map, enabled: boolean) {
     });
   } catch {
     // ignore
+  }
+}
+
+function ensureRasterTileLayer(map: mapboxgl.Map, opts: { id: string; tiles: string[]; opacity: number; zIndex?: 'bottom' | 'top' }) {
+  try {
+    const srcId = `${opts.id}-src`;
+    if (!map.getSource(srcId)) {
+      map.addSource(srcId, { type: 'raster', tiles: opts.tiles, tileSize: 256 });
+    }
+    if (!map.getLayer(opts.id)) {
+      map.addLayer({
+        id: opts.id,
+        type: 'raster',
+        source: srcId,
+        paint: { 'raster-opacity': opts.opacity },
+        layout: { visibility: 'none' },
+      });
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function ensureHillshadeLayer(map: mapboxgl.Map) {
+  try {
+    const srcId = 'mapbox-dem';
+    if (!map.getSource(srcId)) {
+      map.addSource(srcId, {
+        type: 'raster-dem',
+        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+    const id = 'hillshade';
+    if (!map.getLayer(id)) {
+      map.addLayer({
+        id,
+        type: 'hillshade',
+        source: srcId,
+        paint: {
+          'hillshade-exaggeration': 0.4,
+          'hillshade-shadow-color': '#0b120d',
+          'hillshade-highlight-color': '#d6ffe1',
+          'hillshade-accent-color': '#5aff8a',
+        },
+        layout: { visibility: 'none' },
+      });
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function tryLoadGeoJson(url: string): Promise<GeoJSON.FeatureCollection | null> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = (await res.json()) as unknown;
+    if (!data || typeof data !== 'object') return null;
+    const fc = data as GeoJSON.FeatureCollection;
+    if (fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) return null;
+    return fc;
+  } catch {
+    return null;
   }
 }
 
@@ -335,6 +431,49 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     cedarCellsRef.current = cells;
   }, [state.bid]);
 
+  // Load optional custom operator data (property lines, fences, entrances) from public/ folder.
+  const myDataRef = useRef<{ property: GeoJSON.FeatureCollection | null; fences: GeoJSON.FeatureCollection | null; entrances: GeoJSON.FeatureCollection | null }>({
+    property: null,
+    fences: null,
+    entrances: null,
+  });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const base = `/operator-data/${encodeURIComponent(bidId)}`;
+      const [property, fencesA, fencesB, entrances] = await Promise.all([
+        tryLoadGeoJson(`${base}/property-lines.geojson`),
+        tryLoadGeoJson(`${base}/fences.geojson`),
+        tryLoadGeoJson(`${base}/fence-lines.geojson`),
+        tryLoadGeoJson(`${base}/entrances.geojson`),
+      ]);
+      const fences = fencesA ?? fencesB;
+      if (cancelled) return;
+      myDataRef.current = { property, fences, entrances };
+      // If map is already loaded, update sources immediately.
+      const map = mapRef.current;
+      if (map && map.isStyleLoaded()) {
+        try {
+          if (property) {
+            if (!map.getSource('my-property')) map.addSource('my-property', { type: 'geojson', data: property });
+            else (map.getSource('my-property') as mapboxgl.GeoJSONSource).setData(property);
+          }
+          if (fences) {
+            if (!map.getSource('my-fences')) map.addSource('my-fences', { type: 'geojson', data: fences });
+            else (map.getSource('my-fences') as mapboxgl.GeoJSONSource).setData(fences);
+          }
+          if (entrances) {
+            if (!map.getSource('my-entrances')) map.addSource('my-entrances', { type: 'geojson', data: entrances });
+            else (map.getSource('my-entrances') as mapboxgl.GeoJSONSource).setData(entrances);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [bidId]);
+
   // Initialize map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !state.bid) return;
@@ -353,6 +492,26 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     const addCustomLayers = () => {
       const map = mapRef.current;
       if (!map || !map.isStyleLoaded()) return;
+
+      // Optional raster overlays
+      ensureRasterTileLayer(map, { id: 'usgs-topo', tiles: [TILE_USGS_TOPO], opacity: 0.55 });
+      ensureRasterTileLayer(map, { id: 'usgs-hydro', tiles: [TILE_USGS_HYDRO], opacity: 0.75 });
+      ensureRasterTileLayer(map, { id: 'ssurgo-soils', tiles: [TILE_SSURGO_SOILS], opacity: 0.55 });
+      ensureRasterTileLayer(map, { id: 'nwi-wetlands', tiles: [TILE_NWI_WETLANDS_EXPORT], opacity: 0.6 });
+      ensureHillshadeLayer(map);
+
+      // NAIP imagery cached tiles (truecolor/CIR). CIR is approximated via bandIds on tile requests if supported.
+      // (If the service ignores bandIds in tile mode, the layer will still load as default imagery.)
+      ensureRasterTileLayer(map, {
+        id: 'naip-truecolor',
+        tiles: ['https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}'],
+        opacity: 0.8,
+      });
+      ensureRasterTileLayer(map, {
+        id: 'naip-cir',
+        tiles: ['https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}?bandIds=3,0,1'],
+        opacity: 0.8,
+      });
 
       // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
       // Keep as optional even on iPad, but default it off.
@@ -500,6 +659,49 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       } catch {
         // ignore
       }
+
+      // My Data (property/fence/entrance) layers
+      try {
+        const { property, fences, entrances } = myDataRef.current;
+        if (property) {
+          if (!map.getSource('my-property')) map.addSource('my-property', { type: 'geojson', data: property });
+          if (!map.getLayer('my-property-line')) {
+            map.addLayer({
+              id: 'my-property-line',
+              type: 'line',
+              source: 'my-property',
+              paint: { 'line-color': '#ffffff', 'line-width': 3, 'line-opacity': 0.9 },
+              layout: { visibility: 'none' },
+            });
+          }
+        }
+        if (fences) {
+          if (!map.getSource('my-fences')) map.addSource('my-fences', { type: 'geojson', data: fences });
+          if (!map.getLayer('my-fences-line')) {
+            map.addLayer({
+              id: 'my-fences-line',
+              type: 'line',
+              source: 'my-fences',
+              paint: { 'line-color': '#FF6B00', 'line-width': 2, 'line-opacity': 0.9, 'line-dasharray': [2, 1] },
+              layout: { visibility: 'none' },
+            });
+          }
+        }
+        if (entrances) {
+          if (!map.getSource('my-entrances')) map.addSource('my-entrances', { type: 'geojson', data: entrances });
+          if (!map.getLayer('my-entrances-point')) {
+            map.addLayer({
+              id: 'my-entrances-point',
+              type: 'circle',
+              source: 'my-entrances',
+              paint: { 'circle-color': '#13ff43', 'circle-radius': 6, 'circle-stroke-color': '#000', 'circle-stroke-width': 2 },
+              layout: { visibility: 'none' },
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
     };
 
     const applyPrefsToMap = () => {
@@ -509,7 +711,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       setTerrainEnabledSafe(map, prefs.terrain3d);
       setSkyEnabledSafe(map, prefs.sky);
+      setLayerVisibilitySafe(map, 'hillshade', prefs.hillshade);
+      setLayerVisibilitySafe(map, 'usgs-topo', prefs.topo);
+      setLayerVisibilitySafe(map, 'usgs-hydro', prefs.hydro);
+      setLayerVisibilitySafe(map, 'ssurgo-soils', prefs.soils);
+      setLayerVisibilitySafe(map, 'naip-truecolor', prefs.naipTrueColor);
+      setLayerVisibilitySafe(map, 'naip-cir', prefs.naipCIR);
       setLayerVisibilitySafe(map, 'naip-ndvi-overlay', prefs.ndvi);
+      setLayerVisibilitySafe(map, 'my-property-line', prefs.myData);
+      setLayerVisibilitySafe(map, 'my-fences-line', prefs.myData);
+      setLayerVisibilitySafe(map, 'my-entrances-point', prefs.myData);
 
       // Hide/show labels and roads by toggling relevant style layers.
       setStyleGroupVisibility(
@@ -585,7 +796,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       const prefs = layerPrefsRef.current;
       setTerrainEnabledSafe(map, prefs.terrain3d);
       setSkyEnabledSafe(map, prefs.sky);
+      setLayerVisibilitySafe(map, 'hillshade', prefs.hillshade);
+      setLayerVisibilitySafe(map, 'usgs-topo', prefs.topo);
+      setLayerVisibilitySafe(map, 'usgs-hydro', prefs.hydro);
+      setLayerVisibilitySafe(map, 'ssurgo-soils', prefs.soils);
+      setLayerVisibilitySafe(map, 'naip-truecolor', prefs.naipTrueColor);
+      setLayerVisibilitySafe(map, 'naip-cir', prefs.naipCIR);
       setLayerVisibilitySafe(map, 'naip-ndvi-overlay', prefs.ndvi);
+      setLayerVisibilitySafe(map, 'my-property-line', prefs.myData);
+      setLayerVisibilitySafe(map, 'my-fences-line', prefs.myData);
+      setLayerVisibilitySafe(map, 'my-entrances-point', prefs.myData);
       setStyleGroupVisibility(
         map,
         (l) =>
@@ -960,6 +1180,69 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
               {layerPrefs.sky ? 'SKY_ON' : 'SKY_OFF'}
             </button>
             <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, hillshade: !p.hillshade }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.hillshade ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Hillshade (terrain shading)"
+            >
+              {layerPrefs.hillshade ? 'HILLSHADE_ON' : 'HILLSHADE_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, topo: !p.topo }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.topo ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="USGS topo overlay"
+            >
+              {layerPrefs.topo ? 'TOPO_ON' : 'TOPO_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, hydro: !p.hydro }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.hydro ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Streams/rivers/lakes overlay"
+            >
+              {layerPrefs.hydro ? 'HYDRO_ON' : 'HYDRO_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, soils: !p.soils }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.soils ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="SSURGO-derived soils (small-scale)"
+            >
+              {layerPrefs.soils ? 'SOILS_ON' : 'SOILS_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, wetlands: !p.wetlands }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.wetlands ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Wetlands raster overlay"
+            >
+              {layerPrefs.wetlands ? 'WETLANDS_ON' : 'WETLANDS_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, naipTrueColor: !p.naipTrueColor, naipCIR: p.naipCIR && !p.naipTrueColor ? p.naipCIR : false }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.naipTrueColor ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="NAIP aerial imagery (true color)"
+            >
+              {layerPrefs.naipTrueColor ? 'NAIP_TC_ON' : 'NAIP_TC_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, naipCIR: !p.naipCIR, naipTrueColor: p.naipTrueColor && !p.naipCIR ? p.naipTrueColor : false }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.naipCIR ? 'border-[#FF6B00] text-[#FF6B00] bg-[#1b0f06]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="NAIP aerial imagery (color infrared)"
+            >
+              {layerPrefs.naipCIR ? 'NAIP_CIR_ON' : 'NAIP_CIR_OFF'}
+            </button>
+            <button
               onClick={() => setLayerPrefs((p) => ({ ...p, ndvi: !p.ndvi }))}
               className={`px-3 py-2 rounded border text-[10px] font-mono ${
                 layerPrefs.ndvi ? 'border-[#FF6B00] text-[#FF6B00] bg-[#1b0f06]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
@@ -967,6 +1250,15 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
               title="Vegetation index overlay (may appear dark depending on imagery)"
             >
               {layerPrefs.ndvi ? 'NDVI_ON' : 'NDVI_OFF'}
+            </button>
+            <button
+              onClick={() => setLayerPrefs((p) => ({ ...p, myData: !p.myData }))}
+              className={`px-3 py-2 rounded border text-[10px] font-mono ${
+                layerPrefs.myData ? 'border-[#13ff43] text-[#13ff43] bg-[#061f10]' : 'border-green-900/40 text-[#a98a7d] hover:text-white'
+              }`}
+              title="Your property lines / fences / entrances from public/operator-data"
+            >
+              {layerPrefs.myData ? 'MY_DATA_ON' : 'MY_DATA_OFF'}
             </button>
             <button
               onClick={() => setLayerPrefs((p) => ({ ...p, hideLabels: !p.hideLabels }))}

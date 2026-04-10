@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Fence - North", "kind": "fence" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-97.5002, 31.0001],
+          [-97.4990, 31.0001]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Fence - East", "kind": "fence" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-97.4990, 31.0001],
+          [-97.4990, 30.9990]
+        ]
+      }
+    }
+  ]
+}
