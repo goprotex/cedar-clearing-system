@@ -53,6 +53,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   } = useBidStore();
 
   const [convertBusy, setConvertBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   // Prevent hydration mismatch: Zustand generates random IDs/bid numbers
   // on server vs client. Delay rendering until client is mounted.
@@ -132,6 +133,37 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
     }
   }, [bidId, handleSave, currentBid]);
 
+  const generatePdf = useCallback(async () => {
+    try {
+      setPdfBusy(true);
+      handleSave();
+      const { rateCard } = useBidStore.getState();
+      const res = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bid: currentBid, rateCard }),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(msg || `PDF generation failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `CCC-${currentBid.bidNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('PDF downloaded');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'PDF generation failed');
+    } finally {
+      setPdfBusy(false);
+    }
+  }, [handleSave, currentBid]);
+
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
   // All hooks above — safe to early-return now
@@ -210,12 +242,10 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
           <Button
             size="sm"
             className="text-xs bg-[#FF6B00] text-black font-black hover:bg-white uppercase tracking-widest hidden sm:inline-flex"
-            onClick={() => {
-              handleSave();
-              toast.info('PDF generation coming in Phase 4');
-            }}
+            onClick={generatePdf}
+            disabled={pdfBusy || currentBid.pastures.length === 0}
           >
-            GENERATE_PDF
+            {pdfBusy ? 'GENERATING…' : 'GENERATE_PDF'}
           </Button>
         </div>
       </header>
