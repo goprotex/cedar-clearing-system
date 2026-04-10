@@ -14,6 +14,7 @@ type Props = {
   accessToken: string;
   jobs: JobLike[];
   clearedByJob: Record<string, Set<string>>;
+  operatorsByJob: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
   cedarOn: boolean;
   radarOn: boolean;
 };
@@ -26,9 +27,10 @@ function asFeatureCollection(features: GeoJSON.Feature[]): GeoJSON.FeatureCollec
 // Note: this is a "nowcast" endpoint; if it ever changes, swap to their timestamped frames API.
 const RAINVIEWER_TILES = 'https://tilecache.rainviewer.com/v2/radar/nowcast_1/{z}/{x}/{y}/2/1_1.png';
 
-export default function MonitorMap({ accessToken, jobs, clearedByJob, cedarOn, radarOn }: Props) {
+export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, cedarOn, radarOn }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const operatorMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -142,6 +144,68 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, cedarOn, r
 
     src.setData(asFeatureCollection(features));
   }, [jobs, clearedByJob]);
+
+  // Update operator markers (live dots)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const markers = operatorMarkersRef.current;
+    const nextKeys = new Set<string>();
+
+    for (const [jobId, ops] of Object.entries(operatorsByJob ?? {})) {
+      for (const op of ops ?? []) {
+        const key = `${jobId}:${op.user_id}`;
+        nextKeys.add(key);
+        const existing = markers.get(key);
+        if (existing) {
+          existing.setLngLat([op.lng, op.lat]);
+          continue;
+        }
+
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'operator-dot';
+        el.title = `Operator ${op.user_id}`;
+        el.style.width = '12px';
+        el.style.height = '12px';
+        el.style.borderRadius = '999px';
+        el.style.border = '2px solid #fff';
+        el.style.background = '#FF6B00';
+        el.style.boxShadow = '0 0 12px rgba(255,107,0,0.55)';
+
+        el.onclick = () => {
+          const html = `
+            <div style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;">
+              <div style="font-weight:800; letter-spacing:0.08em;">OPERATOR</div>
+              <div style="opacity:0.8; margin-top:4px;">${op.user_id}</div>
+              <div style="opacity:0.8; margin-top:6px;">JOB ${jobId}</div>
+              <div style="margin-top:8px;">
+                <a href="/operator/${op.user_id}" style="color:#FF6B00; font-weight:800; text-decoration:none;">VIEW_PROFILE</a>
+              </div>
+            </div>
+          `;
+          new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
+            .setLngLat([op.lng, op.lat])
+            .setHTML(html)
+            .addTo(map);
+        };
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([op.lng, op.lat])
+          .addTo(map);
+        markers.set(key, marker);
+      }
+    }
+
+    // Remove stale markers
+    for (const [key, marker] of markers.entries()) {
+      if (!nextKeys.has(key)) {
+        marker.remove();
+        markers.delete(key);
+      }
+    }
+  }, [operatorsByJob]);
 
   // Toggle cedar visibility
   useEffect(() => {

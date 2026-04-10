@@ -53,6 +53,69 @@ alter table public.job_members enable row level security;
 alter table public.job_events enable row level security;
 alter table public.job_cleared_cells enable row level security;
 
+-- Live operator positions (latest known)
+create table if not exists public.job_operator_positions (
+  job_id text not null references public.jobs(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  updated_at timestamptz not null default now(),
+  lng double precision not null,
+  lat double precision not null,
+  accuracy_m double precision,
+  heading double precision,
+  speed_mps double precision,
+  primary key (job_id, user_id)
+);
+
+create index if not exists job_operator_positions_job_id_idx on public.job_operator_positions (job_id);
+create index if not exists job_operator_positions_updated_at_idx on public.job_operator_positions (updated_at desc);
+
+alter table public.job_operator_positions enable row level security;
+
+drop policy if exists "job_operator_positions_select_for_members" on public.job_operator_positions;
+create policy "job_operator_positions_select_for_members"
+on public.job_operator_positions
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.job_members jm
+    where jm.job_id = job_operator_positions.job_id
+      and jm.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "job_operator_positions_upsert_self" on public.job_operator_positions;
+create policy "job_operator_positions_upsert_self"
+on public.job_operator_positions
+for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+  and exists (
+    select 1
+    from public.job_members jm
+    where jm.job_id = job_operator_positions.job_id
+      and jm.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "job_operator_positions_update_self" on public.job_operator_positions;
+create policy "job_operator_positions_update_self"
+on public.job_operator_positions
+for update
+to authenticated
+using (
+  user_id = auth.uid()
+  and exists (
+    select 1
+    from public.job_members jm
+    where jm.job_id = job_operator_positions.job_id
+      and jm.user_id = auth.uid()
+  )
+)
+with check (user_id = auth.uid());
+
 -- Keep jobs.cedar_cleared_cells synced with deduped cleared cells.
 create or replace function public.sync_job_cleared_cells_count()
 returns trigger

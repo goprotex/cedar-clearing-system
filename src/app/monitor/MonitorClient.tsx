@@ -18,7 +18,10 @@ type BootstrapJob = {
 type BootstrapResponse = {
   jobs: BootstrapJob[];
   cleared: Record<string, string[]>;
+  operators: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
 };
+
+type OperatorPosition = BootstrapResponse['operators'][string][number];
 
 const MapboxMap = dynamic(() => import('./MonitorMap'), {
   ssr: false,
@@ -44,6 +47,7 @@ export default function MonitorClient() {
   const [busy, setBusy] = useState(true);
   const [radarOn, setRadarOn] = useState(true);
   const [cedarOn, setCedarOn] = useState(true);
+  const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const supabaseRef = useRef<ReturnType<typeof createSupabaseClient> | null>(null);
@@ -64,6 +68,7 @@ export default function MonitorClient() {
           next[jobId] = new Set(cellIds);
         }
         setClearedByJob(next);
+        setOperatorsByJob(data.operators ?? {});
       } catch (e) {
         if (cancelled) return;
         setErr(e instanceof Error ? e.message : String(e));
@@ -121,6 +126,58 @@ export default function MonitorClient() {
     };
   }, [jobs]);
 
+  // Realtime: operator position updates
+  useEffect(() => {
+    if (!jobs.length) return;
+    const supabase = (supabaseRef.current ??= createSupabaseClient());
+    const jobIds = jobs.map((j) => j.id).filter(Boolean);
+    if (!jobIds.length) return;
+
+    const channel = supabase
+      .channel(`monitor-ops-${jobIds.join('-').slice(0, 80)}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'job_operator_positions',
+          filter: `job_id=in.(${jobIds.join(',')})`,
+        },
+        (payload) => {
+          const row = payload.new as { job_id: string; user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string } | null;
+          if (!row) return;
+          if (typeof row.job_id !== 'string' || typeof row.user_id !== 'string') return;
+          if (typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
+          if (typeof row.updated_at !== 'string') return;
+          setOperatorsByJob((prev) => {
+            const next = { ...prev };
+            const jobId = row.job_id;
+            const userId = row.user_id;
+            const existing = next[jobId];
+            const arr = existing ? [...existing] : [];
+            const idx = arr.findIndex((o) => o.user_id === userId);
+            const entry: OperatorPosition = {
+              user_id: userId,
+              lng: row.lng,
+              lat: row.lat,
+              heading: typeof row.heading === 'number' ? row.heading : null,
+              speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
+              accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
+              updated_at: row.updated_at,
+            };
+            if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+            next[jobId] = arr;
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [jobs]);
+
   const totals = useMemo(() => {
     const total = jobs.reduce((s, j) => s + (j.cedar_total_cells ?? 0), 0);
     const cleared = jobs.reduce((s, j) => s + (j.cedar_cleared_cells ?? 0), 0);
@@ -155,6 +212,7 @@ export default function MonitorClient() {
               accessToken={mapboxToken}
               jobs={jobs}
               clearedByJob={clearedByJob}
+              operatorsByJob={operatorsByJob}
               radarOn={radarOn}
               cedarOn={cedarOn}
             />

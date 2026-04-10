@@ -30,7 +30,7 @@ export async function GET() {
 
   const jobIds = (memberships ?? []).map((m) => m.job_id);
   if (jobIds.length === 0) {
-    return NextResponse.json({ jobs: [], clearedByJob: {} as Record<string, string[]> });
+    return NextResponse.json({ jobs: [], clearedByJob: {} as Record<string, string[]>, operatorsByJob: {} as Record<string, unknown[]> });
   }
 
   const { data: jobs, error: jobsErr } = await supabase
@@ -51,6 +51,17 @@ export async function GET() {
     (clearedByJob[row.job_id] ??= []).push(row.cell_id);
   }
 
-  return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], clearedByJob });
+  const { data: operators, error: opErr } = await supabase
+    .from('job_operator_positions')
+    .select('job_id, user_id, lng, lat, accuracy_m, heading_deg, speed_mps, updated_at')
+    .in('job_id', jobIds);
+  if (opErr) return NextResponse.json({ error: opErr.message }, { status: 500 });
+
+  const operatorsByJob: Record<string, unknown[]> = {};
+  for (const row of operators ?? []) {
+    (operatorsByJob[row.job_id] ??= []).push(row);
+  }
+
+  return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], clearedByJob, operatorsByJob });
 }
 

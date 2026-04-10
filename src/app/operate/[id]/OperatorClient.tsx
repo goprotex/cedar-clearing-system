@@ -10,6 +10,7 @@ import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
+const OPERATOR_PUBLISH_MS = 2500;
 
 interface ClearedCell {
   cellIndex: number;
@@ -77,6 +78,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
+  const lastPublishRef = useRef<number>(0);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
   const [state, setState] = useState<OperatorState>({
@@ -393,6 +395,29 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           }
         }).catch(() => {
           // ignore (best-effort)
+        });
+      }
+    }
+
+    // Best-effort: publish operator position periodically for live monitor.
+    if (sharedEnabled) {
+      const now = Date.now();
+      if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
+        lastPublishRef.current = now;
+        const jobId = jobIdFromBidId(bidId);
+        void fetch(`/api/jobs/${jobId}/operator-positions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lng,
+            lat,
+            accuracy_m: stateRef.current.accuracy,
+            heading_deg: stateRef.current.heading,
+            speed_mps: stateRef.current.speed,
+            timestamp: now,
+          }),
+        }).catch(() => {
+          // best-effort
         });
       }
     }
