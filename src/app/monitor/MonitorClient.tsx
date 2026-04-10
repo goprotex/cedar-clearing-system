@@ -41,37 +41,44 @@ function pct(cleared: number, total: number) {
   return Math.max(0, Math.min(100, Math.round((cleared / total) * 100)));
 }
 
-function loadLocalBidsAsJobs(): BootstrapJob[] {
+function loadLocalJobs(): BootstrapJob[] {
   if (typeof window === 'undefined') return [];
-  const jobs: BootstrapJob[] = [];
+  const results: BootstrapJob[] = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!key?.startsWith('ccc_bid_')) continue;
+      if (!key?.startsWith('ccc_job_') || key.startsWith('ccc_job_bid_') || key.startsWith('ccc_job_events_') || key.startsWith('ccc_job_progress_')) continue;
       const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const bid: Bid = JSON.parse(raw);
+      const job = JSON.parse(raw) as { id: string; bidId: string; title: string; status: string; createdAt: string; cedar_total_cells?: number; cedar_cleared_cells?: number };
+      if (!job.id || !job.bidId) continue;
+
+      // Load the bid snapshot for this job
+      const bidRaw = localStorage.getItem(`ccc_job_bid_${job.bidId}`);
+      if (!bidRaw) continue;
+      const bid: Bid = JSON.parse(bidRaw);
       if (!bid.pastures?.length) continue;
+
       let cedarTotal = 0;
       for (const p of bid.pastures) {
-        const feats = p.cedarAnalysis?.gridCells?.features ?? [];
-        for (const f of feats) {
+        for (const f of (p.cedarAnalysis?.gridCells?.features ?? [])) {
           const cls = (f as { properties?: { classification?: string } }).properties?.classification;
           if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') cedarTotal++;
         }
       }
-      jobs.push({
-        id: bid.id || key.replace('ccc_bid_', ''),
-        title: `${bid.bidNumber || 'Bid'} — ${bid.clientName || 'Local'}`,
-        status: bid.status || 'draft',
-        created_at: bid.updatedAt || new Date().toISOString(),
+
+      results.push({
+        id: job.id,
+        title: job.title || `Job ${job.id}`,
+        status: job.status || 'active',
+        created_at: job.createdAt || new Date().toISOString(),
         bid_snapshot: bid,
         cedar_total_cells: cedarTotal,
-        cedar_cleared_cells: 0,
+        cedar_cleared_cells: job.cedar_cleared_cells ?? 0,
       });
     }
   } catch { /* localStorage may be unavailable */ }
-  return jobs;
+  return results;
 }
 
 export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscreen?: boolean } = {}) {
@@ -143,17 +150,17 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         }
         setOperatorsByJob(data.operators ?? {});
 
-        // If no remote jobs, load from localStorage
+        // If no remote jobs, load converted jobs from localStorage
         if (remoteJobs.length === 0) {
-          remoteJobs = loadLocalBidsAsJobs();
+          remoteJobs = loadLocalJobs();
         }
 
         setJobs(remoteJobs);
         setClearedByJob(next);
       } catch (e) {
         if (cancelled) return;
-        // Fall back to local bids
-        const localJobs = loadLocalBidsAsJobs();
+        // Fall back to local jobs
+        const localJobs = loadLocalJobs();
         if (localJobs.length > 0) {
           setJobs(localJobs);
           setErr(null);
@@ -389,7 +396,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
             </div>
 
             {jobs.length === 0 ? (
-              <div className="text-sm text-[#a98a7d]">No jobs found. Create a bid and draw pastures first.</div>
+              <div className="text-sm text-[#a98a7d]">No jobs found. Convert a bid to a job from the bid editor first.</div>
             ) : (
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
                 {jobs.map((j) => {
