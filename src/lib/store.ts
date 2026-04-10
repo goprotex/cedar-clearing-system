@@ -11,6 +11,7 @@ import {
 import { extractTreesFromAnalysis } from '@/lib/tree-layer';
 import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
+import { loadCirCalibration } from '@/lib/cir-calibration';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -409,7 +410,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       'Size filters and pasture clip; one grid cell per detected crown',
     ];
 
-    const spectralProcessLines = [
+    const spectralProcessLinesBase = [
       'Partition pasture into regions sized for reliable NAIP sampling',
       'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
       'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
@@ -511,9 +512,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
         },
       });
 
+      const calibration = loadCirCalibration();
       const objectData = await runCirObjectAnalysis(
         pasture.polygon.geometry.coordinates,
-        pasture.acreage
+        pasture.acreage,
+        calibration
       );
 
       const crownCount =
@@ -525,9 +528,17 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       finalizeCedarAnalysis(objectData, objectProcessLines, completionDetail);
       return;
-    } catch {
-      // Fall back to per-cell spectral sampling
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[cedar] CIR object analysis failed; falling back to spectral sampling', err);
+      }
     }
+
+    /** This branch only runs after CIR object detection fails; calibration sliders affect only the CIR path. */
+    const spectralProcessLines = [
+      'CIR export / object path failed — using 15 m spectral cells instead (Settings cedar/oak calibration does not apply to this run).',
+      ...spectralProcessLinesBase,
+    ];
 
     try {
       const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);

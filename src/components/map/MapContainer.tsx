@@ -245,17 +245,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           '<a href="https://s2maps.eu/" target="_blank" rel="noopener">EOX Sentinel-2 cloudless</a> (Copernicus data)',
       });
 
-      map.addLayer(
-        {
-          id: 'sentinel2-overlay',
-          type: 'raster',
-          source: 'sentinel2-eox',
-          paint: { 'raster-opacity': 0.75 },
-          layout: { visibility: 'none' },
-        },
-        'pastures-fill'
-      );
-
       // ── Pasture polygons source ──
       map.addSource('pastures', {
         type: 'geojson',
@@ -277,6 +266,17 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         },
         layout: { visibility: 'none' },
       });
+
+      map.addLayer(
+        {
+          id: 'sentinel2-overlay',
+          type: 'raster',
+          source: 'sentinel2-eox',
+          paint: { 'raster-opacity': 0.75 },
+          layout: { visibility: 'none' },
+        },
+        'holo-mask-fill'
+      );
 
       // ── Cedar AI overlay source ──
       map.addSource('cedar-analysis', {

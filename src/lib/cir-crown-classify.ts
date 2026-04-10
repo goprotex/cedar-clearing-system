@@ -1,5 +1,5 @@
 /**
- * Fuse fine-scale crown metrics + 10 m / 60 m NDVI context into cedar / oak / mixed labels.
+ * Fuse fine-scale crown metrics + ~20 m NDVI neighborhood context into cedar / oak / mixed labels.
  * Heuristic — not a trained model; thresholds come from CirClassifierCalibration (defaults + localStorage).
  */
 
@@ -22,15 +22,15 @@ function clamp01(x: number): number {
 
 /**
  * Broadleaf vs needle-like separation: high (gndvi - ndvi) often tracks broader leaves.
- * Isolation: local NDVI much higher than 60 m neighborhood → scattered juniper in open pasture.
+ * Isolation: crown NDVI much higher than ~20 m neighborhood mean → scattered juniper in open pasture.
  */
 export function classifyCrownFromCirFeatures(
   f: CirBlobFeatures,
   cal: CirClassifierCalibration = DEFAULT_CIR_CALIBRATION
 ): CrownClassification {
   const broad = f.gndvi - f.ndvi;
-  const iso = f.isolationVs60m;
-  const ctx = f.cellNdvi60m;
+  const iso = f.isolationVs20m;
+  const ctx = f.cellNdvi20m;
   const ar = f.aspectRatio;
   const tex = f.ndviStd;
 

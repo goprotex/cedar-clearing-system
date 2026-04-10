@@ -1,4 +1,5 @@
 import type { CedarAnalysis } from '@/types';
+import type { CirClassifierCalibration } from '@/lib/cir-calibration';
 import { metersPerPixel } from '@/lib/cir-object-detect';
 import { extractCirBlobFeaturesFromRgba } from '@/lib/cir-blob-features';
 import { buildCedarAnalysisFromCirBlobs } from '@/lib/cedar-analysis-from-cir-objects';
@@ -8,7 +9,8 @@ import { buildCedarAnalysisFromCirBlobs } from '@/lib/cedar-analysis-from-cir-ob
  */
 export async function runCirObjectAnalysis(
   coordinates: GeoJSON.Position[][],
-  pastureAcreage: number
+  pastureAcreage: number,
+  calibration?: CirClassifierCalibration
 ): Promise<CedarAnalysis> {
   const res = await fetch('/api/naip-export', {
     method: 'POST',
@@ -49,9 +51,16 @@ export async function runCirObjectAnalysis(
   const blobs = extractCirBlobFeaturesFromRgba(imgData.data, canvas.width, canvas.height, mPerPx, {
     minPixels: 5,
     maxPixelFrac: 0.14,
-    contextCellM10: 10,
-    contextCellM60: 60,
+    contextCellM: 20,
   });
 
-  return buildCedarAnalysisFromCirBlobs(blobs, coordinates, pastureAcreage, canvas.width, canvas.height, bbox);
+  return buildCedarAnalysisFromCirBlobs(
+    blobs,
+    coordinates,
+    pastureAcreage,
+    canvas.width,
+    canvas.height,
+    bbox,
+    calibration
+  );
 }

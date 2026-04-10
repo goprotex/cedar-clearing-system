@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import {
 } from '@/lib/cir-calibration';
 
 const FIELDS: { key: keyof CirClassifierCalibration; label: string; hint?: string }[] = [
-  { key: 'scatteredCedarCtxLt', label: 'Scattered cedar: 60m NDVI <', hint: 'pasture invader' },
+  { key: 'scatteredCedarCtxLt', label: 'Scattered cedar: 20m NDVI <', hint: 'pasture invader' },
   { key: 'scatteredCedarNdviGt', label: '…and crown NDVI >' },
   { key: 'scatteredCedarIsoGt', label: '…and isolation >' },
   { key: 'scatteredCedarCtxLt2', label: 'Open grass: ctx <' },
@@ -41,6 +41,10 @@ export default function CedarCalibratorPanel() {
   const [cal, setCal] = useState<CirClassifierCalibration>(() => loadCirCalibration());
   const [jsonText, setJsonText] = useState('');
 
+  useEffect(() => {
+    saveCirCalibration(cal);
+  }, [cal]);
+
   const update = useCallback((key: keyof CirClassifierCalibration, value: string) => {
     const n = parseFloat(value);
     if (Number.isNaN(n)) return;
@@ -49,7 +53,7 @@ export default function CedarCalibratorPanel() {
 
   const handleSave = useCallback(() => {
     saveCirCalibration(cal);
-    toast.success('Cedar/oak calibration saved. Re-run analysis on a pasture to apply.');
+    toast.success('Calibration saved (also auto-saves as you edit). Re-run cedar analysis on a pasture to apply.');
   }, [cal]);
 
   const handleReset = useCallback(() => {
@@ -82,9 +86,11 @@ export default function CedarCalibratorPanel() {
       <div>
         <h3 className="text-xs font-black uppercase tracking-widest text-[#FF6B00]">Cedar / oak (CIR) calibration</h3>
         <p className="text-[10px] text-[#a98a7d] mt-1 leading-relaxed">
-          Tunes the heuristic in <code className="text-[#13ff43]">cir-crown-classify</code>. Values persist in{' '}
-          <code className="text-[#a98a7d]">{CIR_CALIBRATION_STORAGE_KEY}</code>. After saving, run{' '}
-          <strong className="text-[#e5e2e1]">cedar analysis</strong> again on a pasture.
+          Tunes the heuristic in <code className="text-[#13ff43]">cir-crown-classify</code> for the{' '}
+          <strong className="text-[#e5e2e1]">CIR object</strong> path (single NAIP export + local crowns). Values
+          auto-save to <code className="text-[#a98a7d]">{CIR_CALIBRATION_STORAGE_KEY}</code>. If analysis falls back to
+          15&nbsp;m spectral sampling (e.g. export failed), fixed server thresholds are used instead — your sliders will
+          not change those results. Re-run <strong className="text-[#e5e2e1]">cedar analysis</strong> after tuning.
         </p>
       </div>
 

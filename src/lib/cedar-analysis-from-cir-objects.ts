@@ -3,6 +3,7 @@ import type { CedarAnalysis, CedarAnalysisSummary, CedarVegClass } from '@/types
 import { blobDiameterMeters, metersPerPixel, pixelToLngLat } from '@/lib/cir-object-detect';
 import type { CirBlobFeatures } from '@/lib/cir-blob-features';
 import { classifyCrownFromCirFeatures } from '@/lib/cir-crown-classify';
+import type { CirClassifierCalibration } from '@/lib/cir-calibration';
 import { loadCirCalibration } from '@/lib/cir-calibration';
 
 function squareCellAround(lng: number, lat: number, halfSizeM: number): GeoJSON.Position[][] {
@@ -43,12 +44,14 @@ export function buildCedarAnalysisFromCirBlobs(
   pastureAcreage: number,
   imageW: number,
   imageH: number,
-  bbox: [number, number, number, number]
+  bbox: [number, number, number, number],
+  /** When omitted, reads latest from localStorage (browser) or defaults. */
+  calibrationOverride?: CirClassifierCalibration
 ): CedarAnalysis {
   const [minLng, minLat, maxLng, maxLat] = bbox;
   const pasture = turf.polygon(polygonCoords);
   const mpp = metersPerPixel(minLng, maxLng, minLat, maxLat, imageW, imageH);
-  const calibration = loadCirCalibration();
+  const calibration = calibrationOverride ?? loadCirCalibration();
 
   type Row = {
     lng: number;
@@ -144,8 +147,8 @@ export function buildCedarAnalysisFromCirBlobs(
             : Math.min(14, 4 + r.dM * 0.45),
         blobPixels: r.pixels,
         ndviStd: Math.round(f.ndviStd * 1000) / 1000,
-        cellNdvi60m: Math.round(f.cellNdvi60m * 1000) / 1000,
-        isolationVs60m: Math.round(f.isolationVs60m * 1000) / 1000,
+        cellNdvi20m: Math.round(f.cellNdvi20m * 1000) / 1000,
+        isolationVs20m: Math.round(f.isolationVs20m * 1000) / 1000,
       },
     };
   });

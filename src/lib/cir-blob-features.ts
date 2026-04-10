@@ -1,6 +1,6 @@
 /**
  * Rich crown features from a single NAIP CIR export (bandIds 3,0,1 → PNG R=NIR, G=Red, B=Green).
- * No extra API calls: spectral indices, texture, bbox shape, and multi-scale NDVI context (10 m / 60 m).
+ * No extra API calls: spectral indices, texture, bbox shape, and local NDVI context (~20 m neighborhood).
  */
 
 import { vegetationMask } from '@/lib/cir-object-detect';
@@ -23,27 +23,23 @@ export interface CirBlobFeatures {
   ndviStd: number;
   /** max(width,height)/min(width,height) of axis-aligned bbox in pixels, ≥ 1 */
   aspectRatio: number;
-  /** Mean NDVI of the ~10 m grid cell containing the centroid */
-  cellNdvi10m: number;
-  /** Mean NDVI of the ~60 m grid cell containing the centroid */
-  cellNdvi60m: number;
-  /** ndvi - cellNdvi60m (positive → brighter than wide neighborhood) */
-  isolationVs60m: number;
+  /** Mean NDVI of the ~20 m grid cell containing the centroid */
+  cellNdvi20m: number;
+  /** crown NDVI − cellNdvi20m (positive → brighter than local neighborhood) */
+  isolationVs20m: number;
 }
 
 export interface CirFeatureExtractOptions {
   minPixels?: number;
   maxPixelFrac?: number;
-  /** Ground cell sizes for coarse grids (meters) */
-  contextCellM10?: number;
-  contextCellM60?: number;
+  /** Ground size of the coarse NDVI grid cell (meters). Default 20. */
+  contextCellM?: number;
 }
 
 const DEFAULT_EXTRACT = {
   minPixels: 6,
   maxPixelFrac: 0.12,
-  contextCellM10: 10,
-  contextCellM60: 60,
+  contextCellM: 20,
 };
 
 /** Per-pixel reflectance proxies; NAIP CIR export maps NIR,Red,Green → R,G,B. */
@@ -136,8 +132,7 @@ export function extractCirBlobFeaturesFromRgba(
 ): CirBlobFeatures[] {
   const minPixels = opts.minPixels ?? DEFAULT_EXTRACT.minPixels;
   const maxPixelFrac = opts.maxPixelFrac ?? DEFAULT_EXTRACT.maxPixelFrac;
-  const m10 = opts.contextCellM10 ?? DEFAULT_EXTRACT.contextCellM10;
-  const m60 = opts.contextCellM60 ?? DEFAULT_EXTRACT.contextCellM60;
+  const ctxM = opts.contextCellM ?? DEFAULT_EXTRACT.contextCellM;
 
   const n = width * height;
   const mask = new Uint8Array(n);
@@ -153,10 +148,8 @@ export function extractCirBlobFeaturesFromRgba(
   }
 
   const maxPixels = Math.floor(n * maxPixelFrac);
-  const cellPx10 = cellPxForMeters(mPerPx, m10);
-  const cellPx60 = cellPxForMeters(mPerPx, m60);
-  const grid10 = buildMeanNdviGrid(ndvi, width, height, cellPx10);
-  const grid60 = buildMeanNdviGrid(ndvi, width, height, cellPx60);
+  const cellPxCtx = cellPxForMeters(mPerPx, ctxM);
+  const gridCtx = buildMeanNdviGrid(ndvi, width, height, cellPxCtx);
 
   const visited = new Uint8Array(n);
   const out: CirBlobFeatures[] = [];
@@ -239,8 +232,7 @@ export function extractCirBlobFeaturesFromRgba(
     const cx = acc.sumX * inv;
     const cy = acc.sumY * inv;
 
-    const cellNdvi10m = sampleGrid(cx, cy, grid10.mean, grid10.gw, grid10.gh, grid10.cellPx);
-    const cellNdvi60m = sampleGrid(cx, cy, grid60.mean, grid60.gw, grid60.gh, grid60.cellPx);
+    const cellNdvi20m = sampleGrid(cx, cy, gridCtx.mean, gridCtx.gw, gridCtx.gh, gridCtx.cellPx);
 
     out.push({
       centroidXPx: cx,
@@ -255,9 +247,8 @@ export function extractCirBlobFeaturesFromRgba(
       excessGreen,
       ndviStd,
       aspectRatio,
-      cellNdvi10m,
-      cellNdvi60m,
-      isolationVs60m: meanNdvi - cellNdvi60m,
+      cellNdvi20m,
+      isolationVs20m: meanNdvi - cellNdvi20m,
     });
   }
 
