@@ -116,6 +116,8 @@ export interface TileConsensusStats {
   consensusImprovedPct: number;
 }
 
+export type CedarDetectionMode = 'spectral_grid' | 'cir_objects';
+
 export interface CedarAnalysisSummary {
   totalSamples: number;
   cedar: CedarClassCount;
@@ -131,6 +133,10 @@ export interface CedarAnalysisSummary {
   avgBandVotes: number;
   highConfidenceCedarCells: number;
   gridSpacingM: number;
+  /** When set, hologram should use one tree per detected object (not density-scattered). */
+  detectionMode?: CedarDetectionMode;
+  /** CIR blob count inside pasture (object path). */
+  objectDetectionCount?: number;
   tileConsensus?: TileConsensusStats;
 }
 

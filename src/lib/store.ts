@@ -402,6 +402,13 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (!pasture || pasture.acreage === 0) return;
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
+    const objectProcessLines = [
+      'Single NAIP color-infrared export (one USGS image request for the pasture extent)',
+      'Local vegetation mask from CIR bands (no per-pixel API calls)',
+      '8-connected components to segment tree crowns',
+      'Size filters and pasture clip; one grid cell per detected crown',
+    ];
+
     const spectralProcessLines = [
       'Partition pasture into regions sized for reliable NAIP sampling',
       'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
@@ -410,6 +417,117 @@ export const useBidStore = create<BidStore>((set, get) => ({
       'Classes: cedar vs oak vs mixed brush vs grass vs bare; tile consensus smooths edges',
       'Overlapping-tile consensus to stabilize class boundaries',
     ];
+
+    const finalizeCedarAnalysis = (data: CedarAnalysis, processLines: string[] | undefined, completionDetail: string) => {
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Processing results',
+          detail: 'Aggregating cedar / oak / brush / grass / bare fractions for pricing',
+          progressPct: 95,
+          processLines,
+        },
+      });
+
+      get().updatePasture(pastureId, { cedarAnalysis: data });
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Generating tree positions',
+          detail: 'Placing 3D tree instances from analysis cells',
+          progressPct: 97,
+          processLines,
+        },
+      });
+
+      const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
+      if (updatedPasture) {
+        const trees = extractTreesFromAnalysis([
+          {
+            cedarAnalysis: data,
+            density: updatedPasture.density,
+          },
+        ]);
+        const cedarTrees: MarkedTree[] = trees
+          .filter((t) => t.species === 'cedar')
+          .map((t) => ({
+            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            lng: t.lng,
+            lat: t.lat,
+            species: t.species,
+            action: 'remove' as const,
+            label: `Remove cedar`,
+            height: t.height,
+            canopyDiameter: t.canopyDiameter,
+          }));
+        if (cedarTrees.length > 0) {
+          set({
+            analysisProgress: {
+              active: true,
+              step: 'Auto-marking cedars',
+              detail: `Marking ${cedarTrees.length} cedar trees for removal (you can adjust in the map)`,
+              progressPct: 98,
+              processLines,
+            },
+          });
+          get().updatePasture(pastureId, { savedTrees: cedarTrees });
+        }
+      }
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Analysis complete',
+          detail: completionDetail,
+          progressPct: 100,
+          processLines: undefined,
+        },
+      });
+      setTimeout(() => set({ analysisProgress: null }), 3200);
+    };
+
+    // Prefer one NAIP export + local blob detection (minimal API traffic)
+    try {
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'CIR object detection',
+          detail: `Requesting NAIP mosaic for ~${Math.round(pasture.acreage)} acres (single export)…`,
+          progressPct: 8,
+          processLines: objectProcessLines,
+        },
+      });
+
+      const { runCirObjectAnalysis } = await import('@/lib/run-cir-object-analysis');
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'CIR object detection',
+          detail: 'Downloading image and running local crown segmentation…',
+          progressPct: 35,
+          processLines: objectProcessLines,
+        },
+      });
+
+      const objectData = await runCirObjectAnalysis(
+        pasture.polygon.geometry.coordinates,
+        pasture.acreage
+      );
+
+      const crownCount =
+        objectData.summary.objectDetectionCount ?? objectData.summary.totalSamples;
+      const completionDetail =
+        crownCount === 0
+          ? `CIR object detection found no tree crowns in this pasture (~${Math.round(pasture.acreage)} ac). You can re-run or use manual markup.`
+          : `CIR object detection: ${crownCount} crown${crownCount === 1 ? '' : 's'} (~${objectData.summary.estimatedCedarAcres} ac cedar canopy estimated for mulch).`;
+
+      finalizeCedarAnalysis(objectData, objectProcessLines, completionDetail);
+      return;
+    } catch {
+      // Fall back to per-cell spectral sampling
+    }
 
     try {
       const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
@@ -502,72 +620,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
       const data: CedarAnalysis =
         parts.length === 1 ? parts[0] : mergeCedarAnalyses(parts, pasture.acreage);
 
-      set({
-        analysisProgress: {
-          active: true,
-          step: 'Processing results',
-          detail: 'Aggregating cedar / oak / brush / grass / bare fractions for pricing',
-          progressPct: 95,
-          processLines: spectralProcessLines,
-        },
-      });
-
-      get().updatePasture(pastureId, { cedarAnalysis: data });
-
-      set({
-        analysisProgress: {
-          active: true,
-          step: 'Generating tree positions',
-          detail: 'Placing 3D tree instances from spectral cedar / oak cells',
-          progressPct: 97,
-          processLines: spectralProcessLines,
-        },
-      });
-
-      const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
-      if (updatedPasture) {
-        const trees = extractTreesFromAnalysis([
-          {
-            cedarAnalysis: data,
-            density: updatedPasture.density,
-          },
-        ]);
-        const cedarTrees: MarkedTree[] = trees
-          .filter((t) => t.species === 'cedar')
-          .map((t) => ({
-            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            lng: t.lng,
-            lat: t.lat,
-            species: t.species,
-            action: 'remove' as const,
-            label: `Remove cedar`,
-            height: t.height,
-            canopyDiameter: t.canopyDiameter,
-          }));
-        if (cedarTrees.length > 0) {
-          set({
-            analysisProgress: {
-              active: true,
-              step: 'Auto-marking cedars',
-              detail: `Marking ${cedarTrees.length} cedar trees for removal (you can adjust in the map)`,
-              progressPct: 98,
-              processLines: spectralProcessLines,
-            },
-          });
-          get().updatePasture(pastureId, { savedTrees: cedarTrees });
-        }
-      }
-
-      set({
-        analysisProgress: {
-          active: true,
-          step: 'Analysis complete',
-          detail: `Cedar ~${data.summary.cedar.pct}% of samples (${data.summary.totalSamples} cells). Estimated cedar acres for mulching: ~${data.summary.estimatedCedarAcres} of ${Math.round(pasture.acreage)} ac pasture.`,
-          progressPct: 100,
-          processLines: undefined,
-        },
-      });
-      setTimeout(() => set({ analysisProgress: null }), 3200);
+      const spectralCompletion = `Cedar ~${data.summary.cedar.pct}% of samples (${data.summary.totalSamples} cells). Estimated cedar acres for mulching: ~${data.summary.estimatedCedarAcres} of ${Math.round(pasture.acreage)} ac pasture.`;
+      finalizeCedarAnalysis(data, spectralProcessLines, spectralCompletion);
     } catch {
       set({
         analysisProgress: {

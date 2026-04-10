@@ -262,7 +262,10 @@ function seededRandom(seed: number): () => number {
 
 export function extractTreesFromAnalysis(
   pastures: Array<{
-    cedarAnalysis: { gridCells: GeoJSON.FeatureCollection; summary: { gridSpacingM: number } } | null;
+    cedarAnalysis: {
+      gridCells: GeoJSON.FeatureCollection;
+      summary: { gridSpacingM: number; detectionMode?: string };
+    } | null;
     density: string;
   }>
 ): TreePosition[] {
@@ -272,8 +275,7 @@ export function extractTreesFromAnalysis(
   for (const pasture of pastures) {
     if (!pasture.cedarAnalysis?.gridCells?.features) continue;
 
-    const spacing = pasture.cedarAnalysis.summary.gridSpacingM || 30;
-    const halfSpacingDeg = (spacing / 2) / 111320; // rough meters to degrees
+    const objectMode = pasture.cedarAnalysis.summary.detectionMode === 'cir_objects';
 
     for (const feature of pasture.cedarAnalysis.gridCells.features) {
       const props = feature.properties ?? {};
@@ -281,6 +283,32 @@ export function extractTreesFromAnalysis(
       if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') continue;
 
       const species: Species = cls === 'mixed_brush' ? 'mixed' : cls as Species;
+
+      const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
+      const lngs = coords.map((c) => c[0]);
+      const lats = coords.map((c) => c[1]);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+
+      // One detected crown per cell (CIR blob path — no random scatter inside cell)
+      if (objectMode) {
+        const lng = (minLng + maxLng) / 2;
+        const lat = (minLat + maxLat) / 2;
+        const canopy =
+          typeof props.canopyDiameterM === 'number' ? props.canopyDiameterM : 6;
+        const height =
+          typeof props.heightM === 'number' ? props.heightM : Math.min(14, 4 + canopy * 0.45);
+        trees.push({
+          lng,
+          lat,
+          species,
+          height: Math.round(height * 10) / 10,
+          canopyDiameter: Math.round(canopy * 10) / 10,
+        });
+        continue;
+      }
 
       // Derive per-cell tree count from spectral data
       const ndvi = (props.ndvi as number) ?? 0.2;
@@ -302,15 +330,6 @@ export function extractTreesFromAnalysis(
       else if (bandVotes >= 4) treeCount += 3;
       else if (bandVotes >= 3) treeCount += 2;
       else if (bandVotes >= 2) treeCount += 1;
-
-      // Get cell bounds from polygon (not just centroid)
-      const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
-      const lngs = coords.map(c => c[0]);
-      const lats = coords.map(c => c[1]);
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
 
       for (let t = 0; t < treeCount; t++) {
         // Uniform random distribution across the ENTIRE cell area — no clustering
