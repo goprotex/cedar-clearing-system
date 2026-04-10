@@ -12,7 +12,7 @@ import {
 import { extractTreesFromAnalysis } from '@/lib/tree-layer';
 import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
-import { readCedarDetectSse, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
+import { fetchCedarDetectChunkWithRetry, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
 import { saveBidToSupabase, loadBidFromSupabase, loadBidListFromSupabase, deleteBidFromSupabase, getAuthUserId } from '@/lib/db';
 
@@ -533,25 +533,36 @@ export const useBidStore = create<BidStore>((set, get) => ({
         const coords = chunkCoords[i];
         const chunkAcres = polygonAcreage(coords);
 
-        const res = await fetch('/api/cedar-detect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            coordinates: coords,
-            acreage: chunkAcres,
-            month: new Date().getMonth() + 1,
-            latitude: pasture.centroid[1],
-          }),
-        });
-
-        if (!res.ok) {
-          let msg = `Spectral analysis failed (${res.status})`;
-          try {
-            const errBody = (await res.json()) as { error?: string; detail?: string };
-            if (errBody.error) msg = errBody.detail ? `${errBody.error}: ${errBody.detail}` : errBody.error;
-          } catch {
-            /* ignore */
-          }
+        try {
+          const chunkData = await fetchCedarDetectChunkWithRetry(
+            coords,
+            chunkAcres,
+            new Date().getMonth() + 1,
+            pasture.centroid[1],
+            (payload) => {
+              const innerPct = Number(payload.pct ?? payload.percent ?? 0);
+              const pct = scaledChunkProgress(i, totalChunks, innerPct);
+              const msg = (payload.message as string) || 'Processing…';
+              set({
+                analysisProgress: {
+                  active: true,
+                  phase: (payload.phase as string) || 'sampling',
+                  step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
+                  detail: (payload.detail as string) || '',
+                  pct,
+                  percent: pct,
+                  cedarCount: payload.cedarCount as number | undefined,
+                  oakCount: payload.oakCount as number | undefined,
+                  totalPoints: payload.totalPoints as number | undefined,
+                  completed: payload.completed as number | undefined,
+                  processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+                },
+              });
+            }
+          );
+          parts.push(chunkData);
+        } catch (chunkErr) {
+          let msg = chunkErr instanceof Error ? chunkErr.message : 'Spectral analysis failed';
           if (totalChunks > 1) {
             msg = `Region ${i + 1} of ${totalChunks}: ${msg}`;
           }
@@ -559,29 +570,6 @@ export const useBidStore = create<BidStore>((set, get) => ({
           toast.error(msg);
           return;
         }
-
-        const chunkData = await readCedarDetectSse(res, (payload) => {
-          const innerPct = Number(payload.pct ?? payload.percent ?? 0);
-          const pct = scaledChunkProgress(i, totalChunks, innerPct);
-          const msg = (payload.message as string) || 'Processing…';
-          set({
-            analysisProgress: {
-              active: true,
-              phase: (payload.phase as string) || 'sampling',
-              step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
-              detail: (payload.detail as string) || '',
-              pct,
-              percent: pct,
-              cedarCount: payload.cedarCount as number | undefined,
-              oakCount: payload.oakCount as number | undefined,
-              totalPoints: payload.totalPoints as number | undefined,
-              completed: payload.completed as number | undefined,
-              processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-            },
-          });
-        });
-
-        parts.push(chunkData);
       }
 
       const resultData: CedarAnalysis =
