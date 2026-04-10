@@ -556,6 +556,18 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
         }
 
+        let heartbeatIv: ReturnType<typeof setInterval> | null = null;
+        function startHeartbeat() {
+          heartbeatIv = setInterval(() => {
+            try { controller.enqueue(encoder.encode(': keepalive\n\n')); } catch { /* stream closed */ }
+          }, 15_000);
+        }
+        function stopHeartbeat() {
+          if (heartbeatIv) { clearInterval(heartbeatIv); heartbeatIv = null; }
+        }
+
+        startHeartbeat();
+
         try {
         send('progress', {
           phase: 'grid',
@@ -759,6 +771,7 @@ export async function POST(req: NextRequest) {
         const total = refined.length;
         if (total === 0) {
           send('error', { message: 'No spectral samples after processing.' });
+          stopHeartbeat();
           controller.close();
           return;
         }
@@ -833,8 +846,10 @@ export async function POST(req: NextRequest) {
         }));
 
         send('result', { summary, samples });
+        stopHeartbeat();
         controller.close();
         } catch (streamErr) {
+          stopHeartbeat();
           const message = streamErr instanceof Error ? streamErr.message : 'Spectral stream failed';
           try {
             controller.enqueue(
