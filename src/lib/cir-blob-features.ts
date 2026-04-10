@@ -1,6 +1,6 @@
 /**
  * Rich crown features from a single NAIP CIR export (bandIds 3,0,1 → PNG R=NIR, G=Red, B=Green).
- * No extra API calls: spectral indices, texture, bbox shape, and local NDVI context (~20 m neighborhood).
+ * No extra API calls: spectral indices, texture, bbox, local NDVI context (~20 m), and cast-shadow asymmetry.
  */
 
 import { vegetationMask } from '@/lib/cir-object-detect';
@@ -27,6 +27,11 @@ export interface CirBlobFeatures {
   cellNdvi20m: number;
   /** crown NDVI − cellNdvi20m (positive → brighter than local neighborhood) */
   isolationVs20m: number;
+  /**
+   * Cast-shadow asymmetry: spread of mean luminance across N/E/S/W bands outside the bbox.
+   * Trees often show one much darker side (shadow); turf stays symmetric (~0). ~0…1.
+   */
+  shadowSideContrast: number;
 }
 
 export interface CirFeatureExtractOptions {
@@ -105,6 +110,73 @@ function sampleGrid(
   return grid[iy * gw + ix];
 }
 
+/** Display luminance 0…1 — shadows read dark in all bands. */
+function lum01(data: Uint8ClampedArray, i: number): number {
+  const p = i * 4;
+  const r = data[p];
+  const g = data[p + 1];
+  const b = data[p + 2];
+  return (r + g + b) / (3 * 255);
+}
+
+/**
+ * Mean luminance in axis-aligned bands just outside the blob bbox (N/E/S/W), excluding blob pixels.
+ * Returns (max−min) of the four means — strong when one side is much darker (cast shadow).
+ */
+function shadowContrastFourSides(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  blobSet: Set<number>
+): number {
+  const bw = maxX - minX + 1;
+  const bh = maxY - minY + 1;
+  const depth = Math.max(4, Math.min(28, Math.round(Math.min(bw, bh) * 0.28)));
+  const xPad = Math.max(2, Math.min(12, Math.round(bw * 0.15)));
+
+  const means: number[] = [];
+
+  const sampleBand = (x0: number, y0: number, x1: number, y1: number) => {
+    let s = 0;
+    let n = 0;
+    const xa = Math.max(0, Math.min(width - 1, Math.min(x0, x1)));
+    const xb = Math.max(0, Math.min(width - 1, Math.max(x0, x1)));
+    const ya = Math.max(0, Math.min(height - 1, Math.min(y0, y1)));
+    const yb = Math.max(0, Math.min(height - 1, Math.max(y0, y1)));
+    if (xa > xb || ya > yb) return;
+    for (let y = ya; y <= yb; y++) {
+      const row = y * width;
+      for (let x = xa; x <= xb; x++) {
+        const i = row + x;
+        if (blobSet.has(i)) continue;
+        s += lum01(data, i);
+        n++;
+      }
+    }
+    if (n >= 2) means.push(s / n);
+  };
+
+  // Image y increases downward; smaller y = north in typical north-up NAIP exports.
+  sampleBand(minX - xPad, minY - depth, maxX + xPad, minY - 1);
+  sampleBand(minX - xPad, maxY + 1, maxX + xPad, maxY + depth);
+  sampleBand(minX - depth, minY - xPad, minX - 1, maxY + xPad);
+  sampleBand(maxX + 1, minY - xPad, maxX + depth, maxY + xPad);
+
+  if (means.length < 2) return 0;
+  let lo = means[0];
+  let hi = means[0];
+  for (const m of means) {
+    if (m < lo) lo = m;
+    if (m > hi) hi = m;
+  }
+  const raw = hi - lo;
+  return Math.max(0, Math.min(1, raw / Math.max(0.12, hi + 1e-6)));
+}
+
 type Accum = {
   sumX: number;
   sumY: number;
@@ -174,9 +246,11 @@ export function extractCirBlobFeaturesFromRgba(
 
     const stack = [idx];
     visited[idx] = 1;
+    const blobPixels: number[] = [];
 
     while (stack.length > 0) {
       const cur = stack.pop()!;
+      blobPixels.push(cur);
       const x = cur % width;
       const y = (cur / width) | 0;
       const p = cur * 4;
@@ -234,6 +308,18 @@ export function extractCirBlobFeaturesFromRgba(
 
     const cellNdvi20m = sampleGrid(cx, cy, gridCtx.mean, gridCtx.gw, gridCtx.gh, gridCtx.cellPx);
 
+    const blobSet = new Set(blobPixels);
+    const shadowSideContrast = shadowContrastFourSides(
+      data,
+      width,
+      height,
+      acc.minX,
+      acc.maxX,
+      acc.minY,
+      acc.maxY,
+      blobSet
+    );
+
     out.push({
       centroidXPx: cx,
       centroidYPx: cy,
@@ -249,6 +335,7 @@ export function extractCirBlobFeaturesFromRgba(
       aspectRatio,
       cellNdvi20m,
       isolationVs20m: meanNdvi - cellNdvi20m,
+      shadowSideContrast,
     });
   }
 

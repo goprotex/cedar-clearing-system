@@ -149,6 +149,7 @@ export function buildCedarAnalysisFromCirBlobs(
         ndviStd: Math.round(f.ndviStd * 1000) / 1000,
         cellNdvi20m: Math.round(f.cellNdvi20m * 1000) / 1000,
         isolationVs20m: Math.round(f.isolationVs20m * 1000) / 1000,
+        shadowSideContrast: Math.round(f.shadowSideContrast * 1000) / 1000,
       },
     };
   });
