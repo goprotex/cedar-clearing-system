@@ -13,6 +13,61 @@ const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 200
 const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
 const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
 const OPERATOR_PUBLISH_MS = 2500;
+const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
+
+function isValidLngLat(pair: [number, number]): boolean {
+  const [lng, lat] = pair;
+  return (
+    Number.isFinite(lng) &&
+    Number.isFinite(lat) &&
+    Math.abs(lng) <= 180 &&
+    Math.abs(lat) <= 90 &&
+    !(lng === 0 && lat === 0)
+  );
+}
+
+/** Some stored bids mistakenly used [lat, lng]; Mapbox expects [lng, lat]. */
+function normalizePropertyCenter(pair: [number, number]): [number, number] {
+  const [a, b] = pair;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return pair;
+  if (Math.abs(a) <= 90 && Math.abs(b) <= 180 && a > -25 && a < 75 && b < -40 && b > -180) {
+    return [b, a];
+  }
+  return pair;
+}
+
+function centerFromPastures(bid: Bid): [number, number] {
+  for (const p of bid.pastures) {
+    const ring = p.polygon?.geometry?.coordinates?.[0];
+    if (!ring || ring.length < 3) continue;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    for (const c of ring) {
+      if (!Array.isArray(c) || c.length < 2) continue;
+      const [lng, lat] = c;
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+      minLng = Math.min(minLng, lng);
+      maxLng = Math.max(maxLng, lng);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    }
+    if (minLng !== Infinity) {
+      return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+    }
+  }
+  return DEFAULT_CENTER;
+}
+
+function resolveOperatorView(bid: Bid): { center: [number, number]; zoom: number } {
+  let center = normalizePropertyCenter(bid.propertyCenter);
+  if (!isValidLngLat(center)) center = centerFromPastures(bid);
+  if (!isValidLngLat(center)) center = DEFAULT_CENTER;
+  let zoom = bid.mapZoom;
+  if (!Number.isFinite(zoom) || zoom < 1 || zoom > 22) zoom = 14;
+  return { center, zoom };
+}
 
 interface ClearedCell {
   cellIndex: number;
@@ -114,7 +169,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       try {
         setSharedStatus('syncing');
         const jobId = jobIdFromBidId(bidId);
-        const res = await fetch(`/api/jobs/${jobId}/cleared-cells`, { cache: 'no-store' });
+        const res = await fetch(`/api/jobs/${jobId}/cleared-cells`, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) {
             if (!cancelled) {
@@ -203,6 +261,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
 
+    const { center, zoom } = resolveOperatorView(bid);
+
     // iPad / in-cab devices often struggle with heavy terrain/3D layers.
     // Default to a lighter rendering path on coarse-pointer devices.
     const coarsePointer =
@@ -215,8 +275,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map = new mapboxgl.Map({
         container,
         style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
-        center: bid.propertyCenter,
-        zoom: bid.mapZoom,
+        center,
+        zoom,
         pitch: coarsePointer ? 0 : 45,
         antialias: true,
         preserveDrawingBuffer: true,
@@ -226,6 +286,25 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       setMapError(e instanceof Error ? e.message : 'Map failed to initialize.');
       return;
     }
+
+    const bumpResize = () => {
+      try {
+        map.resize();
+      } catch {
+        /* ignore */
+      }
+    };
+    requestAnimationFrame(bumpResize);
+    setTimeout(bumpResize, 50);
+    setTimeout(bumpResize, 300);
+
+    let loadWatch: number | null = window.setTimeout(() => {
+      if (!map.isStyleLoaded()) {
+        setMapError(
+          'Map style is taking too long to load. Check NEXT_PUBLIC_MAPBOX_TOKEN on the server, network, or ad blockers blocking api.mapbox.com.',
+        );
+      }
+    }, 15000);
 
     map.on('error', (e) => {
       const msg =
@@ -241,10 +320,15 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
 
     map.once('idle', () => {
-      map.resize();
+      bumpResize();
     });
 
     map.on('load', () => {
+      if (loadWatch != null) {
+        window.clearTimeout(loadWatch);
+        loadWatch = null;
+      }
+      try {
       // High fidelity terrain/sky only on non-coarse pointer devices.
       if (!coarsePointer) {
         try {
@@ -282,7 +366,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       // Pasture polygon outlines with holographic green glow
       const pastureFeatures: GeoJSON.Feature[] = bid.pastures
-        .filter(p => p.polygon.geometry.coordinates.length > 0)
+        .filter((p) => (p.polygon?.geometry?.coordinates?.length ?? 0) > 0)
         .map(p => ({
           type: 'Feature', geometry: p.polygon.geometry,
           properties: { name: p.name, color: '#00ff41' },
@@ -346,11 +430,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       // Operator trail line
       map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } });
       map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
+      } catch (err) {
+        setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
+        return;
+      }
+      bumpResize();
+      setTimeout(bumpResize, 100);
     });
 
     mapRef.current = map;
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => {
+      if (loadWatch != null) window.clearTimeout(loadWatch);
+      map.remove();
+      mapRef.current = null;
+    };
   }, [state.bid]);
 
   // Toggle NDVI overlay visibility
@@ -590,9 +684,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#131313] relative overflow-hidden hologram-mode">
-      {/* Map container — always in DOM so ref is available when bid loads */}
-      <div ref={mapContainerRef} className="absolute inset-0" />
+    <div className="min-h-[100dvh] h-[100dvh] w-screen bg-[#131313] relative overflow-hidden hologram-mode operate-mode-root isolate">
+      {/* Map container — z-0 so hologram vignette/scanlines (see globals.css) do not cover the WebGL canvas */}
+      <div ref={mapContainerRef} className="absolute inset-0 z-0 min-h-0" />
 
       {/* No-bid overlay */}
       {!bid && (

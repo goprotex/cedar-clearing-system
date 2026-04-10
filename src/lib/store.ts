@@ -10,7 +10,9 @@ import {
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
 import { extractTreesFromAnalysis } from '@/lib/tree-layer';
-import { normalizeCedarAnalysisPayload } from '@/lib/cedar-analysis-grid';
+import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
+import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
+import { readCedarDetectSse, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -98,6 +100,8 @@ interface BidStore {
     oakCount?: number;
     totalPoints?: number;
     completed?: number;
+    /** Extra pipeline description (large pastures / multi-region runs) */
+    processLines?: string[];
   } | null;
 
   // All saved bids (local storage for Phase 1)
@@ -415,134 +419,165 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (!pasture || pasture.acreage === 0) return;
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
-    try {
-      set({ analysisProgress: { active: true, phase: 'init', step: 'Initializing spectral analysis...', detail: `Scanning ${Math.round(pasture.acreage)} acres at 15m resolution`, pct: 0, percent: 0 } });
+    const spectralProcessLines = [
+      'Partition pasture into regions sized for reliable NAIP sampling',
+      'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
+      'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
+      'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
+      'Overlapping-tile consensus to stabilize class boundaries',
+    ];
 
-      const res = await fetch('/api/cedar-detect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          coordinates: pasture.polygon.geometry.coordinates,
-          acreage: pasture.acreage,
-          month: new Date().getMonth() + 1,
-          latitude: pasture.centroid[1],
-        }),
+    try {
+      const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
+      const totalChunks = chunkCoords.length;
+
+      set({
+        analysisProgress: {
+          active: true,
+          phase: 'init',
+          step: 'Initializing spectral analysis…',
+          detail:
+            totalChunks > 1
+              ? `Large pasture: ${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, 15 m cells). This may take several minutes.`
+              : `Scanning ~${Math.round(pasture.acreage)} acres at 15 m resolution`,
+          pct: 0,
+          percent: 0,
+          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+        },
       });
 
-      if (!res.ok) {
-        let msg = `Spectral analysis failed (${res.status})`;
-        try {
-          const errBody = (await res.json()) as { error?: string; detail?: string };
-          if (errBody.error) msg = errBody.detail ? `${errBody.error}: ${errBody.detail}` : errBody.error;
-        } catch {
-          /* ignore */
-        }
-        set({ analysisProgress: null });
-        toast.error(msg);
-        return;
-      }
+      const parts: CedarAnalysis[] = [];
 
-      const reader = res.body?.getReader();
-      if (!reader) {
-        set({ analysisProgress: null });
-        toast.error('Spectral analysis: no response body from server.');
-        return;
-      }
+      for (let i = 0; i < chunkCoords.length; i++) {
+        const coords = chunkCoords[i];
+        const chunkAcres = polygonAcreage(coords);
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let resultData: CedarAnalysis | null = null;
-      let streamError: string | null = null;
+        const res = await fetch('/api/cedar-detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coordinates: coords,
+            acreage: chunkAcres,
+            month: new Date().getMonth() + 1,
+            latitude: pasture.centroid[1],
+          }),
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        let eventType = '';
-        for (const rawLine of lines) {
-          const line = rawLine.replace(/\r$/, '');
-          if (line.startsWith('event: ')) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith('data: ') && eventType) {
-            try {
-              const payload = JSON.parse(line.slice(6).trim()) as Record<string, unknown>;
-              if (eventType === 'progress') {
-                const p = Number(payload.pct ?? payload.percent ?? 0);
-                set({
-                  analysisProgress: {
-                    active: true,
-                    phase: (payload.phase as string) || 'sampling',
-                    step: (payload.message as string) || 'Processing...',
-                    detail: (payload.detail as string) || '',
-                    pct: p,
-                    percent: p,
-                    cedarCount: payload.cedarCount as number | undefined,
-                    oakCount: payload.oakCount as number | undefined,
-                    totalPoints: payload.totalPoints as number | undefined,
-                    completed: payload.completed as number | undefined,
-                  },
-                });
-              } else if (eventType === 'error') {
-                streamError =
-                  typeof payload.message === 'string'
-                    ? payload.message
-                    : 'Spectral analysis failed on the server.';
-              } else if (eventType === 'result') {
-                resultData = normalizeCedarAnalysisPayload(payload);
-              }
-            } catch {
-              /* skip malformed line */
-            }
-            eventType = '';
+        if (!res.ok) {
+          let msg = `Spectral analysis failed (${res.status})`;
+          try {
+            const errBody = (await res.json()) as { error?: string; detail?: string };
+            if (errBody.error) msg = errBody.detail ? `${errBody.error}: ${errBody.detail}` : errBody.error;
+          } catch {
+            /* ignore */
           }
+          if (totalChunks > 1) {
+            msg = `Region ${i + 1} of ${totalChunks}: ${msg}`;
+          }
+          set({ analysisProgress: null });
+          toast.error(msg);
+          return;
         }
+
+        const chunkData = await readCedarDetectSse(res, (payload) => {
+          const innerPct = Number(payload.pct ?? payload.percent ?? 0);
+          const pct = scaledChunkProgress(i, totalChunks, innerPct);
+          const msg = (payload.message as string) || 'Processing…';
+          set({
+            analysisProgress: {
+              active: true,
+              phase: (payload.phase as string) || 'sampling',
+              step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
+              detail: (payload.detail as string) || '',
+              pct,
+              percent: pct,
+              cedarCount: payload.cedarCount as number | undefined,
+              oakCount: payload.oakCount as number | undefined,
+              totalPoints: payload.totalPoints as number | undefined,
+              completed: payload.completed as number | undefined,
+              processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+            },
+          });
+        });
+
+        parts.push(chunkData);
       }
 
-      if (streamError) {
-        set({ analysisProgress: null });
-        toast.error(streamError);
-        return;
-      }
+      const resultData: CedarAnalysis =
+        parts.length === 1 ? parts[0] : mergeCedarAnalyses(parts, pasture.acreage);
 
-      if (!resultData) {
-        set({ analysisProgress: null });
-        toast.error(
-          'No spectral result was received. Try a smaller pasture, check your connection, or retry — the analysis stream may have been cut off.'
-        );
-        return;
-      }
-
-      set({ analysisProgress: { active: true, phase: 'applying', step: 'Applying results to map...', detail: '', pct: 96, percent: 96, totalPoints: resultData.summary?.totalSamples } });
+      set({
+        analysisProgress: {
+          active: true,
+          phase: 'applying',
+          step: 'Applying results to map…',
+          detail: '',
+          pct: 96,
+          percent: 96,
+          totalPoints: resultData.summary?.totalSamples,
+        },
+      });
       get().updatePasture(pastureId, { cedarAnalysis: resultData });
 
-      set({ analysisProgress: { active: true, phase: 'trees', step: 'Generating 3D tree positions...', detail: 'Placing trees from spectral data', pct: 98, percent: 98 } });
+      set({
+        analysisProgress: {
+          active: true,
+          phase: 'trees',
+          step: 'Generating 3D tree positions…',
+          detail: 'Placing trees from spectral data',
+          pct: 98,
+          percent: 98,
+        },
+      });
+
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
-        const trees = extractTreesFromAnalysis([{
-          cedarAnalysis: resultData,
-          density: updatedPasture.density,
-        }]);
+        const trees = extractTreesFromAnalysis([
+          {
+            cedarAnalysis: resultData,
+            density: updatedPasture.density,
+          },
+        ]);
         const cedarTrees: MarkedTree[] = trees
           .filter((t) => t.species === 'cedar')
           .map((t) => ({
             id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            lng: t.lng, lat: t.lat, species: t.species,
+            lng: t.lng,
+            lat: t.lat,
+            species: t.species,
             action: 'remove' as const,
             label: 'Remove cedar',
-            height: t.height, canopyDiameter: t.canopyDiameter,
+            height: t.height,
+            canopyDiameter: t.canopyDiameter,
           }));
         if (cedarTrees.length > 0) {
+          set({
+            analysisProgress: {
+              active: true,
+              phase: 'trees',
+              step: 'Auto-marking cedars',
+              detail: `Marking ${cedarTrees.length} cedar trees for removal (adjust on the map if needed)`,
+              pct: 99,
+              percent: 99,
+            },
+          });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
       }
 
       const s = resultData.summary;
-      set({ analysisProgress: { active: true, phase: 'done', step: 'Analysis complete', detail: `${s.cedar.pct}% cedar · ${s.oak?.pct || 0}% oak · ${s.totalSamples} samples`, pct: 100, percent: 100, totalPoints: s.totalSamples } });
-      setTimeout(() => set({ analysisProgress: null }), 3000);
+      set({
+        analysisProgress: {
+          active: true,
+          phase: 'done',
+          step: 'Analysis complete',
+          detail: `${s.cedar.pct}% cedar · ${s.oak?.pct ?? 0}% oak · ~${s.estimatedCedarAcres} cedar ac (mulch) of ${Math.round(pasture.acreage)} ac · ${s.totalSamples} cells`,
+          pct: 100,
+          percent: 100,
+          totalPoints: s.totalSamples,
+        },
+      });
+      setTimeout(() => set({ analysisProgress: null }), 3200);
     } catch (e) {
       set({ analysisProgress: null });
       toast.error(e instanceof Error ? e.message : 'Spectral analysis failed.');

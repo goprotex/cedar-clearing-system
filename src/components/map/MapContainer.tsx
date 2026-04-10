@@ -1118,14 +1118,17 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                   {analysisProgress.step}
                 </div>
                 <div className="text-white/40 text-[11px] font-medium">
-                  {analysisProgress.phase === 'grid' ? 'GRID' :
+                  {analysisProgress.phase === 'soil' ? 'SOIL_DATA' :
+                   analysisProgress.phase === 'elevation' ? 'ELEVATION' :
+                   analysisProgress.phase === 'grid' ? 'GRID' :
                    analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
                    analysisProgress.phase === 'consensus' ? 'TILE_CONSENSUS' :
                    analysisProgress.phase === 'sentinel' ? 'S2_FUSION' :
                    analysisProgress.phase === 'building' ? 'BUILD_GRID' :
                    analysisProgress.phase === 'applying' ? 'APPLY_MAP' :
                    analysisProgress.phase === 'trees' ? 'TREES_3D' :
-                   analysisProgress.phase === 'done' ? 'COMPLETE' : 'INITIALIZING'}
+                   analysisProgress.phase === 'done' ? 'COMPLETE' :
+                   analysisProgress.phase === 'init' ? 'START' : 'INITIALIZING'}
                 </div>
               </div>
             </div>
@@ -1168,6 +1171,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               <div className="text-white/30 text-[10px] text-center font-mono tracking-wide">
                 {analysisProgress.detail}
               </div>
+            )}
+
+            {analysisProgress.processLines && analysisProgress.processLines.length > 0 && (
+              <ul className="text-white/25 text-[10px] leading-snug space-y-1 border-t border-white/5 pt-3 list-disc pl-4 text-left">
+                {analysisProgress.processLines.map((line, idx) => (
+                  <li key={idx}>{line}</li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
