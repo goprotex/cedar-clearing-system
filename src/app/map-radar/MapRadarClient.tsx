@@ -73,9 +73,6 @@ export default function MapRadarClient() {
       <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6">
         <div>
           <h1 className="text-4xl font-black uppercase tracking-tighter">MAP_RADAR</h1>
-          <p className="text-[#ffb693] text-xs font-mono">
-            RECONNAISSANCE MODE // SCOUT & SURVEY
-          </p>
         </div>
       </div>
 

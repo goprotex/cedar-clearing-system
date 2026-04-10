@@ -6,9 +6,13 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
+import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
+const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
+const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
+const OPERATOR_PUBLISH_MS = 2500;
 
 interface ClearedCell {
   cellIndex: number;
@@ -71,8 +75,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const trailCoordsRef = useRef<[number, number][]>([]);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [ndviEnabled, setNdviEnabled] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [sharedEnabled, setSharedEnabled] = useState(false);
+  const lastPublishRef = useRef<number>(0);
+  const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
   const [state, setState] = useState<OperatorState>({
     bid: null, trees: [], clearedCellIds: new Set(), clearedCells: [],
@@ -96,6 +105,46 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
   }, [bidId]);
+
+  // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
+  useEffect(() => {
+    if (!state.bid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setSharedStatus('syncing');
+        const jobId = jobIdFromBidId(bidId);
+        const res = await fetch(`/api/jobs/${jobId}/cleared-cells`, { cache: 'no-store' });
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            if (!cancelled) {
+              setSharedEnabled(false);
+              setSharedStatus('unauth');
+            }
+            return;
+          }
+          throw new Error(await res.text().catch(() => 'Failed to load shared progress.'));
+        }
+        const data = (await res.json()) as { cellIds: string[] };
+        if (cancelled) return;
+        setSharedEnabled(true);
+        setSharedStatus('ready');
+        setState((prev) => {
+          const merged = mergeClearedCellIds(prev.clearedCellIds, data.cellIds ?? []);
+          if (merged.size === prev.clearedCellIds.size) return prev;
+          saveOperatorSession(bidId, Array.from(merged), prev.clearedCells);
+          return { ...prev, clearedCellIds: merged };
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setSharedEnabled(false);
+          setSharedStatus('error');
+          console.error('Shared progress sync failed:', e);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [bidId, state.bid]);
 
   // Compute cedar stats
   const cedarStats = useCallback(() => {
@@ -149,15 +198,43 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
-    const map = new mapboxgl.Map({
-      container,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: bid.propertyCenter,
-      zoom: bid.mapZoom,
-      pitch: 45,
-      antialias: true,
-      preserveDrawingBuffer: true,
-      failIfMajorPerformanceCaveat: false,
+    if (!mapboxgl.supported({ failIfMajorPerformanceCaveat: false })) {
+      setMapError('WebGL is not supported on this device/browser.');
+      return;
+    }
+
+    // iPad / in-cab devices often struggle with heavy terrain/3D layers.
+    // Default to a lighter rendering path on coarse-pointer devices.
+    const coarsePointer =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches;
+
+    let map: mapboxgl.Map;
+    try {
+      map = new mapboxgl.Map({
+        container,
+        style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
+        center: bid.propertyCenter,
+        zoom: bid.mapZoom,
+        pitch: coarsePointer ? 0 : 45,
+        antialias: true,
+        preserveDrawingBuffer: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (e) {
+      setMapError(e instanceof Error ? e.message : 'Map failed to initialize.');
+      return;
+    }
+
+    map.on('error', (e) => {
+      const msg =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (e as any)?.error?.message ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (e as any)?.error?.toString?.() ||
+        'Mapbox failed to load.';
+      setMapError(String(msg));
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -168,26 +245,40 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     });
 
     map.on('load', () => {
-      map.addSource('mapbox-dem', {
-        type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
-      });
-      map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
-      map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+      // High fidelity terrain/sky only on non-coarse pointer devices.
+      if (!coarsePointer) {
+        try {
+          map.addSource('mapbox-dem', {
+            type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
+          });
+          map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
+          map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+        } catch {
+          // If terrain fails, keep going with base map only.
+        }
+      }
 
-      // NAIP NDVI overlay at 100% opacity for holographic base
-      map.addSource('naip-ndvi', {
-        type: 'raster',
-        tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
-        ],
-        tileSize: 256,
-      });
-      map.addLayer({
-        id: 'naip-ndvi-overlay',
-        type: 'raster',
-        source: 'naip-ndvi',
-        paint: { 'raster-opacity': 1.0 },
-      });
+      // NAIP NDVI overlay (optional; can appear dark/black depending on server response)
+      if (!coarsePointer) {
+        try {
+          map.addSource('naip-ndvi', {
+            type: 'raster',
+            tiles: [
+              'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+            ],
+            tileSize: 256,
+          });
+          map.addLayer({
+            id: 'naip-ndvi-overlay',
+            type: 'raster',
+            source: 'naip-ndvi',
+            paint: { 'raster-opacity': 0.85 },
+            layout: { visibility: 'none' },
+          });
+        } catch {
+          // Optional overlay; ignore if it fails.
+        }
+      }
 
       // Pasture polygon outlines with holographic green glow
       const pastureFeatures: GeoJSON.Feature[] = bid.pastures
@@ -220,15 +311,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
 
-      map.addLayer({
-        id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
-        paint: {
-          'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
-          'fill-extrusion-opacity': 0.55,
-          'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
-          'fill-extrusion-base': 0,
-        },
-      });
+      if (coarsePointer) {
+        // 2D fill on iPad/field devices for stability/perf
+        map.addLayer({
+          id: 'cedar-cells-fill-2d',
+          type: 'fill',
+          source: 'cedar-cells',
+          paint: {
+            'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
+            'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
+          },
+        });
+      } else {
+        map.addLayer({
+          id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
+          paint: {
+            'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
+            'fill-extrusion-opacity': 0.55,
+            'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
+            'fill-extrusion-base': 0,
+          },
+        });
+      }
 
       map.addLayer({
         id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
@@ -247,6 +351,30 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     mapRef.current = map;
 
     return () => { map.remove(); mapRef.current = null; };
+  }, [state.bid]);
+
+  // Toggle NDVI overlay visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const layerId = 'naip-ndvi-overlay';
+    if (!map.getLayer(layerId)) return;
+    map.setLayoutProperty(layerId, 'visibility', ndviEnabled ? 'visible' : 'none');
+  }, [ndviEnabled]);
+
+  // Resize on orientation change / viewport changes (iPad/Safari)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const onResize = () => {
+      try { map.resize(); } catch { /* ignore */ }
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
   }, [state.bid]);
 
   // Process GPS position — check cedar cells for clearing
@@ -289,19 +417,65 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     }
 
     if (newlyCleared.length > 0) {
+      const ts = Date.now();
       setState(prev => {
         const nextIds = new Set(prev.clearedCellIds);
         const nextCells = [...prev.clearedCells];
         for (const id of newlyCleared) {
           nextIds.add(id);
           const parts = id.split(':');
-          nextCells.push({ cellIndex: parseInt(parts[1]), pastureId: parts[0], timestamp: Date.now() });
+          nextCells.push({ cellIndex: parseInt(parts[1]), pastureId: parts[0], timestamp: ts });
         }
         saveOperatorSession(bidId, Array.from(nextIds), nextCells);
         return { ...prev, clearedCellIds: nextIds, clearedCells: nextCells };
       });
 
       updateCedarSource();
+
+      // Best-effort: if shared progress is enabled, append events so other users/devices see progress.
+      if (sharedEnabled) {
+        const jobId = jobIdFromBidId(bidId);
+        void Promise.allSettled(
+          newlyCleared.map((cellId) =>
+            fetch(`/api/jobs/${jobId}/events`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'operator_cell_cleared', data: { cellId, timestamp: ts } }),
+            })
+          )
+        ).then((results) => {
+          const anyAuth = results.some((r) => r.status === 'fulfilled' && 'value' in r && (r.value as Response).status === 401);
+          if (anyAuth) {
+            setSharedEnabled(false);
+            setSharedStatus('unauth');
+          }
+        }).catch(() => {
+          // ignore (best-effort)
+        });
+      }
+    }
+
+    // Best-effort: publish operator position periodically for live monitor.
+    if (sharedEnabled) {
+      const now = Date.now();
+      if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
+        lastPublishRef.current = now;
+        const jobId = jobIdFromBidId(bidId);
+        void fetch(`/api/jobs/${jobId}/operator-positions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lng,
+            lat,
+            accuracy_m: stateRef.current.accuracy,
+            heading_deg: stateRef.current.heading,
+            speed_mps: stateRef.current.speed,
+            timestamp: now,
+          }),
+        }).catch(() => {
+          // best-effort
+        });
+      }
     }
 
     trailCoordsRef.current.push([lng, lat]);
@@ -312,7 +486,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         trailSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailCoordsRef.current }, properties: {} });
       }
     }
-  }, [bidId, updateCedarSource]);
+  }, [bidId, updateCedarSource, sharedEnabled]);
 
   // Start/stop GPS
   const toggleGPS = useCallback(() => {
@@ -437,6 +611,19 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       {/* Holographic scan-line overlay */}
       {bid && <div className="holo-scanlines" />}
 
+      {/* Map error overlay */}
+      {bid && mapError && (
+        <div className="absolute inset-0 z-40 bg-[#131313]/90 backdrop-blur-sm flex items-center justify-center text-[#e5e2e1]">
+          <div className="max-w-md w-[92vw] border border-[#353534] bg-[#0e0e0e]/90 p-6 space-y-3">
+            <div className="text-[#FF6B00] text-xl font-black uppercase tracking-widest">MAP_OFFLINE</div>
+            <div className="text-xs font-mono text-[#a98a7d] break-words">{mapError}</div>
+            <div className="text-[11px] text-[#a98a7d]">
+              If this is a token/style error, verify <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> and refresh.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar */}
       {bid && (
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#000a02]/80 backdrop-blur-sm border-b border-green-900/40">
@@ -449,6 +636,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setNdviEnabled((v) => !v)}
+              className="text-[10px] font-mono text-[#a98a7d] hover:text-white border border-green-900/40 px-2 py-1 rounded"
+              title="Toggle NDVI overlay"
+            >
+              {ndviEnabled ? 'NDVI_ON' : 'NDVI_OFF'}
+            </button>
             <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[10px] font-mono text-[#a98a7d]">
               {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}

@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
 
 const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
+  { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
   { href: '/map-radar', label: 'MAP_RADAR', icon: '🛰️' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
@@ -15,6 +17,7 @@ const NAV_ITEMS = [
 
 const HEADER_NAV = [
   { href: '/bids', label: 'ESTIMATOR' },
+  { href: '/monitor', label: 'MONITOR' },
   { href: '/fleet', label: 'FLEET' },
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
@@ -24,11 +27,28 @@ const HEADER_NAV = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
+      setAuthEmail(data.user?.email ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthEmail(session?.user?.email ?? null);
+    });
+    return () => {
+      cancelled = true;
+      sub?.subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
@@ -70,6 +90,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span className="text-[10px] text-[#a98a7d] font-mono hidden md:inline">
             SYS_STATUS: OPERATIONAL
           </span>
+          <div className="hidden md:flex items-center gap-2">
+            {authEmail ? (
+              <>
+                <span className="text-[10px] text-[#a98a7d] font-mono truncate max-w-[160px]" title={authEmail}>
+                  USER: {authEmail}
+                </span>
+                <Link
+                  href="/logout"
+                  className="text-[10px] font-mono border border-[#353534] px-2 py-1 text-[#a98a7d] hover:text-white hover:bg-[#353534]"
+                >
+                  LOGOUT
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="text-[10px] font-mono border border-[#353534] px-2 py-1 text-[#a98a7d] hover:text-white hover:bg-[#353534]"
+              >
+                LOGIN
+              </Link>
+            )}
+          </div>
           <Link
             href="/sys-health"
             className={`w-2 h-2 rounded-full ${pathname === '/sys-health' ? 'bg-[#FF6B00]' : 'bg-[#13ff43] animate-pulse'}`}
