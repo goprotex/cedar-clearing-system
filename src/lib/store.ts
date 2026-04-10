@@ -528,10 +528,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
       });
 
       const parts: CedarAnalysis[] = [];
+      console.log(`[analyzeCedar] starting: ${totalChunks} chunk(s), ${Math.round(pasture.acreage)} ac, centroid=[${pasture.centroid.map(n => n.toFixed(4))}]`);
 
       for (let i = 0; i < chunkCoords.length; i++) {
         const coords = chunkCoords[i];
         const chunkAcres = polygonAcreage(coords);
+        console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks}: ${chunkAcres.toFixed(1)} ac`);
 
         try {
           const chunkData = await fetchCedarDetectChunkWithRetry(
@@ -560,9 +562,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
               });
             }
           );
+          console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks} complete: ${chunkData.summary?.totalSamples ?? '?'} samples, cedar=${chunkData.summary?.cedar?.pct ?? '?'}%`);
           parts.push(chunkData);
         } catch (chunkErr) {
           let msg = chunkErr instanceof Error ? chunkErr.message : 'Spectral analysis failed';
+          console.error(`[analyzeCedar] chunk ${i + 1}/${totalChunks} FAILED: ${msg}`);
           if (totalChunks > 1) {
             msg = `Region ${i + 1} of ${totalChunks}: ${msg}`;
           }
@@ -574,6 +578,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       const resultData: CedarAnalysis =
         parts.length === 1 ? parts[0] : mergeCedarAnalyses(parts, pasture.acreage);
+      console.log(`[analyzeCedar] all chunks done: ${resultData.summary?.totalSamples ?? '?'} total samples, cedar=${resultData.summary?.cedar?.pct ?? '?'}%`);
 
       set({
         analysisProgress: {
@@ -646,8 +651,10 @@ export const useBidStore = create<BidStore>((set, get) => ({
           totalPoints: s.totalSamples,
         },
       });
+      console.log(`[analyzeCedar] complete — displayed to user`);
       setTimeout(() => set({ analysisProgress: null }), 3200);
     } catch (e) {
+      console.error(`[analyzeCedar] top-level error: ${e instanceof Error ? e.message : e}`);
       set({ analysisProgress: null });
       toast.error(e instanceof Error ? e.message : 'Spectral analysis failed.');
     }
