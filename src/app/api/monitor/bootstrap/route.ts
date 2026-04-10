@@ -21,7 +21,7 @@ export async function GET() {
   if (authErr || !auth.user?.id) {
     // No auth session — return empty data so the monitor page still renders
     // the map and UI.  Jobs/cleared-cells will be empty until the user signs in.
-    return NextResponse.json({ jobs: [], cleared: {} as Record<string, string[]>, operators: {} as Record<string, unknown[]> });
+    return NextResponse.json({ jobs: [], clearedByJob: {} as Record<string, string[]>, operatorsByJob: {} as Record<string, unknown[]> });
   }
   const userId = auth.user.id;
 
@@ -33,7 +33,7 @@ export async function GET() {
 
   const jobIds = (memberships ?? []).map((m) => m.job_id);
   if (jobIds.length === 0) {
-    return NextResponse.json({ jobs: [], cleared: {} as Record<string, string[]>, operators: {} as Record<string, unknown[]> });
+    return NextResponse.json({ jobs: [], clearedByJob: {} as Record<string, string[]>, operatorsByJob: {} as Record<string, unknown[]> });
   }
 
   const { data: jobs, error: jobsErr } = await supabase
@@ -49,9 +49,9 @@ export async function GET() {
     .in('job_id', jobIds);
   if (clearedErr) return NextResponse.json({ error: clearedErr.message }, { status: 500 });
 
-  const clearedMap: Record<string, string[]> = {};
+  const clearedByJob: Record<string, string[]> = {};
   for (const row of cleared ?? []) {
-    (clearedMap[row.job_id] ??= []).push(row.cell_id);
+    (clearedByJob[row.job_id] ??= []).push(row.cell_id);
   }
 
   const { data: operators, error: opErr } = await supabase
@@ -60,11 +60,18 @@ export async function GET() {
     .in('job_id', jobIds);
   if (opErr) return NextResponse.json({ error: opErr.message }, { status: 500 });
 
-  const operatorsMap: Record<string, unknown[]> = {};
+  const operatorsByJob: Record<string, unknown[]> = {};
   for (const row of operators ?? []) {
-    (operatorsMap[row.job_id] ??= []).push(row);
+    (operatorsByJob[row.job_id] ??= []).push({
+      user_id: row.user_id,
+      lng: row.lng,
+      lat: row.lat,
+      heading: row.heading_deg ?? null,
+      speed_mps: row.speed_mps ?? null,
+      accuracy_m: row.accuracy_m ?? null,
+      updated_at: row.updated_at,
+    });
   }
 
-  return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], cleared: clearedMap, operators: operatorsMap });
+  return NextResponse.json({ jobs: (jobs ?? []) as MonitorJob[], clearedByJob, operatorsByJob });
 }
-

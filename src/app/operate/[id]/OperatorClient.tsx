@@ -7,6 +7,8 @@ import Link from 'next/link';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
+import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
+import { loadBidFromSupabase, getAuthUserId } from '@/lib/db';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
@@ -148,18 +150,37 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Load bid from localStorage
+  // Load bid from Supabase (preferred) or localStorage (fallback)
   useEffect(() => {
-    const raw = localStorage.getItem(`ccc_bid_${bidId}`);
-    if (!raw) return;
-    const bid: Bid = JSON.parse(raw);
-    const trees = extractTreesFromAnalysis(bid.pastures);
+    let cancelled = false;
+    (async () => {
+      let bid: Bid | null = null;
 
-    const saved = loadOperatorSession(bidId);
-    const clearedCellIds = new Set(saved?.clearedCellIds ?? []);
-    const clearedCells = saved?.clearedCells ?? [];
+      if (isSupabaseConfigured) {
+        try {
+          const sb = createSupabaseBrowser();
+          const userId = await getAuthUserId(sb);
+          if (userId) {
+            const result = await loadBidFromSupabase(sb, bidId);
+            if (!result.error && result.bid) bid = result.bid;
+          }
+        } catch { /* fall through */ }
+      }
 
-    setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
+      if (!bid) {
+        const raw = localStorage.getItem(`ccc_bid_${bidId}`);
+        if (raw) bid = JSON.parse(raw) as Bid;
+      }
+
+      if (cancelled || !bid) return;
+      const trees = extractTreesFromAnalysis(bid.pastures);
+      const saved = loadOperatorSession(bidId);
+      const clearedCellIds = new Set(saved?.clearedCellIds ?? []);
+      const clearedCells = saved?.clearedCells ?? [];
+
+      setState(prev => ({ ...prev, bid, trees, clearedCellIds, clearedCells }));
+    })();
+    return () => { cancelled = true; };
   }, [bidId]);
 
   // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
@@ -184,12 +205,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           }
           throw new Error(await res.text().catch(() => 'Failed to load shared progress.'));
         }
-        const data = (await res.json()) as { cellIds: string[] };
+        const data = (await res.json()) as { cells: Array<{ cell_id: string }> };
         if (cancelled) return;
         setSharedEnabled(true);
         setSharedStatus('ready');
         setState((prev) => {
-          const merged = mergeClearedCellIds(prev.clearedCellIds, data.cellIds ?? []);
+          const cellIds = (data.cells ?? []).map((c) => c.cell_id);
+          const merged = mergeClearedCellIds(prev.clearedCellIds, cellIds);
           if (merged.size === prev.clearedCellIds.size) return prev;
           saveOperatorSession(bidId, Array.from(merged), prev.clearedCells);
           return { ...prev, clearedCellIds: merged };
