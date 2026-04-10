@@ -17,11 +17,11 @@ type BootstrapJob = {
 
 type BootstrapResponse = {
   jobs: BootstrapJob[];
-  cleared: Record<string, string[]>;
-  operators: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
+  clearedByJob: Record<string, string[]>;
+  operatorsByJob: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
 };
 
-type OperatorPosition = BootstrapResponse['operators'][string][number];
+type OperatorPosition = BootstrapResponse['operatorsByJob'][string][number];
 
 const MapboxMap = dynamic(() => import('./MonitorMap'), {
   ssr: false,
@@ -48,7 +48,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   const [radarOn, setRadarOn] = useState(true);
   const [cedarOn, setCedarOn] = useState(true);
   const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
-  const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
+  const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operatorsByJob']>({});
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const supabaseRef = useRef<ReturnType<typeof createSupabaseClient> | null>(null);
@@ -65,11 +65,11 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         if (cancelled) return;
         setJobs(data.jobs ?? []);
         const next: Record<string, Set<string>> = {};
-        for (const [jobId, cellIds] of Object.entries(data.cleared ?? {})) {
+        for (const [jobId, cellIds] of Object.entries(data.clearedByJob ?? {})) {
           next[jobId] = new Set(cellIds);
         }
         setClearedByJob(next);
-        setOperatorsByJob(data.operators ?? {});
+        setOperatorsByJob(data.operatorsByJob ?? {});
       } catch (e) {
         if (cancelled) return;
         setErr(e instanceof Error ? e.message : String(e));

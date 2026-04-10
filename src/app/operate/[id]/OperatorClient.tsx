@@ -183,12 +183,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           }
           throw new Error(await res.text().catch(() => 'Failed to load shared progress.'));
         }
-        const data = (await res.json()) as { cellIds: string[] };
+        const data = (await res.json()) as { cells: Array<{ cell_id: string }> };
         if (cancelled) return;
         setSharedEnabled(true);
         setSharedStatus('ready');
         setState((prev) => {
-          const merged = mergeClearedCellIds(prev.clearedCellIds, data.cellIds ?? []);
+          const cellIds = (data.cells ?? []).map((c) => c.cell_id);
+          const merged = mergeClearedCellIds(prev.clearedCellIds, cellIds);
           if (merged.size === prev.clearedCellIds.size) return prev;
           saveOperatorSession(bidId, Array.from(merged), prev.clearedCells);
           return { ...prev, clearedCellIds: merged };
