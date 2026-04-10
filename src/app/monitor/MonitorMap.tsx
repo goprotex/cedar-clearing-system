@@ -24,6 +24,7 @@ type Props = {
   cedarOn: boolean;
   radarOn: boolean;
   layers: Record<LayerKey, boolean>;
+  flyToJobId?: string | null;
   onMapReady?: () => void;
 };
 
@@ -31,7 +32,7 @@ function fc(features: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
-export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, layers, onMapReady }: Props) {
+export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, layers, flyToJobId, onMapReady }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const operatorMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -430,6 +431,30 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       if (!nextKeys.has(key)) { marker.remove(); markers.delete(key); }
     }
   }, [operatorsByJob, mapLoaded]);
+
+  // ── Fly to a specific job's pastures ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !flyToJobId) return;
+    const job = jobs.find((j) => j.id === flyToJobId);
+    if (!job?.bid_snapshot?.pastures) return;
+
+    const bounds = new mapboxgl.LngLatBounds();
+    let hasBounds = false;
+    for (const p of job.bid_snapshot.pastures) {
+      const ring = p.polygon?.geometry?.coordinates?.[0];
+      if (!ring || ring.length < 3) continue;
+      for (const c of ring) {
+        if (Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+          bounds.extend(c as [number, number]);
+          hasBounds = true;
+        }
+      }
+    }
+    if (hasBounds) {
+      map.fitBounds(bounds, { padding: 80, maxZoom: 17, duration: 1400 });
+    }
+  }, [flyToJobId, mapLoaded, jobs]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

@@ -89,6 +89,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
   const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
+  const [flyToJobId, setFlyToJobId] = useState<string | null>(null);
 
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -305,6 +306,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               radarOn={layers.radar}
               cedarOn={layers.cedarAI}
               layers={layers}
+              flyToJobId={flyToJobId}
             />
           ) : (
             <div className="w-full h-full min-h-[70vh] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d]">
@@ -402,7 +404,15 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
                 {jobs.map((j) => {
                   const p = pct(j.cedar_cleared_cells, j.cedar_total_cells);
                   return (
-                    <div key={j.id} className="border border-[#353534] p-3">
+                    <button
+                      key={j.id}
+                      onClick={() => setFlyToJobId(j.id === flyToJobId ? null : j.id)}
+                      className={`w-full text-left border p-3 transition-all ${
+                        flyToJobId === j.id
+                          ? 'border-[#13ff43] bg-[#13ff43]/5'
+                          : 'border-[#353534] hover:border-[#a98a7d]'
+                      }`}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="text-xs font-black truncate">{j.title}</div>
@@ -419,7 +429,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
                         <span>{j.cedar_cleared_cells} cleared</span>
                         <span>{j.cedar_total_cells} total</span>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
