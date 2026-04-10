@@ -296,6 +296,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const watchIdRef = useRef<number | null>(null);
   const trailCoordsRef = useRef<[number, number][]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
   const [hudOpen, setHudOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -745,6 +746,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     let map: mapboxgl.Map;
     try {
+      setMapLoading(true);
       map = new mapboxgl.Map({
         container,
         style: styleUrl(layerPrefsRef.current.baseStyle ?? (coarsePointer ? 'satellite' : 'satellite-streets')),
@@ -757,6 +759,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       });
     } catch (e) {
       setMapError(e instanceof Error ? e.message : 'Map failed to initialize.');
+      setMapLoading(false);
       return;
     }
 
@@ -768,6 +771,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         (e as any)?.error?.toString?.() ||
         'Mapbox failed to load.';
       setMapError(String(msg));
+      setMapLoading(false);
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -778,13 +782,38 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     });
 
     map.on('style.load', () => {
+      setMapLoading(false);
       addCustomLayers();
       applyPrefsToMap();
     });
 
+    // Watchdog: if the style never loads, surface a useful error instead of a blank map.
+    const watchdog = window.setTimeout(() => {
+      try {
+        if (!mapRef.current) return;
+        if (mapRef.current.isStyleLoaded()) return;
+        const tokenSet = !!(process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '');
+        setMapError(
+          `Map style did not load. ${
+            tokenSet
+              ? 'This is usually a token restriction / invalid token / blocked tile request.'
+              : 'NEXT_PUBLIC_MAPBOX_TOKEN is missing.'
+          }`
+        );
+      } catch {
+        setMapError('Map style did not load.');
+      } finally {
+        setMapLoading(false);
+      }
+    }, 9000);
+
     mapRef.current = map;
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => {
+      window.clearTimeout(watchdog);
+      map.remove();
+      mapRef.current = null;
+    };
   }, [state.bid]);
 
   // Apply prefs on change (and when style reloads)
