@@ -42,8 +42,8 @@ export interface CirFeatureExtractOptions {
 }
 
 const DEFAULT_EXTRACT = {
-  minPixels: 6,
-  maxPixelFrac: 0.12,
+  minPixels: 3,
+  maxPixelFrac: 0.16,
   contextCellM: 20,
 };
 
@@ -211,14 +211,15 @@ function bboxOfIndices(indices: number[], width: number): { bw: number; bh: numb
 /** How many spatial clusters to try inside one merged 8-connected blob (tight cedar thickets). */
 function estimateClusterK(pixelCount: number, bw: number, bh: number, mPerPx: number, minPx: number): number {
   const maxDm = Math.max(bw, bh) * mPerPx;
-  const crownM = 3.9;
-  if (pixelCount < 68) return 1;
-  if (pixelCount < minPx * 2.4 && maxDm < crownM * 1.25) return 1;
+  /** Nominal single-tree footprint — smaller ⇒ more aggressive split in dense juniper. */
+  const crownM = 3.15;
+  if (pixelCount < 48) return 1;
+  if (pixelCount < minPx * 2 && maxDm < crownM * 1.15) return 1;
   const bySpan = Math.max(1, Math.round(maxDm / crownM));
   const areaM2 = pixelCount * mPerPx * mPerPx;
   const byArea = Math.max(1, Math.round(areaM2 / (Math.PI * (crownM / 2) ** 2)));
-  const k = Math.round(Math.min(bySpan * bySpan * 0.38 + 1, byArea * 0.85));
-  return Math.max(2, Math.min(24, k));
+  const k = Math.round(Math.min(bySpan * bySpan * 0.55 + 0.5, byArea * 1.12));
+  return Math.max(2, Math.min(40, k));
 }
 
 /**
@@ -243,7 +244,7 @@ function kmeansSplitBlobPixels(
     nd: ndvi[i],
   }));
 
-  const minSeedDistSq = 12; // px — separate nearby crown peaks in a thicket
+  const minSeedDistSq = 7; // px — allow more seeds in packed maroon canopies (~2.6px spacing)
   const sorted = [...pts].sort((a, b) => b.nd - a.nd);
   const seeds: { x: number; y: number }[] = [];
   for (const p of sorted) {
@@ -302,6 +303,33 @@ function kmeansSplitBlobPixels(
   }
   const valid = groups.filter((g) => g.length >= minCluster);
   return valid.length > 0 ? valid : [blobPixels];
+}
+
+/** If a post-k-means cluster still spans many meters, bisect once (handles elongated thickets). */
+function splitOversizedGroupsOnce(
+  groups: number[][],
+  ndvi: Float32Array,
+  width: number,
+  mPerPx: number,
+  minCluster: number
+): number[][] {
+  const out: number[][] = [];
+  const spanThresholdM = 5.8;
+  for (const g of groups) {
+    const { bw, bh } = bboxOfIndices(g, width);
+    const spanM = Math.max(bw, bh) * mPerPx;
+    if (g.length < minCluster * 2 || spanM < spanThresholdM) {
+      out.push(g);
+      continue;
+    }
+    const sub = kmeansSplitBlobPixels(g, ndvi, width, 2, minCluster);
+    if (sub.length >= 2 && sub[0].length >= minCluster && sub[1].length >= minCluster) {
+      out.push(...sub);
+    } else {
+      out.push(g);
+    }
+  }
+  return out;
 }
 
 function accumulateFromIndices(indices: number[], data: Uint8ClampedArray, ndvi: Float32Array, width: number): Accum {
@@ -468,8 +496,10 @@ export function extractCirBlobFeaturesFromRgba(
 
     const { bw, bh } = bboxOfIndices(blobPixels, width);
     const k = estimateClusterK(count, bw, bh, mPerPx, minPixels);
-    const minSub = Math.max(4, minPixels - 1);
-    const groups = k <= 1 ? [blobPixels] : kmeansSplitBlobPixels(blobPixels, ndvi, width, k, minSub);
+    const minSub = Math.max(2, minPixels);
+    let groups = k <= 1 ? [blobPixels] : kmeansSplitBlobPixels(blobPixels, ndvi, width, k, minSub);
+    groups = splitOversizedGroupsOnce(groups, ndvi, width, mPerPx, minSub);
+    groups = splitOversizedGroupsOnce(groups, ndvi, width, mPerPx, minSub);
 
     for (const group of groups) {
       if (group.length < minPixels) continue;

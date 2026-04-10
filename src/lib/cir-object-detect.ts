@@ -35,38 +35,50 @@ export function vegetationMask(r: number, g: number, b: number): boolean {
   const chroma = mx - mn;
   const lum = (r + g + b) / 3;
 
-  if (r < 20 && g < 20 && b < 20) return false;
+  if (r < 16 && g < 16 && b < 16) return false;
 
-  // Caliche / bright bare ground: high, flat RGB
-  if (mx > 232 && mn > 198 && chroma < 42) return false;
-  if (lum > 218 && chroma < 35) return false;
+  // Caliche / bright bare: very high, nearly flat RGB (keep a bit looser so pale canopy isn’t cut)
+  if (mx > 238 && mn > 205 && chroma < 38) return false;
+  if (lum > 228 && chroma < 32) return false;
 
-  // Grey grass / senescent flat cover: mid luminance, very low chroma (below maroon wood)
-  if (lum > 42 && lum < 188 && chroma < 18) return false;
+  // Flat grey herbaceous — only the dullest mid-tones (chroma ≤ 8 keeps maroon / pink safe)
+  if (lum > 40 && lum < 192 && chroma <= 8) return false;
 
   const rn = r / sum;
   const gn = g / sum;
   const bn = b / sum;
 
-  // Classic bright pink / magenta woody (oak, sunlit cedar)
+  // Bright pink / magenta woody (live oak, sunlit canopy)
   const brightWoody =
-    rn > gn + 0.038 &&
-    rn > bn + 0.038 &&
-    r > g * 0.68 &&
-    r > b * 0.68 &&
-    lum < 248;
+    rn > gn + 0.03 &&
+    rn > bn + 0.03 &&
+    r > g * 0.6 &&
+    r > b * 0.62 &&
+    lum < 252;
 
-  // Dark maroon juniper / shaded red canopy: NIR still leads G/B but absolute levels are lower
+  // Dark maroon juniper / dense shaded canopy
   const maroonWoody =
-    chroma >= 18 &&
-    r >= 38 &&
-    r >= g * 0.5 &&
-    r >= b * 0.54 &&
-    (rn > gn + 0.012 || r > g + 8) &&
-    (rn > bn + 0.016 || r > b + 8) &&
-    lum < 200;
+    chroma >= 9 &&
+    r >= 26 &&
+    r >= g * 0.44 &&
+    r >= b * 0.48 &&
+    (rn > gn + 0.006 || r > g + 4) &&
+    (rn > bn + 0.008 || r > b + 5) &&
+    lum > 22 &&
+    lum < 210;
 
-  return brightWoody || maroonWoody;
+  // In-between / hazy red-shift (stress, atmosphere, mixed pixels at crown edge)
+  const mutedWoody =
+    chroma >= 9 &&
+    r >= 32 &&
+    r > g * 0.52 &&
+    r > b * 0.55 &&
+    lum > 35 &&
+    lum < 200 &&
+    (rn > gn || r >= g + 2) &&
+    (rn > bn || r >= b + 3);
+
+  return brightWoody || maroonWoody || mutedWoody;
 }
 
 /**

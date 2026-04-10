@@ -49,8 +49,8 @@ export async function runCirObjectAnalysis(
   const mPerPx = metersPerPixel(minLng, maxLng, minLat, maxLat, canvas.width, canvas.height);
 
   const blobs = extractCirBlobFeaturesFromRgba(imgData.data, canvas.width, canvas.height, mPerPx, {
-    minPixels: 5,
-    maxPixelFrac: 0.14,
+    minPixels: 3,
+    maxPixelFrac: 0.16,
     contextCellM: 20,
   });
 

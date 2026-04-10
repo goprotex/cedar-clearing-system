@@ -747,7 +747,11 @@ export class TreeLayer3D {
           sz *= 0.48;
         }
         if (sp === 'cedar') {
-          sy *= 0.88;
+          // Dome reads larger than cones; scale down so hologram matches individual crowns visually.
+          const v = 0.58;
+          sx *= v;
+          sy *= 0.5;
+          sz *= v;
         }
         dummy.position.set(pos.x, baseY, pos.z);
         dummy.scale.set(sx, sy, sz);
@@ -767,7 +771,7 @@ export class TreeLayer3D {
         const trunkH =
           sp === 'oak' ? t.height * 0.5 : sp === 'mixed' ? t.height * 0.22 : t.height * 0.3;
         const trunkW =
-          t.canopyDiameter * (sp === 'mixed' ? 0.09 : 0.15);
+          t.canopyDiameter * (sp === 'mixed' ? 0.09 : sp === 'cedar' ? 0.1 : 0.15);
         dummy.position.set(pos.x, 0, pos.z);
         dummy.scale.set(trunkW, trunkH, trunkW);
         dummy.updateMatrix();
@@ -783,7 +787,9 @@ export class TreeLayer3D {
       for (let i = 0; i < arr.length; i++) {
         const t = arr[i];
         const pos = this.lngLatToScene(t.lng, t.lat);
-        const r = t.canopyDiameter * (sp === 'mixed' ? 0.36 : 0.6);
+        const r =
+          t.canopyDiameter *
+          (sp === 'mixed' ? 0.36 : sp === 'cedar' ? 0.42 : 0.6);
         dummy.position.set(pos.x, 0, pos.z);
         dummy.scale.set(r, 1, r);
         dummy.updateMatrix();
