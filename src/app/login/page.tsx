@@ -1,11 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
-export default function LoginPage() {
-  const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>('magic');
+function LoginPageInner() {
+  const searchParams = useSearchParams();
+  const signupIntent = searchParams.get('signup') === '1' || searchParams.get('mode') === 'signup';
+  const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>(
+    () => (signupIntent ? 'password-signup' : 'magic'),
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -13,6 +18,10 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const envMissing = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
+  useEffect(() => {
+    if (signupIntent) setMode('password-signup');
+  }, [signupIntent]);
 
   useEffect(() => {
     if (envMissing) return;
@@ -192,3 +201,10 @@ export default function LoginPage() {
   );
 }
 
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#131313] flex items-center justify-center text-[#a98a7d] font-mono text-sm">Loading…</div>}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}

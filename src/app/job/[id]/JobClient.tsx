@@ -6,6 +6,7 @@ import AppShell from '@/components/AppShell';
 import JobExecutionPanel from '@/components/job/JobExecutionPanel';
 import type { Job, JobEvent } from '@/types';
 import { loadLocalJobBundle } from '@/lib/jobs';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 function fmt(ts: string) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
@@ -21,7 +22,7 @@ export default function JobClient({ jobId }: { jobId: string }) {
 
   const load = useCallback(async () => {
     setErr(null);
-    const res = await fetch(`/api/jobs/${jobId}`, { cache: 'no-store', credentials: 'same-origin' });
+    const res = await fetchApiAuthed(`/api/jobs/${jobId}`);
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         const local = loadLocalJobBundle(jobId);

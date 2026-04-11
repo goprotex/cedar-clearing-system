@@ -9,6 +9,10 @@ export type ActiveJobSummary = {
   bid_snapshot: Bid;
   cedar_total_cells: number;
   cedar_cleared_cells: number;
+  work_started_at?: string | null;
+  work_completed_at?: string | null;
+  manual_machine_hours?: number | null;
+  manual_fuel_gallons?: number | null;
 };
 
 export function mergeJobsById(remote: ActiveJobSummary[], local: ActiveJobSummary[]): ActiveJobSummary[] {
@@ -54,8 +58,72 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
         bid_snapshot: bid,
         cedar_total_cells: cedarTotal,
         cedar_cleared_cells: job.cedar_cleared_cells ?? 0,
+        work_started_at: null,
+        work_completed_at: null,
+        manual_machine_hours: null,
+        manual_fuel_gallons: null,
       });
     }
   } catch { /* ignore */ }
   return results;
+}
+
+/** Jobs implied by operator GPS keys (`ccc_operator_pos_*` / trail) when no `ccc_job_*` exists. */
+export function loadJobsFromOperatorStorage(existingIds: Set<string>): ActiveJobSummary[] {
+  if (typeof window === 'undefined') return [];
+  const posPrefix = 'ccc_operator_pos_';
+  const trailPrefix = 'ccc_operator_trail_';
+  const out: ActiveJobSummary[] = [];
+  const seen = new Set(existingIds);
+
+  const tryAdd = (jobId: string) => {
+    if (!jobId || seen.has(jobId)) return;
+    const bidId = jobId.startsWith('job_') ? jobId.slice(4) : jobId;
+    const bidRaw = localStorage.getItem(`ccc_bid_${bidId}`);
+    if (!bidRaw) return;
+    let bid: Bid;
+    try {
+      bid = JSON.parse(bidRaw) as Bid;
+    } catch {
+      return;
+    }
+    if (!bid.pastures?.length) return;
+
+    let cedarTotal = 0;
+    for (const p of bid.pastures) {
+      for (const f of (p.cedarAnalysis?.gridCells?.features ?? [])) {
+        const cls = (f as { properties?: { classification?: string } }).properties?.classification;
+        if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') cedarTotal++;
+      }
+    }
+
+    seen.add(jobId);
+    out.push({
+      id: jobId,
+      title: `${bid.propertyName || 'Property'} — ${bid.bidNumber} (GPS)`,
+      status: 'active',
+      created_at: bid.updatedAt || bid.createdAt || new Date().toISOString(),
+      bid_snapshot: bid,
+      cedar_total_cells: cedarTotal,
+      cedar_cleared_cells: 0,
+      work_started_at: null,
+      work_completed_at: null,
+      manual_machine_hours: null,
+      manual_fuel_gallons: null,
+    });
+  };
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith(posPrefix)) {
+        tryAdd(key.slice(posPrefix.length));
+      } else if (key.startsWith(trailPrefix)) {
+        tryAdd(key.slice(trailPrefix.length));
+      }
+    }
+  } catch { /* ignore */ }
+
+  return out;
 }
