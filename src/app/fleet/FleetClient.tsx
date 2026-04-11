@@ -352,20 +352,21 @@ export default function FleetClient() {
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">FLEET_SYNC</h1>
-          <p className="text-[#ffb693] text-xs font-mono">
+      <div className="min-w-0 max-w-full overflow-x-hidden flex flex-col gap-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 min-w-0">
+        <div className="min-w-0 max-w-full">
+          <h1 className="text-xl sm:text-3xl md:text-4xl font-black uppercase tracking-tighter break-words">FLEET_SYNC</h1>
+          <p className="text-[#ffb693] text-[10px] sm:text-xs font-mono break-words leading-snug">
             {loading ? '…' : `${units.length} UNITS`} —{' '}
             {companyId ? 'SUPABASE · COMPANY_SHARED' : 'SIGN_IN · COMPANY_REQUIRED'}
           </p>
           {!companyId && (
-            <p className="text-[#5a4136] text-[10px] font-mono mt-1 max-w-xl">
+            <p className="text-[#5a4136] text-[10px] font-mono mt-1 max-w-full sm:max-w-xl break-words">
               Your profile needs a company to use the shared fleet. Ask an admin to add you to the team, or complete company setup in settings.
             </p>
           )}
           {companyId && (
-            <p className="text-[#5a4136] text-[10px] font-mono mt-1 max-w-xl">
+            <p className="text-[#5a4136] text-[10px] font-mono mt-1 max-w-full sm:max-w-xl break-words">
               Manual entry until telematics is wired. Job list merges server jobs with local converted jobs on this device — refresh after creating jobs.
             </p>
           )}
@@ -394,7 +395,7 @@ export default function FleetClient() {
       </div>
 
       {loadError && (
-        <div className="border border-red-900 text-red-400 text-sm p-3 mb-4 font-mono">{loadError}</div>
+        <div className="border border-red-900 text-red-400 text-xs sm:text-sm p-3 font-mono break-words">{loadError}</div>
       )}
 
       {companyId && addOpen && (
@@ -455,35 +456,35 @@ export default function FleetClient() {
 
       {companyId && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="border-2 border-[#353534] p-4">
-              <div className="text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest mb-1">ACTIVE_UNITS</div>
-              <div className="text-3xl font-black text-[#13ff43]">{counts.active}</div>
-              <div className="text-[10px] text-[#5a4136] font-mono">of {units.length} total</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 min-w-0">
+            <div className="border-2 border-[#353534] p-2 sm:p-4 min-w-0 overflow-hidden">
+              <div className="text-[8px] sm:text-[10px] text-[#a98a7d] font-bold uppercase tracking-wide sm:tracking-widest mb-1 leading-tight">ACTIVE</div>
+              <div className="text-2xl sm:text-3xl font-black text-[#13ff43] tabular-nums">{counts.active}</div>
+              <div className="text-[9px] sm:text-[10px] text-[#5a4136] font-mono truncate">of {units.length}</div>
             </div>
-            <div className="border-2 border-[#353534] p-4">
-              <div className="text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest mb-1">HOURS_LOGGED_TODAY</div>
-              <div className="text-3xl font-black text-[#FF6B00]">{hoursToday.toFixed(1)}</div>
-              <div className="text-[10px] text-[#5a4136] font-mono">manual log</div>
+            <div className="border-2 border-[#353534] p-2 sm:p-4 min-w-0 overflow-hidden">
+              <div className="text-[8px] sm:text-[10px] text-[#a98a7d] font-bold uppercase tracking-wide sm:tracking-widest mb-1 leading-tight">HRS_TODAY</div>
+              <div className="text-2xl sm:text-3xl font-black text-[#FF6B00] tabular-nums">{hoursToday.toFixed(1)}</div>
+              <div className="text-[9px] sm:text-[10px] text-[#5a4136] font-mono truncate">logged</div>
             </div>
-            <div className="border-2 border-[#353534] p-4">
-              <div className="text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest mb-1">ACRES_TODAY</div>
-              <div className="text-3xl font-black text-[#ffb693]">{totalAcresToday.toFixed(1)}</div>
-              <div className="text-[10px] text-[#5a4136] font-mono">entered per unit</div>
+            <div className="border-2 border-[#353534] p-2 sm:p-4 min-w-0 overflow-hidden">
+              <div className="text-[8px] sm:text-[10px] text-[#a98a7d] font-bold uppercase tracking-wide sm:tracking-widest mb-1 leading-tight">ACRES</div>
+              <div className="text-2xl sm:text-3xl font-black text-[#ffb693] tabular-nums">{totalAcresToday.toFixed(1)}</div>
+              <div className="text-[9px] sm:text-[10px] text-[#5a4136] font-mono truncate">today</div>
             </div>
-            <div className="border-2 border-[#353534] p-4">
-              <div className="text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest mb-1">AVG_FUEL</div>
+            <div className="border-2 border-[#353534] p-2 sm:p-4 min-w-0 overflow-hidden">
+              <div className="text-[8px] sm:text-[10px] text-[#a98a7d] font-bold uppercase tracking-wide sm:tracking-widest mb-1 leading-tight">FUEL Ø</div>
               <div
-                className="text-3xl font-black"
+                className="text-2xl sm:text-3xl font-black tabular-nums"
                 style={{ color: avgFuelLevel > 50 ? '#13ff43' : avgFuelLevel > 25 ? '#FF6B00' : '#ff4444' }}
               >
                 {units.length ? `${avgFuelLevel}%` : '—'}
               </div>
-              <div className="text-[10px] text-[#5a4136] font-mono">gauge (manual)</div>
+              <div className="text-[9px] sm:text-[10px] text-[#5a4136] font-mono truncate">avg</div>
             </div>
           </div>
 
-          <div className="flex gap-2 mb-6 flex-wrap">
+          <div className="flex gap-2 flex-wrap min-w-0">
             {(['all', 'active', 'idle', 'maintenance', 'offline'] as const).map((s) => (
               <button
                 key={s}
@@ -500,8 +501,8 @@ export default function FleetClient() {
             ))}
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1 space-y-3">
+          <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 lg:gap-6 min-w-0 min-h-0">
+            <div className="flex-1 min-w-0 min-h-0 space-y-3 lg:max-h-[calc(100dvh-14rem)] lg:overflow-y-auto lg:pr-1 lg:-mr-1 overscroll-contain">
               {loading && (
                 <div className="text-[#5a4136] font-mono text-sm border border-[#353534] p-6">Loading fleet…</div>
               )}
@@ -548,43 +549,43 @@ export default function FleetClient() {
                           {m.status}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs">
-                        <div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-2 md:gap-x-4 gap-y-1 text-xs min-w-0">
+                        <div className="min-w-0">
                           <span className="text-[#5a4136]">MODEL:</span>{' '}
-                          <span className="text-[#a98a7d]">{m.model}</span>
+                          <span className="text-[#a98a7d] break-words">{m.model}</span>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-[#5a4136]">HOURS:</span>{' '}
-                          <span className="font-mono">{m.hours.toLocaleString()}</span>
+                          <span className="font-mono tabular-nums">{m.hours.toLocaleString()}</span>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-[#5a4136]">FUEL:</span>{' '}
                           <span
-                            className="font-mono"
+                            className="font-mono tabular-nums"
                             style={{ color: m.fuelLevel > 50 ? '#13ff43' : m.fuelLevel > 25 ? '#FF6B00' : '#ff4444' }}
                           >
                             {m.fuelLevel}%
                           </span>
                         </div>
-                        <div>
+                        <div className="min-w-0 col-span-2 md:col-span-1">
                           <span className="text-[#5a4136]">OPERATOR:</span>{' '}
-                          <span className="text-[#a98a7d]">{m.operator}</span>
+                          <span className="text-[#a98a7d] break-words">{m.operator}</span>
                         </div>
                       </div>
                       {(m.currentJob || m.lastLocation) && (
-                        <div className="mt-2 text-xs space-y-0.5">
+                        <div className="mt-2 text-xs space-y-0.5 break-words">
                           {m.currentJob && (
-                            <div>
+                            <div className="min-w-0">
                               <span className="text-[#5a4136]">JOB:</span>{' '}
-                              <span className="font-mono text-[#13ff43]">{jt}</span>
+                              <span className="font-mono text-[#13ff43] break-all">{jt}</span>
                               {jt !== m.currentJob && (
-                                <span className="text-[#5a4136] ml-1 font-mono text-[10px]">({m.currentJob})</span>
+                                <span className="text-[#5a4136] ml-1 font-mono text-[10px] break-all">({m.currentJob})</span>
                               )}
                             </div>
                           )}
-                          <div>
+                          <div className="min-w-0">
                             <span className="text-[#5a4136]">LOCATION:</span>{' '}
-                            <span className="text-[#a98a7d]">{m.lastLocation}</span>
+                            <span className="text-[#a98a7d] break-words">{m.lastLocation}</span>
                           </div>
                         </div>
                       )}
@@ -610,6 +611,7 @@ export default function FleetClient() {
           </div>
         </>
       )}
+      </div>
     </AppShell>
   );
 }
@@ -751,7 +753,7 @@ function MachineDetailPanel({
   }
 
   return (
-    <div className="w-full lg:w-[28rem] border-2 border-[#FF6B00] bg-[#1c1b1b] p-4 shrink-0 self-start flex flex-col max-h-[85vh]">
+    <div className="w-full min-w-0 max-w-full lg:w-[min(28rem,100%)] lg:max-w-[min(28rem,calc(100vw-18rem-3rem))] border-2 border-[#FF6B00] bg-[#1c1b1b] p-3 sm:p-4 shrink-0 lg:sticky lg:top-[calc(5.5rem+env(safe-area-inset-top,0px))] flex flex-col max-h-[min(85dvh,32rem)] lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
           <span className="font-black text-lg uppercase text-[#FF6B00] block truncate">{m.name}</span>
@@ -777,7 +779,7 @@ function MachineDetailPanel({
         ))}
       </div>
 
-      <div className="overflow-y-auto flex-1 space-y-3 text-xs pr-1">
+      <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0 space-y-3 text-xs pr-1 touch-pan-y">
         {detailTab === 'details' && (
           <>
             <FieldRow label="TYPE" value={m.type} onChange={(type) => onUpdate({ type })} />
@@ -785,12 +787,12 @@ function MachineDetailPanel({
             <FieldRow label="OPERATOR" value={m.operator} onChange={(operator) => onUpdate({ operator })} />
             <FieldRow label="LOCATION" value={m.lastLocation} onChange={(lastLocation) => onUpdate({ lastLocation })} />
 
-            <div className="border-b border-[#353534] pb-3">
-              <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1">ASSIGN_JOB</div>
+            <div className="border-b border-[#353534] pb-3 min-w-0">
+              <div className="text-[10px] text-[#5a4136] uppercase tracking-wide mb-1">Job / ref</div>
               <select
                 value={selectedJobSelectValue}
                 onChange={(e) => onUpdate({ currentJob: e.target.value })}
-                className="w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 text-[#a98a7d] mb-2"
+                className="w-full min-w-0 max-w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 text-[#a98a7d] mb-2 text-sm"
               >
                 <option value="">— Unassigned —</option>
                 {jobOptions.map((j) => (
@@ -803,7 +805,7 @@ function MachineDetailPanel({
               <input
                 value={m.currentJob}
                 onChange={(e) => onUpdate({ currentJob: e.target.value })}
-                className="w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 font-mono"
+                className="w-full min-w-0 max-w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 font-mono text-sm break-all"
                 placeholder="e.g. CCC-2604-412"
               />
             </div>
@@ -876,8 +878,8 @@ function MachineDetailPanel({
             <textarea
               value={m.notes}
               onChange={(e) => onUpdate({ notes: e.target.value })}
-              rows={10}
-              className="w-full bg-[#1c1b1b] border border-[#353534] px-2 py-2 text-[#a98a7d] font-mono text-[11px] leading-relaxed resize-y min-h-[120px]"
+              rows={6}
+              className="w-full min-w-0 max-h-40 sm:max-h-48 bg-[#1c1b1b] border border-[#353534] px-2 py-2 text-[#a98a7d] font-mono text-[11px] leading-relaxed resize-y min-h-[100px] overflow-y-auto"
             />
             <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1 mt-4">PHOTOS</div>
             <p className="text-[10px] text-[#5a4136] mb-2">Stored in fleet data (keep images small).</p>
@@ -1030,12 +1032,12 @@ function MachineDetailPanel({
 
 function FieldRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="border-b border-[#353534] pb-3">
-      <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1">{label}</div>
+    <div className="border-b border-[#353534] pb-3 min-w-0">
+      <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1 break-words">{label}</div>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 text-[#a98a7d]"
+        className="w-full min-w-0 max-w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 text-[#a98a7d] text-sm break-words"
       />
     </div>
   );
@@ -1059,8 +1061,8 @@ function LabeledNumber({
     setLocal(String(value));
   }, [value]);
   return (
-    <div>
-      <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1">{label}</div>
+    <div className="min-w-0">
+      <div className="text-[9px] sm:text-[10px] text-[#5a4136] uppercase tracking-wide mb-1 break-words leading-tight">{label}</div>
       <input
         type="number"
         value={local}
@@ -1073,7 +1075,7 @@ function LabeledNumber({
           if (!Number.isFinite(n)) setLocal(String(value));
           else onCommit(n);
         }}
-        className="w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 font-mono"
+        className="w-full min-w-0 max-w-full bg-[#1c1b1b] border border-[#353534] px-2 py-1.5 font-mono text-sm"
       />
     </div>
   );
