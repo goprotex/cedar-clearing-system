@@ -4,7 +4,6 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Bid } from '@/types';
-import { TreeLayer3D, extractTreesFromAnalysis, type PastureWall } from '@/lib/tree-layer';
 
 type JobLike = {
   id: string;
@@ -41,7 +40,6 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
   const popupRef = useRef<mapboxgl.Popup | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const rotationRef = useRef<number | null>(null);
-  const treeLayerRef = useRef<TreeLayer3D | null>(null);
 
   // ── Create map once ──
   useEffect(() => {
@@ -144,7 +142,6 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       popupRef.current?.remove();
       for (const m of operatorMarkersRef.current.values()) m.remove();
       operatorMarkersRef.current.clear();
-      treeLayerRef.current = null;
       map.remove();
       mapRef.current = null;
       setMapLoaded(false);
@@ -436,95 +433,72 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     src.setData(fc(features));
   }, [trailsByJob, mapLoaded]);
 
-  // ── 3D holographic trees: add/remove/update when hologram toggles or data changes ──
+  // ── Hologram 3D cedar extrusions: terrain-following fill-extrusion layer ──
+  // Uses Mapbox native fill-extrusion which follows 3D terrain contours.
+  // Cleared cells get 0 height (disappear). Uncleared cells extrude to tree height.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
+    const extId = 'holo-cedar-extrusion';
+
     if (!layers.hologram) {
-      // Remove tree layer when hologram is off
-      if (treeLayerRef.current && map.getLayer('3d-trees')) {
-        try { map.removeLayer('3d-trees'); } catch {}
-        treeLayerRef.current = null;
-      }
+      if (map.getLayer(extId)) { try { map.removeLayer(extId); } catch {} }
+      if (map.getSource('holo-cedar-ext-src')) { try { map.removeSource('holo-cedar-ext-src'); } catch {} }
       return;
     }
 
-    // Compute center from all pastures for the tree layer origin
-    let originLng = -99.14, originLat = 30.05;
-    for (const job of jobs) {
-      for (const p of job.bid_snapshot?.pastures ?? []) {
-        if (p.centroid && Array.isArray(p.centroid) && p.centroid.length >= 2) {
-          originLng = p.centroid[0];
-          originLat = p.centroid[1];
-          break;
-        }
-      }
-      if (originLng !== -99.14) break;
-    }
-
-    // Remove existing tree layer first (terrain changes disrupt WebGL state)
-    if (treeLayerRef.current && map.getLayer('3d-trees')) {
-      try { map.removeLayer('3d-trees'); } catch {}
-      treeLayerRef.current = null;
-    }
-
-    // Recreate tree layer
-    const tl2 = new TreeLayer3D([originLng, originLat]);
-    treeLayerRef.current = tl2;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      map.addLayer(tl2 as any);
-    } catch { treeLayerRef.current = null; return; }
-
-    const tl = treeLayerRef.current;
-    if (!tl) return;
-
-    // Collect all cleared cell IDs across all jobs
+    // Build extrusion features — only uncleared cells
     const allCleared = new Set<string>();
     for (const job of jobs) {
       const cleared = clearedByJob[job.id];
       if (cleared) for (const id of cleared) allCleared.add(id);
     }
 
-    // Extract trees but EXCLUDE trees from cleared cells
-    // extractTreesFromAnalysis takes pastures — we filter gridCells first
-    const filteredPastures: Array<{ cedarAnalysis: any; density: string }> = [];
+    const feats: GeoJSON.Feature[] = [];
     for (const job of jobs) {
       const bid = job.bid_snapshot;
       if (!bid?.pastures) continue;
       for (const p of bid.pastures) {
-        if (!p.cedarAnalysis?.gridCells?.features) continue;
-        const filteredFeats = p.cedarAnalysis.gridCells.features.filter((_: any, idx: number) => {
+        const gridFeats = p.cedarAnalysis?.gridCells?.features ?? [];
+        gridFeats.forEach((f: any, idx: number) => {
+          const cls = f?.properties?.classification;
+          if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
           const cellId = `${p.id}:${idx}`;
-          return !allCleared.has(cellId);
-        });
-        filteredPastures.push({
-          cedarAnalysis: { gridCells: { ...p.cedarAnalysis.gridCells, features: filteredFeats }, summary: p.cedarAnalysis.summary },
-          density: p.density,
+          const isCleared = allCleared.has(cellId);
+          const color = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
+          const ndvi = (f?.properties?.ndvi as number) ?? 0.3;
+          const height = isCleared ? 0 : Math.max(2, ndvi * 15);
+          feats.push({
+            ...(f as GeoJSON.Feature),
+            properties: { ...f.properties, holoColor: color, extHeight: height, cleared: isCleared ? 1 : 0 },
+          });
         });
       }
     }
 
-    const trees = extractTreesFromAnalysis(filteredPastures as any);
-    if (trees.length > 0) tl.updateTrees(trees);
+    // Remove old and rebuild
+    if (map.getLayer(extId)) { try { map.removeLayer(extId); } catch {} }
+    if (map.getSource('holo-cedar-ext-src')) { try { map.removeSource('holo-cedar-ext-src'); } catch {} }
 
-    // Pasture walls
-    const walls: PastureWall[] = [];
-    for (const job of jobs) {
-      for (const p of job.bid_snapshot?.pastures ?? []) {
-        const ring = p.polygon?.geometry?.coordinates?.[0];
-        if (!ring || ring.length < 3) continue;
-        walls.push({ id: p.id, coordinates: ring as [number, number][], color: '#00ff41' });
-      }
-    }
-    tl.updatePolygonWalls(walls);
+    map.addSource('holo-cedar-ext-src', { type: 'geojson', data: fc(feats) });
+    map.addLayer({
+      id: extId,
+      type: 'fill-extrusion',
+      source: 'holo-cedar-ext-src',
+      paint: {
+        'fill-extrusion-color': ['get', 'holoColor'],
+        'fill-extrusion-opacity': 0.7,
+        'fill-extrusion-height': ['get', 'extHeight'],
+        'fill-extrusion-base': 0,
+      },
+    });
 
-    // Move cedar/pasture 2D layers above 3D trees
-    for (const layerId of ['monitor-cedar-fill', 'monitor-cedar-border', 'holo-mask-fill', 'monitor-pastures-fill', 'monitor-pastures-border', 'monitor-pastures-label']) {
+    // Move labels on top
+    for (const layerId of ['monitor-pastures-label', 'monitor-pastures-border']) {
       if (map.getLayer(layerId)) try { map.moveLayer(layerId); } catch {}
     }
-  }, [layers.hologram, layers.terrain3d, mapLoaded, jobs, clearedByJob]);
+  }, [layers.hologram, mapLoaded, jobs, clearedByJob]);
 
   // ── Operator markers ──
   useEffect(() => {
