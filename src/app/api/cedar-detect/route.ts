@@ -6,6 +6,60 @@ export const maxDuration = 300; // 5 min — thorough spectral analysis
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
 
+/** Smaller batches + retries reduce NAIP rate-limit / transient failures vs 50 parallel requests. */
+const BATCH_SIZE = 25;
+const NAIP_FETCH_TIMEOUT_MS = 15000;
+const NAIP_MAX_ATTEMPTS = 5;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isRetryableHttpStatus(status: number): boolean {
+  return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+async function fetchNaipIdentifyJson(lng: number, lat: number): Promise<unknown | null> {
+  const geom = JSON.stringify({
+    x: lng,
+    y: lat,
+    spatialReference: { wkid: 4326 },
+  });
+  const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
+
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= NAIP_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(NAIP_FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        if (isRetryableHttpStatus(res.status) && attempt < NAIP_MAX_ATTEMPTS) {
+          await sleep(200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 100));
+          continue;
+        }
+        return null;
+      }
+      const text = await res.text();
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        if (attempt < NAIP_MAX_ATTEMPTS) {
+          await sleep(200 * 2 ** (attempt - 1));
+          continue;
+        }
+        return null;
+      }
+    } catch (e) {
+      lastErr = e;
+      if (attempt < NAIP_MAX_ATTEMPTS) {
+        await sleep(200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 150));
+      }
+    }
+  }
+  return null;
+}
+
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
 
 interface BandIndices {
@@ -389,29 +443,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Batch identify requests against NAIP ImageServer
-    const batchSize = 50;
+    // Batch identify requests against NAIP ImageServer (small batches + per-request retries)
     const results: SampleResult[] = [];
 
-    for (let i = 0; i < samplePoints.length; i += batchSize) {
-      const batch = samplePoints.slice(i, i + batchSize);
+    for (let i = 0; i < samplePoints.length; i += BATCH_SIZE) {
+      const batch = samplePoints.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
         batch.map(async (pt): Promise<SampleResult | null> => {
           const [lng, lat] = pt.geometry.coordinates;
           try {
-            const geom = JSON.stringify({
-              x: lng,
-              y: lat,
-              spatialReference: { wkid: 4326 },
-            });
-            const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
-
-            const res = await fetch(url, {
-              signal: AbortSignal.timeout(10000),
-            });
-            if (!res.ok) return null;
-
-            const data = await res.json();
+            const data = (await fetchNaipIdentifyJson(lng, lat)) as { value?: string } | null;
+            if (!data) return null;
             const pixelStr: string = data?.value || '';
 
             if (!pixelStr || pixelStr === 'NoData') {

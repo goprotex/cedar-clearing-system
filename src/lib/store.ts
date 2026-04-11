@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 import type { Bid, BidSummary, CedarAnalysis, CustomLineItem, Pasture, RateCard, SeasonalAnalysis, MarkedTree, AIRecommendation } from '@/types';
 import {
   calculatePastureCost,
@@ -44,6 +45,132 @@ function createDefaultPasture(sortOrder: number): Pasture {
     estimatedHrsPerAcre: 1.0,
     notes: '',
   };
+}
+
+const CEDAR_API_MAX_ATTEMPTS = 5;
+/** Must exceed server maxDuration (300s) so the client does not abort first. */
+const CEDAR_FETCH_TIMEOUT_MS = 320_000;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isRetryableCedarHttpStatus(status: number): boolean {
+  return (
+    status === 408 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+}
+
+/**
+ * POST /api/cedar-detect with retries: handles gateway timeouts, truncated JSON,
+ * and transient NAIP/upstream failures. Validates a complete CedarAnalysis shape.
+ */
+async function fetchCedarAnalysisWithRetries(
+  body: { coordinates: number[][][]; acreage: number },
+  onAttempt: (attempt: number, maxAttempts: number) => void
+): Promise<CedarAnalysis> {
+  let lastMessage = 'Spectral analysis failed';
+
+  for (let attempt = 1; attempt <= CEDAR_API_MAX_ATTEMPTS; attempt++) {
+    onAttempt(attempt, CEDAR_API_MAX_ATTEMPTS);
+    try {
+      const res = await fetch('/api/cedar-detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(CEDAR_FETCH_TIMEOUT_MS),
+      });
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        let errDetail = `Analysis server returned ${res.status}`;
+        try {
+          const errJson = JSON.parse(text) as { error?: string; detail?: string };
+          if (typeof errJson?.error === 'string' || typeof errJson?.detail === 'string') {
+            errDetail = errJson.detail ?? errJson.error ?? errDetail;
+          }
+        } catch {
+          /* use errDetail */
+        }
+        lastMessage = errDetail;
+        const nonRetryable = res.status === 400 || res.status === 404;
+        if (!nonRetryable && isRetryableCedarHttpStatus(res.status) && attempt < CEDAR_API_MAX_ATTEMPTS) {
+          await sleepMs(1500 * 2 ** (attempt - 1));
+          continue;
+        }
+        throw new Error(lastMessage);
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        lastMessage =
+          'No spectral result was received. The analysis stream may have been cut off.';
+        if (attempt < CEDAR_API_MAX_ATTEMPTS) {
+          await sleepMs(1500 * 2 ** (attempt - 1));
+          continue;
+        }
+        throw new Error(lastMessage);
+      }
+
+      const errObj = parsed as { error?: string; detail?: string };
+      if (typeof errObj?.error === 'string' && !('gridCells' in (parsed as object))) {
+        lastMessage = errObj.detail ?? errObj.error;
+        if (attempt < CEDAR_API_MAX_ATTEMPTS && (res.status >= 500 || /timeout|unavailable/i.test(lastMessage))) {
+          await sleepMs(1500 * 2 ** (attempt - 1));
+          continue;
+        }
+        throw new Error(lastMessage);
+      }
+
+      const data = parsed as Partial<CedarAnalysis>;
+      if (
+        !data.gridCells ||
+        data.summary === undefined ||
+        data.summary === null ||
+        typeof data.summary.totalSamples !== 'number'
+      ) {
+        lastMessage =
+          'No spectral result was received. The analysis stream may have been cut off.';
+        if (attempt < CEDAR_API_MAX_ATTEMPTS) {
+          await sleepMs(1500 * 2 ** (attempt - 1));
+          continue;
+        }
+        throw new Error(lastMessage);
+      }
+
+      return data as CedarAnalysis;
+    } catch (e) {
+      const name = e instanceof Error ? e.name : '';
+      const isAbort = name === 'AbortError' || name === 'TimeoutError';
+      const isNetwork = e instanceof TypeError;
+      lastMessage =
+        isAbort
+          ? 'Spectral analysis timed out — large pastures can take several minutes. Retrying…'
+          : e instanceof Error
+            ? e.message
+            : 'Spectral analysis failed';
+
+      if ((isAbort || isNetwork) && attempt < CEDAR_API_MAX_ATTEMPTS) {
+        await sleepMs(1500 * 2 ** (attempt - 1));
+        continue;
+      }
+      if (attempt < CEDAR_API_MAX_ATTEMPTS && e instanceof Error && /cut off|invalid|JSON/i.test(e.message)) {
+        await sleepMs(1500 * 2 ** (attempt - 1));
+        continue;
+      }
+      throw e instanceof Error ? e : new Error(lastMessage);
+    }
+  }
+
+  throw new Error(lastMessage);
 }
 
 function createDefaultBid(): Bid {
@@ -394,20 +521,22 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
     try {
       set({ analysisProgress: { active: true, step: 'Running spectral analysis...', detail: `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution` } });
-      const res = await fetch('/api/cedar-detect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          coordinates: pasture.polygon.geometry.coordinates,
-          acreage: pasture.acreage,
-        }),
+      const body = {
+        coordinates: pasture.polygon.geometry.coordinates,
+        acreage: pasture.acreage,
+      };
+      const data = await fetchCedarAnalysisWithRetries(body, (attempt, max) => {
+        if (attempt > 1) {
+          set({
+            analysisProgress: {
+              active: true,
+              step: 'Retrying spectral analysis…',
+              detail: `Attempt ${attempt} of ${max} — connection or imagery service was interrupted`,
+            },
+          });
+        }
       });
-      if (!res.ok) {
-        set({ analysisProgress: null });
-        return;
-      }
       set({ analysisProgress: { active: true, step: 'Processing results...', detail: 'Classifying vegetation: cedar, oak, grass, brush, bare ground' } });
-      const data: CedarAnalysis = await res.json();
       get().updatePasture(pastureId, { cedarAnalysis: data });
 
       // Auto-mark all cedar trees as "remove" by default
@@ -438,7 +567,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
       set({ analysisProgress: { active: true, step: 'Analysis complete!', detail: `Found ${data.summary.cedar.pct}% cedar across ${data.summary.totalSamples} sample points` } });
       // Clear after a brief moment so user sees the completion
       setTimeout(() => set({ analysisProgress: null }), 2000);
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Spectral analysis failed';
+      toast.error(msg, { duration: 8000 });
       set({ analysisProgress: null });
     }
   },
