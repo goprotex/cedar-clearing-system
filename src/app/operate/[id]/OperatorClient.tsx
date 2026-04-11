@@ -5,7 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 import type { Bid } from '@/types';
-import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
+import { extractTreesFromAnalysis, TreeLayer3D, type TreePosition, type PastureWall } from '@/lib/tree-layer';
 import { treeFeaturesForMapboxExtrusion } from '@/lib/operate-mapbox-trees';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
@@ -17,6 +17,16 @@ const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
 const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
 const OPERATOR_PUBLISH_MS = 2500;
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
+
+const VEGETATION_COLORS: Record<string, string> = {
+  cedar: '#22c55e',
+  oak: '#92400e',
+  mixed: '#f97316',
+  brush: '#eab308',
+  mesquite: '#a16207',
+};
+
+type OperateLayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'hologram';
 
 function isValidLngLat(pair: [number, number]): boolean {
   const [lng, lat] = pair;
@@ -135,7 +145,18 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const trailCoordsRef = useRef<[number, number][]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [ndviEnabled, setNdviEnabled] = useState(false);
+  const [layers, setLayers] = useState<Record<OperateLayerKey, boolean>>({
+    soil: false,
+    naip: false,
+    naipCIR: false,
+    naipNDVI: false,
+    hologram: false,
+  });
+  const preHoloLayersRef = useRef<Pick<Record<OperateLayerKey, boolean>, 'naip' | 'naipCIR' | 'naipNDVI'> | null>(null);
+  const treeLayerRef = useRef<TreeLayer3D | null>(null);
+  const holoRotationRef = useRef<number | null>(null);
+  const layersRef = useRef(layers);
+  layersRef.current = layers;
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
@@ -267,6 +288,44 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   // Build a flattened list of cedar cells with centroids for proximity checks
   const cedarCellsRef = useRef<Array<{ id: string; lng: number; lat: number; pastureId: string; cellIndex: number }>>([]);
 
+  const toggleLayer = useCallback((key: OperateLayerKey) => {
+    setLayers((prev) => {
+      const next = { ...prev };
+      if (key === 'naip' || key === 'naipCIR' || key === 'naipNDVI') {
+        if (!prev[key]) {
+          next.naip = false;
+          next.naipCIR = false;
+          next.naipNDVI = false;
+        }
+      }
+      if (key === 'hologram' && !prev.hologram) {
+        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI };
+        next.naip = false;
+        next.naipCIR = false;
+        next.naipNDVI = true;
+        const map = mapRef.current;
+        if (map?.isStyleLoaded()) {
+          map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
+        }
+      }
+      if (key === 'hologram' && prev.hologram) {
+        const saved = preHoloLayersRef.current;
+        if (saved) {
+          next.naip = saved.naip;
+          next.naipCIR = saved.naipCIR;
+          next.naipNDVI = saved.naipNDVI;
+          preHoloLayersRef.current = null;
+        }
+        const map = mapRef.current;
+        if (map?.isStyleLoaded()) {
+          map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+        }
+      }
+      next[key] = !prev[key];
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!state.bid) return;
     const cells: typeof cedarCellsRef.current = [];
@@ -382,26 +441,106 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             }
           }
 
-          if (!coarsePointer) {
-            try {
-              map.addSource('naip-ndvi', {
-                type: 'raster',
-                tiles: [
-                  'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
-                ],
-                tileSize: 256,
-              });
-              map.addLayer({
-                id: 'naip-ndvi-overlay',
-                type: 'raster',
-                source: 'naip-ndvi',
-                paint: { 'raster-opacity': 0.85 },
-                layout: { visibility: 'none' },
-              });
-            } catch {
-              // optional overlay
-            }
+          try {
+            map.addSource('soil-wms', {
+              type: 'raster',
+              tiles: [
+                'https://SDMDataAccess.sc.egov.usda.gov/Spatial/SDM.wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mapunitpoly&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'soil-overlay',
+              type: 'raster',
+              source: 'soil-wms',
+              paint: { 'raster-opacity': 0.45 },
+              layout: { visibility: 'none' },
+            });
+          } catch {
+            /* optional */
           }
+          try {
+            map.addSource('naip-rgb', {
+              type: 'raster',
+              tiles: [
+                'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'naip-overlay',
+              type: 'raster',
+              source: 'naip-rgb',
+              paint: { 'raster-opacity': 0.85 },
+              layout: { visibility: 'none' },
+            });
+          } catch {
+            /* optional */
+          }
+          try {
+            map.addSource('naip-cir', {
+              type: 'raster',
+              tiles: [
+                'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&bandIds=3,0,1&f=image',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'naip-cir-overlay',
+              type: 'raster',
+              source: 'naip-cir',
+              paint: { 'raster-opacity': 0.85 },
+              layout: { visibility: 'none' },
+            });
+          } catch {
+            /* optional */
+          }
+          try {
+            map.addSource('naip-ndvi', {
+              type: 'raster',
+              tiles: [
+                'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&renderingRule=%7B%22rasterFunction%22%3A%22NDVI%22%2C%22rasterFunctionArguments%22%3A%7B%22VisibleBandID%22%3A0%2C%22InfraredBandID%22%3A3%7D%7D&f=image',
+              ],
+              tileSize: 256,
+            });
+            map.addLayer({
+              id: 'naip-ndvi-overlay',
+              type: 'raster',
+              source: 'naip-ndvi',
+              paint: { 'raster-opacity': 0.75 },
+              layout: { visibility: 'none' },
+            });
+          } catch {
+            /* optional */
+          }
+
+          const worldRing: [number, number][] = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+          const holoHoles: [number, number][][] = bid.pastures
+            .filter((p) => (p.polygon?.geometry?.coordinates?.length ?? 0) > 0)
+            .map((p) => p.polygon.geometry.coordinates[0] as [number, number][]);
+          map.addSource('holo-mask', {
+            type: 'geojson',
+            data:
+              holoHoles.length > 0
+                ? {
+                    type: 'FeatureCollection',
+                    features: [
+                      {
+                        type: 'Feature',
+                        geometry: { type: 'Polygon', coordinates: [worldRing, ...holoHoles] },
+                        properties: {},
+                      },
+                    ],
+                  }
+                : { type: 'FeatureCollection', features: [] },
+          });
+          map.addLayer({
+            id: 'holo-mask-fill',
+            type: 'fill',
+            source: 'holo-mask',
+            paint: { 'fill-color': '#000000', 'fill-opacity': 0.92 },
+            layout: { visibility: 'none' },
+          });
 
           const pastureFeatures: GeoJSON.Feature[] = bid.pastures
             .filter((p) => (p.polygon?.geometry?.coordinates?.length ?? 0) > 0)
@@ -534,14 +673,320 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     };
   }, [state.bid]);
 
-  // Toggle NDVI overlay visibility
+  // Layer toggles (soil, NAIP variants, hologram) — aligned with bid / scout maps
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const layerId = 'naip-ndvi-overlay';
-    if (!map.getLayer(layerId)) return;
-    map.setLayoutProperty(layerId, 'visibility', ndviEnabled ? 'visible' : 'none');
-  }, [ndviEnabled]);
+    const bid = state.bid;
+    if (!map || !mapReady || !map.isStyleLoaded() || !bid) return;
+
+    const coarsePointer =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches;
+
+    const holoExpr: mapboxgl.Expression = [
+      'match',
+      ['get', 'classification'],
+      'cedar',
+      '#00ff41',
+      'oak',
+      '#ffaa00',
+      'mixed_brush',
+      '#22dd44',
+      '#00ff41',
+    ];
+
+    const rasterKeys: { key: OperateLayerKey; id: string }[] = [
+      { key: 'naip', id: 'naip-overlay' },
+      { key: 'naipCIR', id: 'naip-cir-overlay' },
+      { key: 'naipNDVI', id: 'naip-ndvi-overlay' },
+    ];
+    for (const { key, id } of rasterKeys) {
+      if (!map.getLayer(id)) continue;
+      const on = layers[key];
+      map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      const op = key === 'naipNDVI' ? 0.75 : 0.85;
+      map.setPaintProperty(id, 'raster-opacity', layers.hologram && key === 'naipNDVI' && on ? 1.0 : op);
+    }
+
+    if (map.getLayer('soil-overlay')) {
+      map.setLayoutProperty('soil-overlay', 'visibility', layers.soil ? 'visible' : 'none');
+      map.setPaintProperty('soil-overlay', 'raster-opacity', 1.0);
+      if (layers.soil) {
+        try {
+          map.moveLayer('soil-overlay');
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    if (layers.hologram) {
+      if (map.getLayer('holo-mask-fill')) map.setLayoutProperty('holo-mask-fill', 'visibility', 'visible');
+
+      for (const bl of map.getStyle().layers ?? []) {
+        if (bl.id.startsWith('satellite') || bl.id.includes('mapbox-satellite')) {
+          try {
+            map.setPaintProperty(bl.id, 'raster-saturation', -0.8);
+            map.setPaintProperty(bl.id, 'raster-brightness-max', 0.35);
+          } catch {
+            /* not raster */
+          }
+        }
+      }
+      for (const bl of map.getStyle().layers ?? []) {
+        if (
+          bl.id.includes('road') ||
+          bl.id.includes('label') ||
+          bl.id.includes('poi') ||
+          bl.id.includes('building') ||
+          bl.id.includes('transit') ||
+          bl.id.includes('admin') ||
+          bl.id.includes('place') ||
+          bl.id.includes('water-') ||
+          bl.id.includes('waterway') ||
+          bl.id.includes('land-structure') ||
+          bl.id.includes('aeroway')
+        ) {
+          try {
+            map.setLayoutProperty(bl.id, 'visibility', 'none');
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (map.getLayer('pastures-border')) {
+        map.setPaintProperty('pastures-border', 'line-color', '#00ff41');
+        map.setPaintProperty('pastures-border', 'line-width', 3);
+      }
+      if (map.getLayer('pastures-fill')) {
+        map.setPaintProperty('pastures-fill', 'fill-color', '#00ff41');
+        map.setPaintProperty('pastures-fill', 'fill-opacity', 0.05);
+      }
+      if (map.getLayer('pastures-label')) {
+        map.setPaintProperty('pastures-label', 'text-color', '#00ff41');
+      }
+
+      if (map.getLayer('cedar-cells-fill')) {
+        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-color', holoExpr);
+        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-opacity', 0.6);
+        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-height', [
+          'case',
+          ['==', ['get', 'cleared'], 1],
+          0.5,
+          6,
+        ]);
+      }
+      if (map.getLayer('cedar-cells-fill-2d')) {
+        map.setPaintProperty('cedar-cells-fill-2d', 'fill-color', holoExpr);
+        map.setPaintProperty('cedar-cells-fill-2d', 'fill-opacity', 0.7);
+      }
+      if (map.getLayer('cedar-cells-border')) {
+        map.setPaintProperty('cedar-cells-border', 'line-color', holoExpr);
+        map.setPaintProperty('cedar-cells-border', 'line-opacity', 0.9);
+        map.setPaintProperty('cedar-cells-border', 'line-width', 1.5);
+      }
+
+      if (map.getLayer('operate-trees-3d')) {
+        map.setLayoutProperty('operate-trees-3d', 'visibility', 'none');
+      }
+
+      if (coarsePointer && map.getLayer('3d-trees')) {
+        try {
+          map.removeLayer('3d-trees');
+        } catch {
+          /* ignore */
+        }
+        treeLayerRef.current = null;
+      } else if (!coarsePointer && !map.getLayer('3d-trees')) {
+        try {
+          const { center } = resolveOperatorView(bid);
+          const tl = new TreeLayer3D(center);
+          treeLayerRef.current = tl;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          map.addLayer(tl as any);
+          const trees = extractTreesFromAnalysis(bid.pastures);
+          if (trees.length > 0) tl.updateTrees(trees);
+          const walls: PastureWall[] = bid.pastures
+            .filter((p) => p.polygon.geometry.coordinates.length > 0)
+            .map((p) => ({
+              id: p.id,
+              coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
+              color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
+            }));
+          tl.updatePolygonWalls(walls);
+        } catch {
+          /* WebGL / custom layer optional */
+        }
+      }
+
+      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+        const tl = treeLayerRef.current;
+        const trees = extractTreesFromAnalysis(bid.pastures);
+        if (trees.length > 0) tl.updateTrees(trees);
+        for (const sp of ['cedar', 'oak', 'mixed'] as const) {
+          tl.setSpeciesVisible(sp, true);
+        }
+      }
+
+      for (const layerId of [
+        'cedar-cells-fill',
+        'cedar-cells-fill-2d',
+        'cedar-cells-border',
+        'holo-mask-fill',
+        'pastures-fill',
+        'pastures-border',
+        'pastures-label',
+      ]) {
+        if (map.getLayer(layerId)) {
+          try {
+            map.moveLayer(layerId);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    } else {
+      if (holoRotationRef.current) {
+        cancelAnimationFrame(holoRotationRef.current);
+        holoRotationRef.current = null;
+      }
+
+      if (map.getLayer('holo-mask-fill')) map.setLayoutProperty('holo-mask-fill', 'visibility', 'none');
+
+      for (const bl of map.getStyle().layers ?? []) {
+        if (bl.id.startsWith('satellite') || bl.id.includes('mapbox-satellite')) {
+          try {
+            map.setPaintProperty(bl.id, 'raster-saturation', 0);
+            map.setPaintProperty(bl.id, 'raster-brightness-max', 1);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      for (const bl of map.getStyle().layers ?? []) {
+        if (
+          bl.id.includes('road') ||
+          bl.id.includes('label') ||
+          bl.id.includes('poi') ||
+          bl.id.includes('building') ||
+          bl.id.includes('transit') ||
+          bl.id.includes('admin') ||
+          bl.id.includes('place') ||
+          bl.id.includes('water-') ||
+          bl.id.includes('waterway') ||
+          bl.id.includes('land-structure') ||
+          bl.id.includes('aeroway')
+        ) {
+          try {
+            map.setLayoutProperty(bl.id, 'visibility', 'visible');
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      if (map.getLayer('pastures-border')) {
+        map.setPaintProperty('pastures-border', 'line-color', '#00ff41');
+        map.setPaintProperty('pastures-border', 'line-width', 2);
+      }
+      if (map.getLayer('pastures-fill')) {
+        map.setPaintProperty('pastures-fill', 'fill-color', '#00ff41');
+        map.setPaintProperty('pastures-fill', 'fill-opacity', 0.05);
+      }
+      if (map.getLayer('pastures-label')) {
+        map.setPaintProperty('pastures-label', 'text-color', '#00ff41');
+      }
+
+      if (map.getLayer('cedar-cells-fill')) {
+        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-color', ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']]);
+        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-opacity', 0.55);
+        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-height', ['case', ['==', ['get', 'cleared'], 1], 0.5, 3]);
+      }
+      if (map.getLayer('cedar-cells-fill-2d')) {
+        map.setPaintProperty('cedar-cells-fill-2d', 'fill-color', ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']]);
+        map.setPaintProperty('cedar-cells-fill-2d', 'fill-opacity', ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55]);
+      }
+      if (map.getLayer('cedar-cells-border')) {
+        map.setPaintProperty('cedar-cells-border', 'line-color', ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']]);
+        map.setPaintProperty('cedar-cells-border', 'line-opacity', 0.4);
+        map.setPaintProperty('cedar-cells-border', 'line-width', 0.5);
+      }
+
+      if (map.getLayer('operate-trees-3d')) {
+        map.setLayoutProperty('operate-trees-3d', 'visibility', 'visible');
+      }
+
+      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+        try {
+          map.removeLayer('3d-trees');
+        } catch {
+          /* ignore */
+        }
+        treeLayerRef.current = null;
+      }
+    }
+  }, [layers, mapReady, state.bid]);
+
+  // Slow bearing drift while hologram is on (starts/stops with hologram toggle only)
+  useEffect(() => {
+    if (!layers.hologram || !mapReady) {
+      if (holoRotationRef.current) {
+        cancelAnimationFrame(holoRotationRef.current);
+        holoRotationRef.current = null;
+      }
+      return;
+    }
+    const spin = () => {
+      if (!mapRef.current || !layersRef.current.hologram) return;
+      mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
+      holoRotationRef.current = requestAnimationFrame(spin);
+    };
+    holoRotationRef.current = requestAnimationFrame(spin);
+    return () => {
+      if (holoRotationRef.current) {
+        cancelAnimationFrame(holoRotationRef.current);
+        holoRotationRef.current = null;
+      }
+    };
+  }, [layers.hologram, mapReady]);
+
+  // Hologram spin: pause on interaction, resume after idle (same idea as bid map)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !layers.hologram) return;
+
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const pause = () => {
+      if (holoRotationRef.current) {
+        cancelAnimationFrame(holoRotationRef.current);
+        holoRotationRef.current = null;
+      }
+      if (resumeTimer) clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => {
+        if (!mapRef.current || !layersRef.current.hologram) return;
+        const spin = () => {
+          if (!mapRef.current || !layersRef.current.hologram) return;
+          mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
+          holoRotationRef.current = requestAnimationFrame(spin);
+        };
+        holoRotationRef.current = requestAnimationFrame(spin);
+      }, 3000);
+    };
+
+    map.on('mousedown', pause);
+    map.on('touchstart', pause);
+    map.on('wheel', pause);
+
+    return () => {
+      map.off('mousedown', pause);
+      map.off('touchstart', pause);
+      map.off('wheel', pause);
+      if (resumeTimer) clearTimeout(resumeTimer);
+    };
+  }, [layers.hologram, mapReady]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -852,15 +1297,31 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
               OPERATOR_MODE // {bid.bidNumber}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setNdviEnabled((v) => !v)}
-              className="text-[10px] font-mono text-[#a98a7d] hover:text-white border border-green-900/40 px-2 py-1 rounded"
-              title="Toggle NDVI overlay"
-            >
-              {ndviEnabled ? 'NDVI_ON' : 'NDVI_OFF'}
-            </button>
-            <span className={`w-2 h-2 rounded-full ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
+          <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-1.5 max-w-[min(100%,52rem)]">
+            {(
+              [
+                { key: 'soil' as const, label: 'SOIL' },
+                { key: 'naip' as const, label: 'RGB' },
+                { key: 'naipCIR' as const, label: 'CIR' },
+                { key: 'naipNDVI' as const, label: 'NDVI' },
+                { key: 'hologram' as const, label: 'HOLO' },
+              ] as const
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleLayer(key)}
+                className={`text-[9px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                  layers[key]
+                    ? 'text-[#13ff43] border-[#13ff43] bg-[#001a06]/90'
+                    : 'text-[#a98a7d] border-green-900/40 hover:text-white'
+                }`}
+                title={`Toggle ${label} layer`}
+              >
+                {layers[key] ? `${label}_ON` : `${label}_OFF`}
+              </button>
+            ))}
+            <span className={`w-2 h-2 rounded-full shrink-0 ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
             <span className="text-[10px] font-mono text-[#a98a7d]">
               {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
             </span>
