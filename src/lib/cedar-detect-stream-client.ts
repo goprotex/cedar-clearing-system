@@ -1,5 +1,6 @@
 import { normalizeCedarAnalysisPayload } from '@/lib/cedar-analysis-grid';
-import type { CedarAnalysis } from '@/types';
+import type { CedarAnalysis, CedarAnalysisSummary } from '@/types';
+import { samplesToGridCells, type SpectralSamplePayload } from '@/lib/cedar-analysis-grid';
 
 /**
  * Mobile Safari (and some Android browsers) suspend JS execution when the tab
@@ -10,8 +11,12 @@ import type { CedarAnalysis } from '@/types';
 const STREAM_STALL_TIMEOUT_MS = 90_000;
 
 /**
- * Reads the cedar-detect SSE stream (progress + final compact samples/summary).
- * Includes stall detection for mobile browsers that suspend streams.
+ * Reads the cedar-detect SSE stream.
+ *
+ * Supports two result protocols:
+ * 1. Legacy: single `result` event with {summary, samples}
+ * 2. Batched: `result_summary` → N × `result_samples` → `result_done`
+ *    (avoids single-event size limits that cause silent drops on Vercel/mobile)
  */
 export async function readCedarDetectSse(
   res: Response,
@@ -33,6 +38,10 @@ export async function readCedarDetectSse(
   let totalBytes = 0;
   let lastEventType = '';
 
+  let batchedSummary: CedarAnalysisSummary | null = null;
+  const batchedSamples: SpectralSamplePayload[] = [];
+  let batchCount = 0;
+
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
   let stalled = false;
 
@@ -53,7 +62,7 @@ export async function readCedarDetectSse(
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        console.log(`[${tag}] reader done: chunks=${chunkCount}, bytes=${totalBytes}, hasResult=${!!resultData}, hasError=${!!streamError}`);
+        console.log(`[${tag}] reader done: chunks=${chunkCount}, bytes=${totalBytes}, hasResult=${!!resultData}, batchedSamples=${batchedSamples.length}, hasError=${!!streamError}`);
         break;
       }
 
@@ -83,10 +92,35 @@ export async function readCedarDetectSse(
                   : 'Spectral analysis failed on the server.';
               console.error(`[${tag}] server error event: ${streamError}`);
             } else if (eventType === 'result') {
-              console.log(`[${tag}] result event received: samples=${Array.isArray(payload.samples) ? (payload.samples as unknown[]).length : 'n/a'}, hasSummary=${!!payload.summary}`);
+              console.log(`[${tag}] legacy result event: samples=${Array.isArray(payload.samples) ? (payload.samples as unknown[]).length : 'n/a'}, hasSummary=${!!payload.summary}`);
               resultData = normalizeCedarAnalysisPayload(payload);
               if (!resultData) {
-                console.error(`[${tag}] normalizeCedarAnalysisPayload returned null! payload keys: ${Object.keys(payload).join(', ')}, summary keys: ${payload.summary ? Object.keys(payload.summary as object).join(', ') : 'MISSING'}`);
+                console.error(`[${tag}] normalizeCedarAnalysisPayload returned null! keys: ${Object.keys(payload).join(', ')}`);
+              }
+            } else if (eventType === 'result_summary') {
+              batchedSummary = payload.summary as CedarAnalysisSummary;
+              console.log(`[${tag}] result_summary: totalBatches=${payload.totalBatches}, totalSamples=${batchedSummary?.totalSamples}`);
+            } else if (eventType === 'result_samples') {
+              const batch = payload.samples as SpectralSamplePayload[];
+              if (Array.isArray(batch)) {
+                batchedSamples.push(...batch);
+                batchCount++;
+              }
+            } else if (eventType === 'result_done') {
+              console.log(`[${tag}] result_done: batchCount=${batchCount}, totalSamples=${batchedSamples.length}, expected=${payload.totalSamples}`);
+              if (batchedSummary && batchedSamples.length > 0) {
+                let halfLng = batchedSummary.cellHalfLngDeg;
+                let halfLat = batchedSummary.cellHalfLatDeg;
+                if (halfLng == null || halfLat == null) {
+                  const m = batchedSummary.gridSpacingM / 2;
+                  halfLat = m / 111_320;
+                  halfLng = m / 111_320;
+                }
+                const gridCells = samplesToGridCells(batchedSamples, halfLng, halfLat);
+                resultData = { summary: batchedSummary, gridCells };
+                console.log(`[${tag}] assembled batched result: ${batchedSamples.length} samples, ${gridCells.features.length} grid cells`);
+              } else {
+                console.error(`[${tag}] result_done but missing data: summary=${!!batchedSummary}, samples=${batchedSamples.length}`);
               }
             }
           } catch (parseErr) {
@@ -106,7 +140,7 @@ export async function readCedarDetectSse(
   }
   if (!resultData) {
     const reason = stalled ? 'stream_stall' : 'stream_ended';
-    console.error(`[${tag}] no result: reason=${reason}, lastEvent=${lastEventType}, chunks=${chunkCount}, bytes=${totalBytes}, bufferLen=${buffer.length}`);
+    console.error(`[${tag}] no result: reason=${reason}, lastEvent=${lastEventType}, chunks=${chunkCount}, bytes=${totalBytes}, bufferLen=${buffer.length}, batchedSamples=${batchedSamples.length}`);
     const err = new Error(
       stalled
         ? 'Spectral analysis stream stalled — your device may have suspended the connection. Retrying…'

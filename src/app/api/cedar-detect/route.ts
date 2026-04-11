@@ -855,7 +855,14 @@ export async function POST(req: NextRequest) {
         }));
 
         console.log(`[cedar-detect:${reqId}] sending result: ${total} samples, cedar=${summary.cedar.count}, elapsed=${Date.now() - t0}ms`);
-        send('result', { summary, samples });
+        const BATCH_SIZE = 200;
+        send('result_summary', { summary, totalBatches: Math.ceil(samples.length / BATCH_SIZE) });
+        for (let b = 0; b < samples.length; b += BATCH_SIZE) {
+          send('result_samples', { batch: Math.floor(b / BATCH_SIZE), samples: samples.slice(b, b + BATCH_SIZE) });
+        }
+        send('result_done', { totalSamples: samples.length });
+
+
         stopHeartbeat();
         controller.close();
         console.log(`[cedar-detect:${reqId}] stream closed OK, total elapsed=${Date.now() - t0}ms`);
