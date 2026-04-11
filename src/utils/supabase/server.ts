@@ -46,3 +46,22 @@ export async function createClient(request?: Request) {
     },
   );
 }
+
+/**
+ * Resolve the signed-in user for API routes. When the client sends `Authorization: Bearer <jwt>`,
+ * pass the JWT into `getUser(jwt)` — `getUser()` alone does not use the bearer-only client session
+ * (persistSession: false), which caused 401s in production for fetchApiAuthed calls.
+ */
+export async function getUserFromRequest(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  request?: Request,
+) {
+  const bearerFromRequest = request?.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const headersList = await headers();
+  const bearerFromNext = headersList.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const bearer = bearerFromRequest ?? bearerFromNext;
+  if (bearer) {
+    return supabase.auth.getUser(bearer);
+  }
+  return supabase.auth.getUser();
+}

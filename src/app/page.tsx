@@ -69,9 +69,9 @@ export default function Home() {
   const reduce = useReducedMotion();
 
   return (
-    <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
+    <div className="min-h-screen max-w-[100vw] overflow-x-hidden bg-[#131313] text-[#e5e2e1] scan-line">
       <motion.header
-        className="fixed top-0 w-full z-50 border-b-2 border-[#353534] bg-[#131313]/90 backdrop-blur-md flex justify-between items-center px-4 md:px-6 py-4"
+        className="fixed top-0 left-0 right-0 z-50 max-w-[100vw] min-w-0 border-b-2 border-[#353534] bg-[#131313]/90 backdrop-blur-md flex justify-between items-center px-4 md:px-6 py-4"
         initial={reduce ? false : { y: -24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, ease: easeOut }}

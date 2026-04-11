@@ -222,57 +222,59 @@ export default function ClientsDetailClient({ id }: { id: string }) {
             No bids linked yet. Set <span className="text-[#e5e2e1]">client_id</span> on bids to associate them.
           </div>
         ) : (
-          <>
-            <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 text-[10px] text-[#a98a7d] font-bold uppercase border-b border-[#353534]">
-              <div className="col-span-2">Bid</div>
-              <div className="col-span-2">Status</div>
-              <div className="col-span-3">Property</div>
-              <div className="col-span-2 text-right">Amount</div>
-              <div className="col-span-3">Jobs</div>
+          <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x">
+            <div className="min-w-[680px]">
+              <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 text-[10px] text-[#a98a7d] font-bold uppercase border-b border-[#353534]">
+                <div className="col-span-2">Bid</div>
+                <div className="col-span-2">Status</div>
+                <div className="col-span-3">Property</div>
+                <div className="col-span-2 text-right">Amount</div>
+                <div className="col-span-3">Jobs</div>
+              </div>
+              {bids.map((b) => {
+                const linked = jobsByBid.get(b.id) ?? [];
+                return (
+                  <div
+                    key={b.id}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-3 border-b border-[#353534] hover:bg-[#2a2a2a]/50"
+                  >
+                    <div className="md:col-span-2 font-mono text-[#ffb693]">
+                      <Link href={`/bid/${b.id}`} className="hover:underline">
+                        {b.bid_number}
+                      </Link>
+                    </div>
+                    <div className="md:col-span-2">
+                      <span
+                        className={`border px-2 py-0.5 text-[10px] font-black uppercase ${
+                          STATUS_COLORS[b.status] || 'border-[#353534] text-[#a98a7d]'
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </div>
+                    <div className="md:col-span-3 text-sm truncate">{b.property_name || '—'}</div>
+                    <div className="md:col-span-2 text-right text-sm font-mono">{formatCurrency(Number(b.total_amount) || 0)}</div>
+                    <div className="md:col-span-3 text-xs">
+                      {linked.length === 0 ? (
+                        <span className="text-[#5a4136]">No job</span>
+                      ) : (
+                        <ul className="space-y-1">
+                          {linked.map((j) => (
+                            <li key={j.id}>
+                              <Link href={`/job/${j.id}`} className="text-[#13ff43] hover:underline">
+                                {j.title}
+                              </Link>
+                              <span className="text-[#5a4136] ml-1">({j.status})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {bids.map((b) => {
-              const linked = jobsByBid.get(b.id) ?? [];
-              return (
-                <div
-                  key={b.id}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-3 border-b border-[#353534] hover:bg-[#2a2a2a]/50"
-                >
-                  <div className="md:col-span-2 font-mono text-[#ffb693]">
-                    <Link href={`/bid/${b.id}`} className="hover:underline">
-                      {b.bid_number}
-                    </Link>
-                  </div>
-                  <div className="md:col-span-2">
-                    <span
-                      className={`border px-2 py-0.5 text-[10px] font-black uppercase ${
-                        STATUS_COLORS[b.status] || 'border-[#353534] text-[#a98a7d]'
-                      }`}
-                    >
-                      {b.status}
-                    </span>
-                  </div>
-                  <div className="md:col-span-3 text-sm truncate">{b.property_name || '—'}</div>
-                  <div className="md:col-span-2 text-right text-sm font-mono">{formatCurrency(Number(b.total_amount) || 0)}</div>
-                  <div className="md:col-span-3 text-xs">
-                    {linked.length === 0 ? (
-                      <span className="text-[#5a4136]">No job</span>
-                    ) : (
-                      <ul className="space-y-1">
-                        {linked.map((j) => (
-                          <li key={j.id}>
-                            <Link href={`/job/${j.id}`} className="text-[#13ff43] hover:underline">
-                              {j.title}
-                            </Link>
-                            <span className="text-[#5a4136] ml-1">({j.status})</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </>
+          </div>
         )}
       </div>
     </AppShell>

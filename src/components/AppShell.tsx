@@ -45,8 +45,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] min-h-screen bg-[#131313] text-[#e5e2e1] scan-line overflow-x-hidden">
-      <header className="fixed top-0 left-0 right-0 z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center min-h-16 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]">
-        <div className="flex items-center gap-4 md:gap-6">
+      <header className="fixed top-0 left-0 right-0 z-50 max-w-[100vw] min-w-0 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center min-h-16 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]">
+        <div className="flex items-center gap-2 sm:gap-4 md:gap-6 min-w-0 flex-1">
           <button
             className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -58,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
           </button>
           <SiteLogo />
-          <div className="hidden sm:flex flex-wrap gap-x-2 gap-y-1 md:gap-x-4 text-[10px] md:text-xs font-bold items-center max-w-[min(52vw,28rem)] lg:max-w-none justify-end">
+          <div className="hidden sm:flex flex-wrap gap-x-1.5 gap-y-1 md:gap-x-3 text-[10px] md:text-xs font-bold items-center min-w-0 max-w-[min(48vw,24rem)] lg:max-w-[min(56vw,36rem)] justify-end">
             {HEADER_NAV.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
@@ -127,9 +127,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="px-4 mb-6">
+        <div className="px-4 mb-4">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
+        </div>
+
+        <div className="px-4 mb-4">
+          <Link
+            href="/bids#new-bid"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block w-full text-center bg-[#FF6B00]/15 border border-[#FF6B00] text-[#ffb693] text-[10px] font-black uppercase tracking-widest py-2.5 hover:bg-[#FF6B00] hover:text-black transition-colors"
+          >
+            + New bid
+          </Link>
         </div>
 
         <div className="px-4 mb-3 md:hidden">
@@ -186,9 +196,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 max-w-[min(16rem,100vw)] border-r-2 border-[#353534] bg-[#131313] flex flex-col min-w-0 overflow-x-hidden pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-2 z-40 hidden md:flex">
-        <div className="px-4 mb-8">
+        <div className="px-4 mb-6">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
+        </div>
+
+        <div className="px-4 mb-4">
+          <Link
+            href="/bids#new-bid"
+            className="block w-full text-center bg-[#FF6B00]/15 border border-[#FF6B00] text-[#ffb693] text-[10px] font-black uppercase tracking-widest py-2.5 hover:bg-[#FF6B00] hover:text-black transition-colors"
+          >
+            + New bid
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden min-h-0 min-w-0 pr-0.5">

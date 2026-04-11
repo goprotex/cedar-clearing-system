@@ -148,7 +148,8 @@ export default function ClientsListClient() {
           </p>
         </div>
       ) : (
-        <div className="border-2 border-[#353534]">
+        <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x">
+        <div className="min-w-[640px] border-2 border-[#353534]">
           <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-[#2a2a2a] border-b border-[#353534] text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest">
             <div className="col-span-4">Name</div>
             <div className="col-span-3 hidden sm:block">Contact</div>
@@ -173,6 +174,7 @@ export default function ClientsListClient() {
               </div>
             </Link>
           ))}
+        </div>
         </div>
       )}
 

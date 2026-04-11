@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import type { UserAppPreferences } from '@/types/profile';
 import { isCompanyAdmin } from '@/lib/company-admin';
 
@@ -7,7 +7,7 @@ const PROFILE_ROLES = ['owner', 'manager', 'operator', 'crew_lead', 'viewer'] as
 
 export async function GET(req: Request) {
   const supabase = await createClient(req);
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase, req);
   if (authErr || !auth.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   const supabase = await createClient(req);
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  const { data: authData, error: authErr } = await getUserFromRequest(supabase, req);
   if (authErr || !authData.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

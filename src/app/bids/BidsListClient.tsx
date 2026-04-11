@@ -37,8 +37,11 @@ export default function BidsListClient() {
 
   return (
     <AppShell>
-      {/* Title Row */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+      {/* Title Row — anchor for /bids#new-bid + sidebar link; scroll-mt clears fixed header */}
+      <div
+        id="new-bid"
+        className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0 scroll-mt-[calc(5.5rem+env(safe-area-inset-top,0px))]"
+      >
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">ACTIVE_BIDS</h1>
           <p className="text-[#ffb693] text-[10px] sm:text-xs font-mono">
@@ -69,8 +72,9 @@ export default function BidsListClient() {
         </div>
       ) : (
         <>
-          {/* Desktop table */}
-          <div className="hidden md:block border-2 border-[#353534]">
+          {/* Desktop table — horizontal scroll so wide grids stay reachable (root uses overflow-x-hidden) */}
+          <div className="hidden md:block w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x">
+          <div className="min-w-[720px] border-2 border-[#353534]">
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-[#2a2a2a] border-b border-[#353534] text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest">
               <div className="col-span-2">BID_ID</div>
@@ -134,6 +138,7 @@ export default function BidsListClient() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
 
           {/* Mobile cards */}

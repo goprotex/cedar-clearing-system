@@ -158,7 +158,8 @@ export default function ArchiveClient() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block border-2 border-[#353534]">
+          <div className="hidden md:block w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x">
+          <div className="min-w-[720px] border-2 border-[#353534]">
             <div className="grid grid-cols-12 gap-4 px-4 py-2 bg-[#2a2a2a] border-b border-[#353534] text-[10px] text-[#a98a7d] font-bold uppercase tracking-widest">
               <div className="col-span-2">BID_ID</div>
               <div className="col-span-1">STATUS</div>
@@ -221,6 +222,7 @@ export default function ArchiveClient() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
 
           {/* Mobile cards */}
