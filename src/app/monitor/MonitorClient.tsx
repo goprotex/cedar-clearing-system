@@ -2,19 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import type { Bid } from '@/types';
+import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import type { LayerKey } from './MonitorMap';
 
-type BootstrapJob = {
-  id: string;
-  title: string;
-  status: string;
-  created_at: string;
-  bid_snapshot: Bid;
-  cedar_total_cells: number;
-  cedar_cleared_cells: number;
-};
+type BootstrapJob = ActiveJobSummary;
 
 type BootstrapResponse = {
   jobs: BootstrapJob[];
@@ -64,52 +56,36 @@ function pct(cleared: number, total: number) {
   return Math.max(0, Math.min(100, Math.round((cleared / total) * 100)));
 }
 
-function loadLocalJobs(): BootstrapJob[] {
-  if (typeof window === 'undefined') return [];
-  const results: BootstrapJob[] = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key?.startsWith('ccc_job_') || key.startsWith('ccc_job_bid_') || key.startsWith('ccc_job_events_') || key.startsWith('ccc_job_progress_')) continue;
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const job = JSON.parse(raw) as { id: string; bidId: string; title: string; status: string; createdAt: string; cedar_total_cells?: number; cedar_cleared_cells?: number };
-      if (!job.id || !job.bidId) continue;
-
-      // Load the bid snapshot for this job
-      const bidRaw = localStorage.getItem(`ccc_job_bid_${job.bidId}`);
-      if (!bidRaw) continue;
-      const bid: Bid = JSON.parse(bidRaw);
-      if (!bid.pastures?.length) continue;
-
-      let cedarTotal = 0;
-      for (const p of bid.pastures) {
-        for (const f of (p.cedarAnalysis?.gridCells?.features ?? [])) {
-          const cls = (f as { properties?: { classification?: string } }).properties?.classification;
-          if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') cedarTotal++;
-        }
-      }
-
-      results.push({
-        id: job.id,
-        title: job.title || `Job ${job.id}`,
-        status: job.status || 'active',
-        created_at: job.createdAt || new Date().toISOString(),
-        bid_snapshot: bid,
-        cedar_total_cells: cedarTotal,
-        cedar_cleared_cells: job.cedar_cleared_cells ?? 0,
-      });
-    }
-  } catch { /* localStorage may be unavailable */ }
-  return results;
-}
-
 export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscreen?: boolean } = {}) {
   const [jobs, setJobs] = useState<BootstrapJob[]>([]);
   const [clearedByJob, setClearedByJob] = useState<Record<string, Set<string>>>({});
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
+
+  // Optional TV layout: ?tv=1 or profile preference (signed-in)
+  useEffect(() => {
+    if (fullscreenProp) return;
+    try {
+      const tv = new URLSearchParams(window.location.search).get('tv');
+      if (tv === '1' || tv === 'true') setFullscreen(true);
+    } catch { /* ignore */ }
+  }, [fullscreenProp]);
+
+  useEffect(() => {
+    if (fullscreenProp) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = (await res.json()) as { profile?: { preferences?: { monitor_tv_default?: boolean } } | null };
+        if (cancelled) return;
+        if (data.profile?.preferences?.monitor_tv_default) setFullscreen(true);
+      } catch { /* not signed in or prefs missing */ }
+    })();
+    return () => { cancelled = true; };
+  }, [fullscreenProp]);
   const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
   const [trailsByJob, setTrailsByJob] = useState<Record<string, [number, number][]>>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
@@ -166,23 +142,24 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         if (cancelled) return;
 
         let remoteJobs = data.jobs ?? [];
+        const localStored = loadLocalStorageJobs();
+        if (localStored.length > 0) {
+          remoteJobs = mergeJobsById(remoteJobs, localStored);
+        } else if (remoteJobs.length === 0) {
+          remoteJobs = loadLocalStorageJobs();
+        }
         const next: Record<string, Set<string>> = {};
         for (const [jobId, cellIds] of Object.entries(data.cleared ?? {})) {
           next[jobId] = new Set(cellIds);
         }
         setOperatorsByJob(data.operators ?? {});
 
-        // If no remote jobs, load converted jobs from localStorage
-        if (remoteJobs.length === 0) {
-          remoteJobs = loadLocalJobs();
-        }
-
         setJobs(remoteJobs);
         setClearedByJob(next);
       } catch (e) {
         if (cancelled) return;
         // Fall back to local jobs
-        const localJobs = loadLocalJobs();
+        const localJobs = loadLocalStorageJobs();
         if (localJobs.length > 0) {
           setJobs(localJobs);
           setErr(null);

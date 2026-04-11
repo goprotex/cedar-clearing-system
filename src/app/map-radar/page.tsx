@@ -1,9 +1,6 @@
-import MapRadarClient from './MapRadarClient';
+import { redirect } from 'next/navigation';
 
-export const metadata = {
-  title: 'Map Radar — Cedar Hack',
-};
-
-export default function MapRadarPage() {
-  return <MapRadarClient />;
+/** Old standalone map + recon notes demo — use /operations instead. */
+export default function MapRadarRedirectPage() {
+  redirect('/operations');
 }
