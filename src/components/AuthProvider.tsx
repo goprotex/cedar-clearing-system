@@ -22,12 +22,21 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     const supabase = supabaseRef.current;
 
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      setEmail(data.session?.user?.email ?? null);
+      setLoading(false);
+    })();
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user?.email ?? null);
       setLoading(false);
     });
 
     return () => {
+      cancelled = true;
       sub?.subscription.unsubscribe();
     };
   }, []);

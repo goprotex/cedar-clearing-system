@@ -139,6 +139,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
   const lastPublishRef = useRef<number>(0);
+  const supabaseSessionRef = useRef(false);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
   const [state, setState] = useState<OperatorState>({
@@ -182,6 +183,20 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     })();
     return () => { cancelled = true; };
   }, [bidId]);
+
+  // Track Supabase session so we can publish GPS to job_operator_positions whenever the user is signed in
+  // (not only when shared cleared-cell sync succeeded).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const sb = createSupabaseBrowser();
+    void sb.auth.getSession().then(({ data }) => {
+      supabaseSessionRef.current = !!data.session;
+    });
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+      supabaseSessionRef.current = !!session;
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
 
   // Restore persisted trail from localStorage
   useEffect(() => {
@@ -622,7 +637,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         lng,
         lat,
         accuracy_m: stateRef.current.accuracy,
-        heading_deg: stateRef.current.heading,
+        heading: stateRef.current.heading,
         speed_mps: stateRef.current.speed,
         timestamp: now,
       };
@@ -639,11 +654,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         body: JSON.stringify({ ...posData, jobId, trailPoint: [lng, lat] }),
       }).catch(() => { /* best-effort */ });
 
-      // Also push to Supabase if authed
-      if (sharedEnabled) {
+      // Push to Supabase when signed in so scout monitor realtime works (shared progress is separate).
+      if (supabaseSessionRef.current) {
         void fetch(`/api/jobs/${jobId}/operator-positions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify(posData),
         }).catch(() => { /* best-effort */ });
       }

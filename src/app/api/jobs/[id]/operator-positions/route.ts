@@ -21,7 +21,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   const { data, error } = await supabase
     .from('job_operator_positions')
-    .select('job_id, user_id, updated_at, lng, lat, accuracy_m, heading_deg, speed_mps')
+    .select('job_id, user_id, updated_at, lng, lat, accuracy_m, heading, speed_mps')
     .eq('job_id', id)
     .order('updated_at', { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -57,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     lng: number;
     lat: number;
     accuracy_m: number | null;
+    heading: number | null;
     heading_deg: number | null;
     speed_mps: number | null;
   }> | null;
@@ -65,13 +66,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Missing lng/lat' }, { status: 400 });
   }
 
+  const heading =
+    typeof b.heading === 'number' ? b.heading
+      : typeof b.heading_deg === 'number' ? b.heading_deg : null;
+
   const { error: upsertErr } = await supabase.from('job_operator_positions').upsert({
     job_id: id,
     user_id: userId,
     lng: b.lng,
     lat: b.lat,
     accuracy_m: b.accuracy_m ?? null,
-    heading_deg: b.heading_deg ?? null,
+    heading,
     speed_mps: b.speed_mps ?? null,
   }, { onConflict: 'job_id,user_id' });
   if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 });

@@ -64,6 +64,16 @@ function pct(cleared: number, total: number) {
   return Math.max(0, Math.min(100, Math.round((cleared / total) * 100)));
 }
 
+/** Union remote + local jobs so signed-in users still see local-only converted jobs on the map. */
+function mergeJobsById(remote: BootstrapJob[], local: BootstrapJob[]): BootstrapJob[] {
+  const byId = new Map<string, BootstrapJob>();
+  for (const j of remote) byId.set(j.id, j);
+  for (const j of local) {
+    if (!byId.has(j.id)) byId.set(j.id, j);
+  }
+  return Array.from(byId.values());
+}
+
 function loadLocalJobs(): BootstrapJob[] {
   if (typeof window === 'undefined') return [];
   const results: BootstrapJob[] = [];
@@ -166,16 +176,17 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         if (cancelled) return;
 
         let remoteJobs = data.jobs ?? [];
+        const localStored = loadLocalJobs();
+        if (localStored.length > 0) {
+          remoteJobs = mergeJobsById(remoteJobs, localStored);
+        } else if (remoteJobs.length === 0) {
+          remoteJobs = loadLocalJobs();
+        }
         const next: Record<string, Set<string>> = {};
         for (const [jobId, cellIds] of Object.entries(data.cleared ?? {})) {
           next[jobId] = new Set(cellIds);
         }
         setOperatorsByJob(data.operators ?? {});
-
-        // If no remote jobs, load converted jobs from localStorage
-        if (remoteJobs.length === 0) {
-          remoteJobs = loadLocalJobs();
-        }
 
         setJobs(remoteJobs);
         setClearedByJob(next);
@@ -261,13 +272,14 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           try {
             const raw = localStorage.getItem(key);
             if (!raw) continue;
-            const pos = JSON.parse(raw) as { lng: number; lat: number; accuracy_m: number | null; heading_deg: number | null; speed_mps: number | null; timestamp: number };
+            const pos = JSON.parse(raw) as { lng: number; lat: number; accuracy_m: number | null; heading?: number | null; heading_deg?: number | null; speed_mps: number | null; timestamp: number };
             if (typeof pos.lng !== 'number' || typeof pos.lat !== 'number') continue;
             if (pos.timestamp && Date.now() - pos.timestamp > 5 * 60 * 1000) continue;
+            const heading = typeof pos.heading === 'number' ? pos.heading : pos.heading_deg ?? null;
             next[job.id] = [{
               user_id: 'operator',
               lng: pos.lng, lat: pos.lat,
-              heading: pos.heading_deg, speed_mps: pos.speed_mps, accuracy_m: pos.accuracy_m,
+              heading, speed_mps: pos.speed_mps, accuracy_m: pos.accuracy_m,
               updated_at: new Date(pos.timestamp).toISOString(),
             }];
             break;
