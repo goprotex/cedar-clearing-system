@@ -627,10 +627,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         timestamp: now,
       };
 
-      // Always write to localStorage so monitor can pick it up locally
+      // Always write to localStorage for same-device monitor
       try {
         localStorage.setItem(`ccc_operator_pos_${jobId}`, JSON.stringify(posData));
-      } catch { /* storage full — ignore */ }
+      } catch { /* storage full */ }
+
+      // Always publish to server-side store for cross-device monitor
+      void fetch('/api/local-operator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...posData, jobId, trailPoint: [lng, lat] }),
+      }).catch(() => { /* best-effort */ });
 
       // Also push to Supabase if authed
       if (sharedEnabled) {

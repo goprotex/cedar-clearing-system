@@ -201,36 +201,70 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobs]);
 
-  // Poll localStorage for operator positions (written by operate mode)
+  // Poll server-side API + localStorage for operator positions and trails
   useEffect(() => {
     if (!jobs.length) return;
-    const poll = () => {
+    let cancelled = false;
+
+    const poll = async () => {
+      const jobIds = jobs.map((j) => j.id);
       const next: typeof operatorsByJob = {};
+      const trails: Record<string, [number, number][]> = {};
+
+      // 1. Try server-side store (works cross-device)
+      try {
+        const res = await fetch(`/api/local-operator?jobIds=${jobIds.join(',')}`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json() as Record<string, { lng: number; lat: number; accuracy_m: number | null; heading_deg: number | null; speed_mps: number | null; timestamp: number; trail: [number, number][] }>;
+          for (const [jobId, pos] of Object.entries(data)) {
+            if (typeof pos.lng !== 'number' || typeof pos.lat !== 'number') continue;
+            if (pos.timestamp && Date.now() - pos.timestamp > 5 * 60 * 1000) continue;
+            next[jobId] = [{
+              user_id: 'operator',
+              lng: pos.lng, lat: pos.lat,
+              heading: pos.heading_deg, speed_mps: pos.speed_mps, accuracy_m: pos.accuracy_m,
+              updated_at: new Date(pos.timestamp).toISOString(),
+            }];
+            if (pos.trail?.length >= 2) trails[jobId] = pos.trail;
+          }
+        }
+      } catch { /* server may be unavailable */ }
+
+      // 2. Also check localStorage (same-device fallback)
       for (const job of jobs) {
+        if (next[job.id]) continue;
         const bidId = job.id.startsWith('job_') ? job.id.slice(4) : job.id;
-        // Check both job ID and bid ID keys
         for (const key of [`ccc_operator_pos_${job.id}`, `ccc_operator_pos_job_${bidId}`]) {
           try {
             const raw = localStorage.getItem(key);
             if (!raw) continue;
             const pos = JSON.parse(raw) as { lng: number; lat: number; accuracy_m: number | null; heading_deg: number | null; speed_mps: number | null; timestamp: number };
             if (typeof pos.lng !== 'number' || typeof pos.lat !== 'number') continue;
-            // Only show if position is recent (last 5 minutes)
             if (pos.timestamp && Date.now() - pos.timestamp > 5 * 60 * 1000) continue;
             next[job.id] = [{
               user_id: 'operator',
-              lng: pos.lng,
-              lat: pos.lat,
-              heading: pos.heading_deg,
-              speed_mps: pos.speed_mps,
-              accuracy_m: pos.accuracy_m,
+              lng: pos.lng, lat: pos.lat,
+              heading: pos.heading_deg, speed_mps: pos.speed_mps, accuracy_m: pos.accuracy_m,
               updated_at: new Date(pos.timestamp).toISOString(),
             }];
             break;
           } catch { /* ignore */ }
         }
+        // Trail from localStorage
+        if (!trails[job.id]) {
+          const bidId2 = job.id.startsWith('job_') ? job.id.slice(4) : job.id;
+          for (const key of [`ccc_operator_trail_${job.id}`, `ccc_operator_trail_job_${bidId2}`]) {
+            try {
+              const raw = localStorage.getItem(key);
+              if (!raw) continue;
+              const coords = JSON.parse(raw) as [number, number][];
+              if (Array.isArray(coords) && coords.length >= 2) { trails[job.id] = coords; break; }
+            } catch { /* ignore */ }
+          }
+        }
       }
-      // Merge with any existing Supabase-sourced operators
+
+      if (cancelled) return;
       setOperatorsByJob(prev => {
         const merged = { ...prev };
         for (const [jobId, ops] of Object.entries(next)) {
@@ -239,29 +273,12 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         }
         return merged;
       });
-
-      // Load operator trails
-      const trails: Record<string, [number, number][]> = {};
-      for (const job of jobs) {
-        const bidId = job.id.startsWith('job_') ? job.id.slice(4) : job.id;
-        for (const key of [`ccc_operator_trail_${job.id}`, `ccc_operator_trail_job_${bidId}`]) {
-          try {
-            const raw = localStorage.getItem(key);
-            if (!raw) continue;
-            const coords = JSON.parse(raw) as [number, number][];
-            if (Array.isArray(coords) && coords.length >= 2) {
-              trails[job.id] = coords;
-              break;
-            }
-          } catch { /* ignore */ }
-        }
-      }
       setTrailsByJob(trails);
     };
 
-    poll();
+    void poll();
     const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [jobs]);
 
   // Realtime: cleared cells
