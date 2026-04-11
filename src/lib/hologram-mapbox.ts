@@ -12,7 +12,8 @@ type Species = 'cedar' | 'oak' | 'mixed';
 const HOLO_COLORS: Record<Species, string> = {
   cedar: '#00ff66',
   oak: '#ffaa00',
-  mixed: '#22dd88',
+  // Same as cedar — mixed stands use the cedar silhouette in 3D operate mode.
+  mixed: '#00ff66',
 };
 
 const WALL_HEIGHT_M = 40;

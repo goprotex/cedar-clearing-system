@@ -1,7 +1,7 @@
 /**
  * Mapbox-native 3D tree stand-ins: fill-extrusion polygons on terrain (DEM).
- * Cedars use three stacked tapered cylinders (wide base → narrow top) to read
- * as conical juniper / eastern red cedar silhouettes; oak/mixed stay single volumes.
+ * Cedars and mixed brush use the same stacked tapered cylinders (conical cedar silhouette).
+ * Oak keeps a distinct shorter/wider volume for contrast when present.
  */
 import * as turf from '@turf/turf';
 import type { TreePosition } from '@/lib/cedar-tree-data';
@@ -52,8 +52,8 @@ export function treeFeaturesForMapboxExtrusion(
     const height = Math.max(2, Math.min(t.height || 8, 25));
 
     try {
-      if (t.species === 'cedar') {
-        // Stacked cone: three cylinders with decreasing radius (juniper / cedar silhouette).
+      if (t.species === 'cedar' || t.species === 'mixed') {
+        // Stacked cone: three cylinders with decreasing radius (cedar / juniper silhouette).
         let base = 0;
         for (const tier of CEDAR_TIERS) {
           const segH = height * tier.hFrac;
@@ -67,16 +67,6 @@ export function treeFeaturesForMapboxExtrusion(
         const r = Math.max(1.2, canopyR * 1.05);
         const h = Math.min(height * 0.72, 18);
         pushCylinder(features, t.lng, t.lat, r, 0, h, '#92400e', steps);
-      } else {
-        // Mixed brush: medium taper — two tiers
-        const h1 = height * 0.55;
-        const h2 = height * 0.45;
-        const r1 = Math.max(0.9, canopyR * 0.95);
-        const r2 = Math.max(0.55, canopyR * 0.55);
-        pushCylinder(features, t.lng, t.lat, r1, 0, h1, '#3f6212', steps);
-        if (features.length < MAX_FEATURES) {
-          pushCylinder(features, t.lng, t.lat, r2, h1, h2, '#4d7c0f', steps);
-        }
       }
     } catch {
       /* skip bad coords */

@@ -484,16 +484,15 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           loadWatch = null;
         }
         try {
-          if (!coarsePointer) {
-            try {
-              map.addSource('mapbox-dem', {
-                type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
-              });
-              map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
-              map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
-            } catch {
-              // terrain optional
-            }
+          // DEM on phones too so tree extrusions sit on terrain (no grid “chunk” prisms).
+          try {
+            map.addSource('mapbox-dem', {
+              type: 'raster-dem', url: 'mapbox://mapbox.mapbox-terrain-dem-v1', tileSize: 512, maxzoom: 14,
+            });
+            map.setTerrain({ source: 'mapbox-dem', exaggeration: coarsePointer ? 1.0 : 1.2 });
+            map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+          } catch {
+            /* terrain optional */
           }
 
           try {
@@ -609,75 +608,25 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
           map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
 
-          const allCedarFeatures: GeoJSON.Feature[] = [];
-          for (const p of bid.pastures) {
-            if (!p.cedarAnalysis?.gridCells?.features) continue;
-            p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
-              const cls = f.properties?.classification;
-              if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
-              const cellId = `${p.id}:${idx}`;
-              const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
-              allCedarFeatures.push({
-                ...f,
-                properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
-              });
-            });
-          }
-
-          map.addSource('cedar-cells', { type: 'geojson', data: { type: 'FeatureCollection', features: allCedarFeatures } });
-
-          if (coarsePointer) {
+          // Mapbox-native 3D trees only (no grid cell blocks — clearing still uses analysis grid in memory).
+          try {
+            const treeList = extractTreesFromAnalysis(bid.pastures);
+            const treeFc = treeFeaturesForMapboxExtrusion(treeList, { maxTrees: 2400, circleSteps: 12 });
+            map.addSource('operate-trees-3d', { type: 'geojson', data: treeFc });
             map.addLayer({
-              id: 'cedar-cells-fill-2d',
-              type: 'fill',
-              source: 'cedar-cells',
+              id: 'operate-trees-3d',
+              type: 'fill-extrusion',
+              source: 'operate-trees-3d',
               paint: {
-                'fill-color': ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']],
-                'fill-opacity': ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55],
+                'fill-extrusion-color': ['get', 'color'],
+                'fill-extrusion-height': ['get', 'height_m'],
+                'fill-extrusion-base': ['get', 'base_m'],
+                'fill-extrusion-opacity': 0.92,
               },
             });
-          } else {
-            map.addLayer({
-              id: 'cedar-cells-fill', type: 'fill-extrusion', source: 'cedar-cells',
-              paint: {
-                'fill-extrusion-color': ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']],
-                'fill-extrusion-opacity': 0.55,
-                'fill-extrusion-height': ['case', ['==', ['get', 'cleared'], 1], 0.5, 3],
-                'fill-extrusion-base': 0,
-              },
-            });
-
-            // Mapbox-native 3D tree stand-ins (fill-extrusion cylinders) — sit on terrain DEM, above cell prisms
-            if (map.getTerrain()) {
-              try {
-                const treeList = extractTreesFromAnalysis(bid.pastures);
-                const treeFc = treeFeaturesForMapboxExtrusion(treeList, { maxTrees: 2400, circleSteps: 12 });
-                map.addSource('operate-trees-3d', { type: 'geojson', data: treeFc });
-                map.addLayer({
-                  id: 'operate-trees-3d',
-                  type: 'fill-extrusion',
-                  source: 'operate-trees-3d',
-                  paint: {
-                    'fill-extrusion-color': ['get', 'color'],
-                    'fill-extrusion-height': ['get', 'height_m'],
-                    'fill-extrusion-base': ['get', 'base_m'],
-                    'fill-extrusion-opacity': 0.92,
-                  },
-                });
-              } catch {
-                /* optional */
-              }
-            }
+          } catch {
+            /* optional */
           }
-
-          map.addLayer({
-            id: 'cedar-cells-border', type: 'line', source: 'cedar-cells',
-            paint: {
-              'line-color': ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']],
-              'line-width': 0.5,
-              'line-opacity': 0.4,
-            },
-          });
 
           // Restore persisted trail if available
           const trailData = trailCoordsRef.current.length >= 2
@@ -754,18 +703,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(pointer: coarse)').matches;
 
-    const holoExpr: mapboxgl.Expression = [
-      'match',
-      ['get', 'classification'],
-      'cedar',
-      '#00ff41',
-      'oak',
-      '#ffaa00',
-      'mixed_brush',
-      '#22dd44',
-      '#00ff41',
-    ];
-
     const rasterKeys: { key: OperateLayerKey; id: string }[] = [
       { key: 'naip', id: 'naip-overlay' },
       { key: 'naipCIR', id: 'naip-cir-overlay' },
@@ -838,26 +775,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         map.setPaintProperty('pastures-label', 'text-color', '#00ff41');
       }
 
-      if (map.getLayer('cedar-cells-fill')) {
-        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-color', holoExpr);
-        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-opacity', 0.6);
-        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-height', [
-          'case',
-          ['==', ['get', 'cleared'], 1],
-          0.5,
-          6,
-        ]);
-      }
-      if (map.getLayer('cedar-cells-fill-2d')) {
-        map.setPaintProperty('cedar-cells-fill-2d', 'fill-color', holoExpr);
-        map.setPaintProperty('cedar-cells-fill-2d', 'fill-opacity', 0.7);
-      }
-      if (map.getLayer('cedar-cells-border')) {
-        map.setPaintProperty('cedar-cells-border', 'line-color', holoExpr);
-        map.setPaintProperty('cedar-cells-border', 'line-opacity', 0.9);
-        map.setPaintProperty('cedar-cells-border', 'line-width', 1.5);
-      }
-
       if (map.getLayer('operate-trees-3d')) {
         map.setLayoutProperty('operate-trees-3d', 'visibility', 'none');
       }
@@ -898,9 +815,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
 
       for (const layerId of [
-        'cedar-cells-fill',
-        'cedar-cells-fill-2d',
-        'cedar-cells-border',
         'holo-mask-fill',
         'pastures-fill',
         'pastures-border',
@@ -962,21 +876,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
       if (map.getLayer('pastures-label')) {
         map.setPaintProperty('pastures-label', 'text-color', '#00ff41');
-      }
-
-      if (map.getLayer('cedar-cells-fill')) {
-        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-color', ['case', ['==', ['get', 'cleared'], 1], '#333333', ['get', 'holoColor']]);
-        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-opacity', 0.55);
-        map.setPaintProperty('cedar-cells-fill', 'fill-extrusion-height', ['case', ['==', ['get', 'cleared'], 1], 0.5, 3]);
-      }
-      if (map.getLayer('cedar-cells-fill-2d')) {
-        map.setPaintProperty('cedar-cells-fill-2d', 'fill-color', ['case', ['==', ['get', 'cleared'], 1], '#1f1f1f', ['get', 'holoColor']]);
-        map.setPaintProperty('cedar-cells-fill-2d', 'fill-opacity', ['case', ['==', ['get', 'cleared'], 1], 0.2, 0.55]);
-      }
-      if (map.getLayer('cedar-cells-border')) {
-        map.setPaintProperty('cedar-cells-border', 'line-color', ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']]);
-        map.setPaintProperty('cedar-cells-border', 'line-opacity', 0.4);
-        map.setPaintProperty('cedar-cells-border', 'line-width', 0.5);
       }
 
       if (map.getLayer('operate-trees-3d')) {
@@ -1069,30 +968,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   }, [state.bid]);
 
   // Process GPS position — check cedar cells for clearing
-  const updateCedarSource = useCallback(() => {
-    const map = mapRef.current;
-    const bid = stateRef.current.bid;
-    if (!map || !map.isStyleLoaded() || !bid) return;
-
-    const source = map.getSource('cedar-cells') as mapboxgl.GeoJSONSource | undefined;
-    if (!source) return;
-
-    const features: GeoJSON.Feature[] = [];
-    for (const p of bid.pastures) {
-      if (!p.cedarAnalysis?.gridCells?.features) continue;
-      p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
-        const cls = f.properties?.classification;
-        if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
-        const cellId = `${p.id}:${idx}`;
-        const holoColor = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
-        features.push({
-          ...f,
-          properties: { ...f.properties, cellId, holoColor, cleared: stateRef.current.clearedCellIds.has(cellId) ? 1 : 0 },
-        });
-      });
-    }
-    source.setData({ type: 'FeatureCollection', features });
-  }, []);
+  /** Grid cell map layers removed; GPS clearing still uses cedar analysis in memory. */
+  const updateCedarSource = useCallback(() => {}, []);
 
   const processPosition = useCallback((lng: number, lat: number) => {
     const cells = cedarCellsRef.current;
