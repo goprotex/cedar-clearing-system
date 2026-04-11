@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { createClient, isSupabaseConfigured } from '@/utils/supabase/client';
 
 type AuthContextValue = {
   email: string | null;
@@ -16,11 +16,12 @@ export function useAuth() {
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const supabaseRef = useRef(createClient());
+  const [loading, setLoading] = useState(() => isSupabaseConfigured);
 
   useEffect(() => {
-    const supabase = supabaseRef.current;
+    if (!isSupabaseConfigured) return;
+
+    const supabase = createClient();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user?.email ?? null);

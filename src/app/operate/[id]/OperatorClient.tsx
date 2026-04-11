@@ -5,7 +5,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 import type { Bid } from '@/types';
-import { extractTreesFromAnalysis, TreeLayer3D, type TreePosition, type PastureWall } from '@/lib/tree-layer';
+import { HologramMapboxLayers, extractTreesFromAnalysis, type TreePosition } from '@/lib/hologram-mapbox';
+import type { PastureWall } from '@/lib/cedar-tree-data';
 import { treeFeaturesForMapboxExtrusion } from '@/lib/operate-mapbox-trees';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
@@ -153,7 +154,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     hologram: false,
   });
   const preHoloLayersRef = useRef<Pick<Record<OperateLayerKey, boolean>, 'naip' | 'naipCIR' | 'naipNDVI'> | null>(null);
-  const treeLayerRef = useRef<TreeLayer3D | null>(null);
+  const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
   const holoRotationRef = useRef<number | null>(null);
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -793,20 +794,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         map.setLayoutProperty('operate-trees-3d', 'visibility', 'none');
       }
 
-      if (coarsePointer && map.getLayer('3d-trees')) {
+      if (coarsePointer && treeLayerRef.current) {
         try {
-          map.removeLayer('3d-trees');
+          treeLayerRef.current.remove();
         } catch {
           /* ignore */
         }
         treeLayerRef.current = null;
-      } else if (!coarsePointer && !map.getLayer('3d-trees')) {
+      } else if (!coarsePointer && !treeLayerRef.current) {
         try {
-          const { center } = resolveOperatorView(bid);
-          const tl = new TreeLayer3D(center);
+          const tl = new HologramMapboxLayers(map);
           treeLayerRef.current = tl;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          map.addLayer(tl as any);
           const trees = extractTreesFromAnalysis(bid.pastures);
           if (trees.length > 0) tl.updateTrees(trees);
           const walls: PastureWall[] = bid.pastures
@@ -818,11 +816,11 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             }));
           tl.updatePolygonWalls(walls);
         } catch {
-          /* WebGL / custom layer optional */
+          /* optional */
         }
       }
 
-      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+      if (treeLayerRef.current && map.getLayer('holo-trees-extrusion')) {
         const tl = treeLayerRef.current;
         const trees = extractTreesFromAnalysis(bid.pastures);
         if (trees.length > 0) tl.updateTrees(trees);
@@ -917,9 +915,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         map.setLayoutProperty('operate-trees-3d', 'visibility', 'visible');
       }
 
-      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+      if (treeLayerRef.current) {
         try {
-          map.removeLayer('3d-trees');
+          treeLayerRef.current.remove();
         } catch {
           /* ignore */
         }

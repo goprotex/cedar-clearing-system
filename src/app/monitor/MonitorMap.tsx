@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Bid } from '@/types';
-import { extractTreesFromAnalysis } from '@/lib/tree-layer';
+import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
 
 type JobLike = {
   id: string;

@@ -4,7 +4,7 @@
  * as conical juniper / eastern red cedar silhouettes; oak/mixed stay single volumes.
  */
 import * as turf from '@turf/turf';
-import type { TreePosition } from '@/lib/tree-layer';
+import type { TreePosition } from '@/lib/cedar-tree-data';
 
 const DEFAULT_MAX = 4000;
 /** Cap GeoJSON features (cedars emit 3 tiers each). */

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Legacy duplicate app tree (not the active Next.js root)
+    "cedar-clearing-system/**",
   ]),
 ]);
 

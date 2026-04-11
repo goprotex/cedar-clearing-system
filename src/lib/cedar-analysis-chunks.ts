@@ -43,30 +43,80 @@ export function polygonAcreage(coords: Position[][]): number {
   return turf.area(turf.polygon(coords)) / 4047;
 }
 
+/**
+ * When a pasture fits in one TARGET_SAMPLES_PER_CHUNK but has >1 grid cell,
+ * split once so we always have ≥2 regions (resume checkpoints after each chunk).
+ */
+function splitPastureOnceForResume(poly: Feature<Polygon>): Position[][][] {
+  const bbox = turf.bbox(poly);
+  const [minX, minY, maxX, maxY] = bbox;
+  const w = maxX - minX;
+  const h = maxY - minY;
+  if (w < MIN_SPLIT_DEG && h < MIN_SPLIT_DEG) return [];
+
+  const splitVertical = w >= h;
+  let leftBox: Feature<Polygon>;
+  let rightBox: Feature<Polygon>;
+  if (splitVertical) {
+    const mid = (minX + maxX) / 2;
+    leftBox = turf.bboxPolygon([minX, minY, mid, maxY]);
+    rightBox = turf.bboxPolygon([mid, minY, maxX, maxY]);
+  } else {
+    const mid = (minY + maxY) / 2;
+    leftBox = turf.bboxPolygon([minX, minY, maxX, mid]);
+    rightBox = turf.bboxPolygon([minX, mid, maxX, maxY]);
+  }
+
+  const leftI = intersectPair(poly, leftBox);
+  const rightI = intersectPair(poly, rightBox);
+  const out: Position[][][] = [];
+  for (const piece of [leftI, rightI]) {
+    if (!piece) continue;
+    for (const expanded of expandToPolygonFeatures(piece)) {
+      out.push(expanded.geometry.coordinates);
+    }
+  }
+  return out.length >= 2 ? out : [];
+}
+
 export function getCedarAnalysisChunkPolygons(coords: Position[][]): Position[][][] {
   const poly = turf.polygon(coords);
   const areaM2 = turf.area(poly);
   const samples = estimateSampleCount(areaM2);
-  if (samples <= TARGET_SAMPLES_PER_CHUNK) {
+
+  // ~One 15 m cell — second chunk would be empty
+  if (samples <= 1) {
     return [coords];
   }
 
-  const features = splitRecursive(poly, 0);
-  const out: Position[][][] = [];
-  for (const f of features) {
-    const g = f.geometry;
-    if (g.type === 'Polygon') out.push(g.coordinates);
-    else {
-      for (const rings of g.coordinates) out.push(rings);
+  const targetMax = Math.min(TARGET_SAMPLES_PER_CHUNK, Math.max(1, Math.floor(samples / 2)));
+
+  let chunks: Position[][][];
+  if (samples <= targetMax) {
+    const forced = splitPastureOnceForResume(poly);
+    chunks = forced.length >= 2 ? forced : [coords];
+  } else {
+    const features = splitRecursiveWithBudget(poly, 0, targetMax);
+    const out: Position[][][] = [];
+    for (const f of features) {
+      for (const expanded of expandToPolygonFeatures(f)) {
+        out.push(expanded.geometry.coordinates);
+      }
     }
+    chunks = out.length > 0 ? out : [coords];
   }
-  return out.length > 0 ? out : [coords];
+
+  return chunks.length > 0 ? chunks : [coords];
 }
 
-function splitRecursive(poly: Feature<Polygon>, depth: number): Feature<Polygon | MultiPolygon>[] {
+function splitRecursiveWithBudget(
+  poly: Feature<Polygon>,
+  depth: number,
+  maxSamplesPerLeaf: number
+): Feature<Polygon | MultiPolygon>[] {
   const areaM2 = turf.area(poly);
   const samples = estimateSampleCount(areaM2);
-  if (samples <= TARGET_SAMPLES_PER_CHUNK || depth >= MAX_SPLIT_DEPTH) {
+  if (samples <= maxSamplesPerLeaf || depth >= MAX_SPLIT_DEPTH) {
     return [poly];
   }
 
@@ -99,7 +149,7 @@ function splitRecursive(poly: Feature<Polygon>, depth: number): Feature<Polygon 
   for (const piece of [leftI, rightI]) {
     if (!piece) continue;
     for (const expanded of expandToPolygonFeatures(piece)) {
-      next.push(...splitRecursive(expanded, depth + 1));
+      next.push(...splitRecursiveWithBudget(expanded, depth + 1, maxSamplesPerLeaf));
     }
   }
 

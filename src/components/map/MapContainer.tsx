@@ -7,8 +7,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
-import { TreeLayer3D, extractTreesFromAnalysis } from '@/lib/tree-layer';
-import type { PastureWall } from '@/lib/tree-layer';
+import { HologramMapboxLayers, extractTreesFromAnalysis } from '@/lib/hologram-mapbox';
+import type { PastureWall } from '@/lib/cedar-tree-data';
 import type { MarkedTree } from '@/types';
 
 const VEGETATION_COLORS: Record<string, string> = {
@@ -33,7 +33,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const lastFlyToPastureRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
-  const treeLayerRef = useRef<TreeLayer3D | null>(null);
+  const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -500,36 +500,26 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         map.setPaintProperty('pastures-labels', 'text-color', '#00ff41');
       }
 
-      // ── 3D tree layer (added first, then 2D hologram layers moved on top) ──
-      if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
-        if (treeLayerRef.current && !map.getLayer('3d-trees')) {
-          treeLayerRef.current = null;
-        }
-        if (!treeLayerRef.current) {
-          const treeLayer = new TreeLayer3D(currentBid.propertyCenter);
-          treeLayerRef.current = treeLayer;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          map.addLayer(treeLayer as any);
-        }
+      // Mapbox fill-extrusion trees on terrain (no Three.js custom layer)
+      if (!treeLayerRef.current) {
+        treeLayerRef.current = new HologramMapboxLayers(map);
       }
 
       const tl = treeLayerRef.current;
-      if (tl) {
-        const trees = extractTreesFromAnalysis(currentBid.pastures);
-        if (trees.length > 0) tl.updateTrees(trees);
+      const trees = extractTreesFromAnalysis(currentBid.pastures);
+      tl.updateTrees(trees);
 
-        const walls: PastureWall[] = currentBid.pastures
-          .filter(p => p.polygon.geometry.coordinates.length > 0)
-          .map(p => ({
-            id: p.id,
-            coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
-            color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
-          }));
-        tl.updatePolygonWalls(walls);
+      const walls: PastureWall[] = currentBid.pastures
+        .filter((p) => p.polygon.geometry.coordinates.length > 0)
+        .map((p) => ({
+          id: p.id,
+          coordinates: p.polygon.geometry.coordinates[0] as [number, number][],
+          color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
+        }));
+      tl.updatePolygonWalls(walls);
 
-        for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
-          tl.setSpeciesVisible(sp, speciesVisible[sp]);
-        }
+      for (const sp of ['cedar', 'oak', 'mixed'] as Species[]) {
+        tl.setSpeciesVisible(sp, speciesVisible[sp]);
       }
 
       // Move 2D hologram layers above the 3D tree layer so they render on top
@@ -556,9 +546,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         rotationFrameRef.current = null;
       }
 
-      // Remove 3D tree layer
-      if (treeLayerRef.current && map.getLayer('3d-trees')) {
-        map.removeLayer('3d-trees');
+      if (treeLayerRef.current) {
+        treeLayerRef.current.remove();
         treeLayerRef.current = null;
       }
 

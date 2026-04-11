@@ -1,4 +1,5 @@
 import type { CedarAnalysis, CedarAnalysisSummary, CedarVegClass, TileConsensusStats } from '@/types';
+import { TARGET_SAMPLES_PER_CHUNK } from '@/lib/cedar-analysis-chunks';
 
 function roundCoord(n: number): number {
   return Math.round(n * 1e5) / 1e5;
@@ -130,6 +131,10 @@ export function mergeCedarAnalyses(parts: CedarAnalysis[], pastureAcreage: numbe
     lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
     sentinelFusion: base0.sentinelFusion,
     tileConsensus: sumTileConsensus(parts),
+    chunkedRun:
+      parts.length > 1
+        ? { chunkCount: parts.length, maxSamplesPerChunk: TARGET_SAMPLES_PER_CHUNK }
+        : undefined,
   };
 
   return {

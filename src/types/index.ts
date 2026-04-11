@@ -116,6 +116,11 @@ export interface TileConsensusStats {
   consensusImprovedPct: number;
 }
 
+export interface CedarChunkRunStats {
+  chunkCount: number;
+  maxSamplesPerChunk: number;
+}
+
 export interface CedarAnalysisSummary {
   totalSamples: number;
   cedar: CedarClassCount;
@@ -146,6 +151,8 @@ export interface CedarAnalysisSummary {
     winterSceneId?: string;
     summerSceneId?: string;
   };
+  /** Present when analysis was split into multiple API requests and merged client-side. */
+  chunkedRun?: CedarChunkRunStats;
 }
 
 export interface CedarAnalysis {

@@ -383,6 +383,11 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                   {pasture.cedarAnalysis.summary.sentinelFusion.summerDate ?? '—'} ({pasture.cedarAnalysis.summary.sentinelFusion.pairedSamples} subsample points)
                 </div>
               )}
+              {pasture.cedarAnalysis.summary.chunkedRun && (
+                <div className="text-[10px] text-muted-foreground">
+                  Analyzed in {pasture.cedarAnalysis.summary.chunkedRun.chunkCount} regions (≤{pasture.cedarAnalysis.summary.chunkedRun.maxSamplesPerChunk.toLocaleString()} samples each), merged for full pasture
+                </div>
+              )}
             </div>
 
             <div className="text-center">
