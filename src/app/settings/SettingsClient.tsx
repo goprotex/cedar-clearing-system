@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import type { UserAppPreferences } from '@/types/profile';
-import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/components/AuthProvider';
+import { createClient, isSupabaseConfigured } from '@/utils/supabase/client';
 import { fetchApiAuthed } from '@/lib/auth-client';
 
 type SettingsPayload = {
@@ -22,6 +23,7 @@ type SettingsPayload = {
 };
 
 export default function SettingsClient() {
+  const { email: authEmail, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -84,8 +86,26 @@ export default function SettingsClient() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!isSupabaseConfigured) {
+      void load();
+      return;
+    }
+    if (!authEmail) {
+      setLoading(false);
+      setEmail(null);
+      setFullName('');
+      setPhone('');
+      setRole('operator');
+      setCompanyName(null);
+      setAvatarUrl(null);
+      setCanEditOwnRole(false);
+      setMonitorTv(false);
+      setErr(null);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [authLoading, authEmail, load]);
 
   const save = async () => {
     setSaving(true);
@@ -169,11 +189,11 @@ export default function SettingsClient() {
         </div>
       </div>
 
-      {loading && (
+      {(loading || authLoading) && (
         <div className="text-xs font-mono text-[#5a4136] py-8">LOADING…</div>
       )}
 
-      {!loading && !email && (
+      {!loading && !authLoading && !email && (
         <div className="border-2 border-[#353534] p-6 max-w-lg space-y-4">
           <p className="text-sm text-[#a98a7d]">Sign in to edit your profile and app preferences.</p>
           <Link
@@ -185,7 +205,7 @@ export default function SettingsClient() {
         </div>
       )}
 
-      {!loading && email && (
+      {!loading && !authLoading && email && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
           <section className="border-2 border-[#353534] p-5 space-y-4">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">Profile</h2>

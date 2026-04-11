@@ -5,8 +5,8 @@ import { isCompanyAdmin } from '@/lib/company-admin';
 
 const PROFILE_ROLES = ['owner', 'manager', 'operator', 'crew_lead', 'viewer'] as const;
 
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(req: Request) {
+  const supabase = await createClient(req);
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -44,7 +44,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const { data: authData, error: authErr } = await supabase.auth.getUser();
   if (authErr || !authData.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -5,13 +5,15 @@ import { cookies, headers } from "next/headers";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
-export async function createClient() {
+export async function createClient(request?: Request) {
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Supabase env vars missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY.');
   }
 
+  const bearerFromRequest = request?.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
   const headersList = await headers();
-  const bearer = headersList.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const bearerFromNext = headersList.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const bearer = bearerFromRequest ?? bearerFromNext;
   if (bearer) {
     return createSupabaseJsClient(supabaseUrl, supabaseKey, {
       auth: { persistSession: false, autoRefreshToken: false },

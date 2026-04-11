@@ -24,13 +24,18 @@ function withBearer(init: RequestInit | undefined, accessToken: string | undefin
  */
 export async function fetchApiAuthed(url: string, init?: RequestInit): Promise<Response> {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  let { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (!error && data.session) session = data.session;
+  }
   const token = session?.access_token;
 
   let res = await fetch(url, withBearer(init, token));
   if (res.status === 401) {
     await syncAuthSessionToCookies();
-    const { data: { session: s2 } } = await supabase.auth.getSession();
+    const { data: r, error: refErr } = await supabase.auth.refreshSession();
+    const s2 = !refErr && r.session ? r.session : (await supabase.auth.getSession()).data.session;
     res = await fetch(url, withBearer(init, s2?.access_token));
   }
   return res;
