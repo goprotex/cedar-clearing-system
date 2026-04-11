@@ -245,7 +245,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     }
 
     // 3D terrain — exaggeration 2x
-    if (layers.terrain3d && !layers.hologram) {
+    if (layers.terrain3d) {
       try {
         map.setTerrain({ source: 'mapbox-dem', exaggeration: 2.0 });
         if (!map.getLayer('sky')) {

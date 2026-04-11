@@ -118,16 +118,13 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           next.naipNDVI = false;
         }
       }
-      // Hologram on → disable terrain (they conflict), enable cedar + NDVI
+      // Hologram on → enable cedar + NDVI
       if (key === 'hologram' && !prev.hologram) {
-        next.terrain3d = false;
         next.cedarAI = true;
         next.naipNDVI = true;
         next.naip = false;
         next.naipCIR = false;
       }
-      // Block terrain while hologram active
-      if (key === 'terrain3d' && prev.hologram) return prev;
       next[key] = !prev[key];
       return next;
     });
