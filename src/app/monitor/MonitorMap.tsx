@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Bid } from '@/types';
+import { TreeLayer3D, extractTreesFromAnalysis, type PastureWall } from '@/lib/tree-layer';
 
 type JobLike = {
   id: string;
@@ -39,6 +40,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
   const popupRef = useRef<mapboxgl.Popup | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const rotationRef = useRef<number | null>(null);
+  const treeLayerRef = useRef<TreeLayer3D | null>(null);
 
   // ── Create map once ──
   useEffect(() => {
@@ -108,7 +110,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.addSource('monitor-pastures', { type: 'geojson', data: fc([]) });
       map.addLayer({ id: 'monitor-pastures-fill', type: 'fill', source: 'monitor-pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.08 } });
       map.addLayer({ id: 'monitor-pastures-border', type: 'line', source: 'monitor-pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-opacity': 0.8, 'line-dasharray': [2, 1] } });
-      map.addLayer({ id: 'monitor-pastures-label', type: 'symbol', source: 'monitor-pastures', layout: { 'text-field': ['concat', ['get', 'name'], '\n', ['get', 'acreLabel']], 'text-size': 13, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-anchor': 'center' }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
+      map.addLayer({ id: 'monitor-pastures-label', type: 'symbol', source: 'monitor-pastures', layout: { 'text-field': ['concat', ['get', 'jobTitle'], '\n', ['get', 'name'], ' — ', ['get', 'acreLabel']], 'text-size': 13, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-anchor': 'center' }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
 
       // Click handlers
       map.on('click', 'monitor-pastures-fill', (e) => {
@@ -137,6 +139,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       popupRef.current?.remove();
       for (const m of operatorMarkersRef.current.values()) m.remove();
       operatorMarkersRef.current.clear();
+      treeLayerRef.current = null;
       map.remove();
       mapRef.current = null;
       setMapLoaded(false);
@@ -179,7 +182,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
         // Pasture polygon
         const ring = p.polygon?.geometry?.coordinates?.[0];
         if (ring && ring.length >= 3) {
-          pastureFeats.push({ type: 'Feature', geometry: p.polygon.geometry, properties: { jobId: job.id, pastureId: p.id, name: p.name, acreLabel: `${p.acreage ?? 0} ac`, cedarTotal, cedarCleared } } as GeoJSON.Feature);
+          pastureFeats.push({ type: 'Feature', geometry: p.polygon.geometry, properties: { jobId: job.id, jobTitle: job.title ?? '', pastureId: p.id, name: p.name, acreLabel: `${p.acreage ?? 0} ac`, cedarTotal, cedarCleared } } as GeoJSON.Feature);
           for (const c of ring) {
             if (Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
               bounds.extend(c as [number, number]);
@@ -413,6 +416,95 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.off('wheel', pause);
     };
   }, [layers.hologram, mapLoaded]);
+
+  // ── 3D holographic trees: add/remove/update when hologram toggles or data changes ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    if (!layers.hologram) {
+      // Remove tree layer when hologram is off
+      if (treeLayerRef.current && map.getLayer('3d-trees')) {
+        try { map.removeLayer('3d-trees'); } catch {}
+        treeLayerRef.current = null;
+      }
+      return;
+    }
+
+    // Compute center from all pastures for the tree layer origin
+    let originLng = -99.14, originLat = 30.05;
+    for (const job of jobs) {
+      for (const p of job.bid_snapshot?.pastures ?? []) {
+        if (p.centroid && Array.isArray(p.centroid) && p.centroid.length >= 2) {
+          originLng = p.centroid[0];
+          originLat = p.centroid[1];
+          break;
+        }
+      }
+      if (originLng !== -99.14) break;
+    }
+
+    // Create tree layer if needed
+    if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
+      if (treeLayerRef.current && !map.getLayer('3d-trees')) treeLayerRef.current = null;
+      if (!treeLayerRef.current) {
+        const tl = new TreeLayer3D([originLng, originLat]);
+        treeLayerRef.current = tl;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          map.addLayer(tl as any);
+        } catch { treeLayerRef.current = null; return; }
+      }
+    }
+
+    const tl = treeLayerRef.current;
+    if (!tl) return;
+
+    // Collect all cleared cell IDs across all jobs
+    const allCleared = new Set<string>();
+    for (const job of jobs) {
+      const cleared = clearedByJob[job.id];
+      if (cleared) for (const id of cleared) allCleared.add(id);
+    }
+
+    // Extract trees but EXCLUDE trees from cleared cells
+    // extractTreesFromAnalysis takes pastures — we filter gridCells first
+    const filteredPastures: Array<{ cedarAnalysis: any; density: string }> = [];
+    for (const job of jobs) {
+      const bid = job.bid_snapshot;
+      if (!bid?.pastures) continue;
+      for (const p of bid.pastures) {
+        if (!p.cedarAnalysis?.gridCells?.features) continue;
+        const filteredFeats = p.cedarAnalysis.gridCells.features.filter((_: any, idx: number) => {
+          const cellId = `${p.id}:${idx}`;
+          return !allCleared.has(cellId);
+        });
+        filteredPastures.push({
+          cedarAnalysis: { gridCells: { ...p.cedarAnalysis.gridCells, features: filteredFeats }, summary: p.cedarAnalysis.summary },
+          density: p.density,
+        });
+      }
+    }
+
+    const trees = extractTreesFromAnalysis(filteredPastures as any);
+    if (trees.length > 0) tl.updateTrees(trees);
+
+    // Pasture walls
+    const walls: PastureWall[] = [];
+    for (const job of jobs) {
+      for (const p of job.bid_snapshot?.pastures ?? []) {
+        const ring = p.polygon?.geometry?.coordinates?.[0];
+        if (!ring || ring.length < 3) continue;
+        walls.push({ id: p.id, coordinates: ring as [number, number][], color: '#00ff41' });
+      }
+    }
+    tl.updatePolygonWalls(walls);
+
+    // Move cedar/pasture 2D layers above 3D trees
+    for (const layerId of ['monitor-cedar-fill', 'monitor-cedar-border', 'holo-mask-fill', 'monitor-pastures-fill', 'monitor-pastures-border', 'monitor-pastures-label']) {
+      if (map.getLayer(layerId)) try { map.moveLayer(layerId); } catch {}
+    }
+  }, [layers.hologram, mapLoaded, jobs, clearedByJob]);
 
   // ── Operator markers ──
   useEffect(() => {
