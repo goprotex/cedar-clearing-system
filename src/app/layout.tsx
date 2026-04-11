@@ -30,7 +30,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} dark h-full antialiased overflow-x-hidden`}
+      className={`${spaceGrotesk.variable} dark h-full antialiased scroll-smooth overflow-x-hidden`}
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-space-grotesk)] bg-[#131313] text-[#e5e2e1] overflow-x-hidden">
         <AuthProvider>
