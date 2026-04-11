@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Bid } from '@/types';
+import { extractTreesFromAnalysis } from '@/lib/tree-layer';
 
 type JobLike = {
   id: string;
@@ -433,64 +434,107 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     src.setData(fc(features));
   }, [trailsByJob, mapLoaded]);
 
-  // ── Hologram 3D cedar extrusions: terrain-following fill-extrusion layer ──
-  // Uses Mapbox native fill-extrusion which follows 3D terrain contours.
-  // Cleared cells get 0 height (disappear). Uncleared cells extrude to tree height.
+  // ── Hologram 3D trees: individual canopy extrusions that follow terrain ──
+  // Each tree from extractTreesFromAnalysis gets a small hexagon polygon
+  // extruded to its height. Cleared cells' trees are excluded entirely.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    const extId = 'holo-cedar-extrusion';
+    const SRC = 'holo-tree-src';
+    const CANOPY = 'holo-tree-canopy';
+    const TRUNK = 'holo-tree-trunk';
 
     if (!layers.hologram) {
-      if (map.getLayer(extId)) { try { map.removeLayer(extId); } catch {} }
-      if (map.getSource('holo-cedar-ext-src')) { try { map.removeSource('holo-cedar-ext-src'); } catch {} }
+      for (const id of [CANOPY, TRUNK]) { if (map.getLayer(id)) try { map.removeLayer(id); } catch {} }
+      if (map.getSource(SRC)) try { map.removeSource(SRC); } catch {}
       return;
     }
 
-    // Build extrusion features — only uncleared cells
+    // Collect cleared cells
     const allCleared = new Set<string>();
     for (const job of jobs) {
       const cleared = clearedByJob[job.id];
       if (cleared) for (const id of cleared) allCleared.add(id);
     }
 
-    const feats: GeoJSON.Feature[] = [];
+    // Filter out cleared cells, then extract tree positions
+    const filteredPastures: Array<{ cedarAnalysis: any; density: string }> = [];
     for (const job of jobs) {
       const bid = job.bid_snapshot;
       if (!bid?.pastures) continue;
       for (const p of bid.pastures) {
-        const gridFeats = p.cedarAnalysis?.gridCells?.features ?? [];
-        gridFeats.forEach((f: any, idx: number) => {
-          const cls = f?.properties?.classification;
-          if (cls !== 'cedar' && cls !== 'oak' && cls !== 'mixed_brush') return;
-          const cellId = `${p.id}:${idx}`;
-          const isCleared = allCleared.has(cellId);
-          const color = cls === 'cedar' ? '#00ff41' : cls === 'oak' ? '#ffaa00' : '#22dd44';
-          const ndvi = (f?.properties?.ndvi as number) ?? 0.3;
-          const height = isCleared ? 0 : Math.max(2, ndvi * 15);
-          feats.push({
-            ...(f as GeoJSON.Feature),
-            properties: { ...f.properties, holoColor: color, extHeight: height, cleared: isCleared ? 1 : 0 },
-          });
+        if (!p.cedarAnalysis?.gridCells?.features) continue;
+        const kept = p.cedarAnalysis.gridCells.features.filter((_: any, idx: number) => !allCleared.has(`${p.id}:${idx}`));
+        filteredPastures.push({
+          cedarAnalysis: { gridCells: { ...p.cedarAnalysis.gridCells, features: kept }, summary: p.cedarAnalysis.summary },
+          density: p.density,
         });
       }
     }
 
-    // Remove old and rebuild
-    if (map.getLayer(extId)) { try { map.removeLayer(extId); } catch {} }
-    if (map.getSource('holo-cedar-ext-src')) { try { map.removeSource('holo-cedar-ext-src'); } catch {} }
+    const trees = extractTreesFromAnalysis(filteredPastures as any);
 
-    map.addSource('holo-cedar-ext-src', { type: 'geojson', data: fc(feats) });
+    // Build hexagon canopy polygons for each tree
+    const feats: GeoJSON.Feature[] = [];
+    const mPerDegLat = 111320;
+    for (const t of trees) {
+      const radiusM = t.canopyDiameter / 2;
+      const radiusDegLat = radiusM / mPerDegLat;
+      const radiusDegLng = radiusM / (mPerDegLat * Math.cos((t.lat * Math.PI) / 180));
+      const color = t.species === 'cedar' ? '#00ff41' : t.species === 'oak' ? '#ffaa00' : '#22dd44';
+
+      // 6-sided polygon (hexagon) for canopy
+      const sides = 6;
+      const ring: [number, number][] = [];
+      for (let i = 0; i <= sides; i++) {
+        const angle = (i * 2 * Math.PI) / sides;
+        ring.push([
+          t.lng + Math.cos(angle) * radiusDegLng,
+          t.lat + Math.sin(angle) * radiusDegLat,
+        ]);
+      }
+
+      feats.push({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [ring] },
+        properties: {
+          color,
+          height: t.height,
+          trunkTop: t.species === 'oak' ? t.height * 0.4 : t.height * 0.15,
+        },
+      });
+    }
+
+    // Remove old layers/source
+    for (const id of [CANOPY, TRUNK]) { if (map.getLayer(id)) try { map.removeLayer(id); } catch {} }
+    if (map.getSource(SRC)) try { map.removeSource(SRC); } catch {}
+
+    map.addSource(SRC, { type: 'geojson', data: fc(feats) });
+
+    // Trunk: short extrusion from ground to canopy base
     map.addLayer({
-      id: extId,
+      id: TRUNK,
       type: 'fill-extrusion',
-      source: 'holo-cedar-ext-src',
+      source: SRC,
       paint: {
-        'fill-extrusion-color': ['get', 'holoColor'],
-        'fill-extrusion-opacity': 0.7,
-        'fill-extrusion-height': ['get', 'extHeight'],
+        'fill-extrusion-color': ['get', 'color'],
+        'fill-extrusion-opacity': 0.3,
+        'fill-extrusion-height': ['get', 'trunkTop'],
         'fill-extrusion-base': 0,
+      },
+    });
+
+    // Canopy: extrusion from trunk top to full height
+    map.addLayer({
+      id: CANOPY,
+      type: 'fill-extrusion',
+      source: SRC,
+      paint: {
+        'fill-extrusion-color': ['get', 'color'],
+        'fill-extrusion-opacity': 0.65,
+        'fill-extrusion-height': ['get', 'height'],
+        'fill-extrusion-base': ['get', 'trunkTop'],
       },
     });
 
