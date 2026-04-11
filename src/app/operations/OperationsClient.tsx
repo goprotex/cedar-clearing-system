@@ -76,8 +76,11 @@ export default function OperationsClient() {
           <h1 className="text-4xl font-black uppercase tracking-tighter">OPERATIONS</h1>
           <p className="text-[#a98a7d] text-xs font-mono mt-1">ACTIVE_JOBS // CREW // PREFERENCES</p>
         </div>
-        <div className="text-right text-[10px] font-mono text-[#a98a7d]">
+        <div className="text-right text-[10px] font-mono text-[#a98a7d] flex flex-col items-end gap-1">
           {authLoading ? 'AUTH…' : email ? <span className="text-[#13ff43] truncate max-w-[220px] inline-block align-bottom" title={email}>SIGNED_IN</span> : <span>LOCAL_ONLY</span>}
+          <Link href="/dashboard" className="text-[#FF6B00] hover:underline">
+            Team / roles
+          </Link>
         </div>
       </div>
 

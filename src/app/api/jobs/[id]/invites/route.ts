@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { generateInviteToken, hashInviteToken } from '@/lib/invite-token';
+import { canManageJobMembers } from '@/lib/job-members-admin';
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -19,14 +20,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: me, error: meErr } = await supabase
-    .from('job_members')
-    .select('role')
-    .eq('job_id', jobId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (meErr) return NextResponse.json({ error: meErr.message }, { status: 500 });
-  if (!me || me.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!(await canManageJobMembers(supabase, jobId, userId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   let body: { email?: string; role?: string };
   try {
@@ -79,14 +75,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: me, error: meErr } = await supabase
-    .from('job_members')
-    .select('role')
-    .eq('job_id', jobId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (meErr) return NextResponse.json({ error: meErr.message }, { status: 500 });
-  if (!me || me.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!(await canManageJobMembers(supabase, jobId, userId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   let inviteId: string | undefined;
   try {

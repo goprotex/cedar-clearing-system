@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
   { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
+  { href: '/dashboard', label: 'TEAM', icon: '👥' },
   { href: '/operations', label: 'OPERATIONS', icon: '📟' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
 const HEADER_NAV = [
   { href: '/bids', label: 'ESTIMATOR' },
   { href: '/monitor', label: 'MONITOR' },
+  { href: '/dashboard', label: 'TEAM' },
   { href: '/fleet', label: 'FLEET' },
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },

@@ -4,15 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import type { UserAppPreferences } from '@/types/profile';
+import { createClient } from '@/utils/supabase/client';
 
 type SettingsPayload = {
   email: string | null;
+  can_edit_own_role?: boolean;
   profile: {
     full_name: string;
     role: string;
     phone: string | null;
     company_id: string | null;
     company_name: string | null;
+    avatar_url: string | null;
     preferences: UserAppPreferences;
   } | null;
 };
@@ -28,6 +31,12 @@ export default function SettingsClient() {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('operator');
   const [companyName, setCompanyName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [canEditOwnRole, setCanEditOwnRole] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [monitorTv, setMonitorTv] = useState(false);
 
   const load = useCallback(async () => {
@@ -41,23 +50,29 @@ export default function SettingsClient() {
         setPhone('');
         setRole('operator');
         setCompanyName(null);
+        setAvatarUrl(null);
+        setCanEditOwnRole(false);
         setMonitorTv(false);
         return;
       }
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as SettingsPayload;
       setEmail(data.email);
+      setCanEditOwnRole(Boolean(data.can_edit_own_role));
+      setNewEmail(data.email ?? '');
       if (data.profile) {
         setFullName(data.profile.full_name ?? '');
         setPhone(data.profile.phone ?? '');
         setRole(data.profile.role ?? 'operator');
         setCompanyName(data.profile.company_name);
+        setAvatarUrl(data.profile.avatar_url ?? null);
         setMonitorTv(Boolean(data.profile.preferences?.monitor_tv_default));
       } else {
         setFullName('');
         setPhone('');
         setRole('operator');
         setCompanyName(null);
+        setAvatarUrl(null);
         setMonitorTv(false);
       }
     } catch (e) {
@@ -76,6 +91,20 @@ export default function SettingsClient() {
     setErr(null);
     setSaved(false);
     try {
+      const supabase = createClient();
+      if (newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) throw new Error('Passwords do not match');
+        if (newPassword.length < 8) throw new Error('Password must be at least 8 characters');
+        const { error: pwErr } = await supabase.auth.updateUser({ password: newPassword });
+        if (pwErr) throw new Error(pwErr.message);
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+      if (newEmail.trim() && newEmail.trim().toLowerCase() !== (email ?? '').toLowerCase()) {
+        const { error: emErr } = await supabase.auth.updateUser({ email: newEmail.trim() });
+        if (emErr) throw new Error(emErr.message);
+      }
+
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         credentials: 'same-origin',
@@ -83,7 +112,8 @@ export default function SettingsClient() {
         body: JSON.stringify({
           full_name: fullName,
           phone: phone.trim() || null,
-          role,
+          ...(canEditOwnRole ? { role } : {}),
+          avatar_url: avatarUrl,
           preferences: { monitor_tv_default: monitorTv },
         }),
       });
@@ -98,6 +128,30 @@ export default function SettingsClient() {
     }
   };
 
+  const uploadAvatar = async (file: File) => {
+    setAvatarUploading(true);
+    setErr(null);
+    try {
+      const supabase = createClient();
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) throw new Error('Not signed in');
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `${uid}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg',
+      });
+      if (upErr) throw new Error(upErr.message);
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      setAvatarUrl(pub.publicUrl);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   return (
     <AppShell>
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-4 mb-8">
@@ -105,9 +159,14 @@ export default function SettingsClient() {
           <h1 className="text-4xl font-black uppercase tracking-tighter">SETTINGS</h1>
           <p className="text-[#a98a7d] text-xs font-mono mt-1">PROFILE // APP // ACCOUNT</p>
         </div>
-        <Link href="/operations" className="text-[10px] font-mono text-[#FF6B00] hover:underline">
-          ← Operations
-        </Link>
+        <div className="flex flex-wrap gap-4 text-[10px] font-mono">
+          <Link href="/dashboard" className="text-[#13ff43] hover:underline">
+            Employee dashboard
+          </Link>
+          <Link href="/operations" className="text-[#FF6B00] hover:underline">
+            ← Operations
+          </Link>
+        </div>
       </div>
 
       {loading && (
@@ -131,8 +190,42 @@ export default function SettingsClient() {
           <section className="border-2 border-[#353534] p-5 space-y-4">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">Profile</h2>
             <div>
-              <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Email</label>
-              <div className="text-sm font-mono text-[#e5e2e1]">{email}</div>
+              <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Profile photo</label>
+              <div className="flex items-center gap-3 flex-wrap">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover border border-[#353534]" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-[#353534] flex items-center justify-center text-xs text-[#a98a7d] font-mono">
+                    —
+                  </div>
+                )}
+                <label className="cursor-pointer text-[10px] font-mono border border-[#353534] px-3 py-2 hover:border-[#FF6B00]">
+                  {avatarUploading ? 'Uploading…' : 'Upload image'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    disabled={avatarUploading}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (f) void uploadAvatar(f);
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-[9px] text-[#5a4136] mt-1">JPEG, PNG, WebP, or GIF — then save settings.</p>
+            </div>
+            <div>
+              <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Sign-in email</label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono"
+              />
+              <p className="text-[9px] text-[#5a4136] mt-1">Changing email may require confirmation from your inbox.</p>
             </div>
             {companyName && (
               <div>
@@ -162,7 +255,8 @@ export default function SettingsClient() {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-[#353534] px-3 py-2 text-sm"
+                disabled={!canEditOwnRole}
+                className="w-full bg-[#1a1a1a] border border-[#353534] px-3 py-2 text-sm disabled:opacity-50"
               >
                 <option value="owner">Owner</option>
                 <option value="manager">Manager</option>
@@ -170,7 +264,36 @@ export default function SettingsClient() {
                 <option value="crew_lead">Crew lead</option>
                 <option value="viewer">Viewer</option>
               </select>
-              <p className="text-[10px] text-[#5a4136] mt-1">Separate from per-job roles on shared jobs.</p>
+              <p className="text-[10px] text-[#5a4136] mt-1">
+                {canEditOwnRole
+                  ? 'Company owner or manager — you can change your role here.'
+                  : 'Only company owners and managers can change app roles. Ask an admin or use the employee dashboard.'}
+              </p>
+            </div>
+          </section>
+
+          <section className="border-2 border-[#353534] p-5 space-y-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">Security</h2>
+            <div>
+              <label className="text-[9px] text-[#5a4136] uppercase block mb-1">New password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono"
+                placeholder="Leave blank to keep current"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Confirm password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono"
+              />
             </div>
           </section>
 

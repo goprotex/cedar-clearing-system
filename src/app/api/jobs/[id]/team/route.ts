@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { isCompanyAdmin } from '@/lib/company-admin';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
@@ -16,7 +17,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     .eq('user_id', userId)
     .maybeSingle();
   if (meErr) return NextResponse.json({ error: meErr.message }, { status: 500 });
-  if (!me) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const companyAdmin = await isCompanyAdmin(supabase, userId);
 
   const { data: teamRes, error: teamErr } = await supabase.rpc('get_job_team', { p_job_id: jobId });
   if (teamErr) return NextResponse.json({ error: teamErr.message }, { status: 500 });
@@ -25,8 +27,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     return NextResponse.json({ error: team?.error ?? 'team_load_failed' }, { status: 403 });
   }
 
+  const canManageTeam = me?.role === 'owner' || companyAdmin;
+
   let pendingInvites: unknown[] | null = null;
-  if (me.role === 'owner') {
+  if (canManageTeam) {
     const { data: invRes, error: invErr } = await supabase.rpc('get_job_invites_pending', { p_job_id: jobId });
     if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
     const inv = invRes as { ok?: boolean; invites?: unknown[] } | null;
@@ -34,7 +38,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   }
 
   return NextResponse.json({
-    myRole: me.role,
+    myRole: me?.role ?? null,
+    canManageTeam,
     members: team.members ?? [],
     pendingInvites,
   });

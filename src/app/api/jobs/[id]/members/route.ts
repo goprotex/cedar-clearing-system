@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { canManageJobMembers } from '@/lib/job-members-admin';
 
 type Role = 'owner' | 'worker' | 'viewer';
 
@@ -11,14 +12,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: me, error: meErr } = await supabase
-    .from('job_members')
-    .select('role')
-    .eq('job_id', jobId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (meErr) return NextResponse.json({ error: meErr.message }, { status: 500 });
-  if (!me || me.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!(await canManageJobMembers(supabase, jobId, userId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   let body: { userId?: string; role?: Role };
   try {
@@ -73,14 +69,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: me, error: meErr } = await supabase
-    .from('job_members')
-    .select('role')
-    .eq('job_id', jobId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (meErr) return NextResponse.json({ error: meErr.message }, { status: 500 });
-  if (!me || me.role !== 'owner') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!(await canManageJobMembers(supabase, jobId, userId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   let targetUserId: string | undefined;
   try {
