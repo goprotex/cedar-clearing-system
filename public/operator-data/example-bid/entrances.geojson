@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Main Gate", "type": "entrance" },
+      "geometry": { "type": "Point", "coordinates": [-97.5002, 31.508] }
+    }
+  ]
+}
+
