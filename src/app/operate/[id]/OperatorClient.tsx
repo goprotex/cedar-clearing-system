@@ -407,9 +407,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const err = (e as any)?.error;
         const msg = err?.message || err?.toString?.() || 'Mapbox failed to load.';
-        const isTileErr = /tile|source|sprite|glyph/i.test(String(msg));
-        if (!isTileErr) {
-          setMapError(String(msg));
+        const s = String(msg);
+        // Tile/network glitches and GPU noise should not brick the whole view.
+        const isRecoverable =
+          /tile|source|sprite|glyph|webgl|context|lost|decode|network|fetch|image/i.test(s);
+        if (!isRecoverable) {
+          setMapError(s);
         }
       });
 
@@ -846,10 +849,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         }
       }
     } else {
-      if (holoRotationRef.current) {
-        cancelAnimationFrame(holoRotationRef.current);
-        holoRotationRef.current = null;
-      }
+      // Do not cancel holoRotationRef here — that ref drives global slow rotation and
+      // must only be managed by the rotation / pause effects (cancelling here broke the map).
 
       if (map.getLayer('holo-mask-fill')) map.setLayoutProperty('holo-mask-fill', 'visibility', 'none');
 
@@ -1261,16 +1262,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       )}
 
-      {/* Map error overlay */}
+      {/* Map error banner — does not cover the header or block the whole map */}
       {bid && mapError && (
-        <div className="absolute inset-0 z-40 bg-[#131313]/90 backdrop-blur-sm flex items-center justify-center text-[#e5e2e1]">
-          <div className="max-w-md w-[92vw] border border-[#353534] bg-[#0e0e0e]/90 p-6 space-y-3">
-            <div className="text-[#FF6B00] text-xl font-black uppercase tracking-widest">MAP_OFFLINE</div>
-            <div className="text-xs font-mono text-[#a98a7d] break-words">{mapError}</div>
-            <div className="text-[11px] text-[#a98a7d]">
-              If this is a token/style error, verify <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> and refresh.
-            </div>
+        <div className="absolute top-14 left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]">
+          <div className="text-[#FF6B00] text-sm font-black uppercase tracking-widest">MAP_ISSUE</div>
+          <div className="text-[10px] font-mono text-[#a98a7d] break-words mt-1">{mapError}</div>
+          <div className="text-[10px] text-[#a98a7d] mt-2">
+            Check <code className="bg-[#353534] px-1 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code>, network, or ad blockers. Dismiss by fixing and refreshing.
           </div>
+          <button
+            type="button"
+            onClick={() => setMapError(null)}
+            className="mt-2 text-[10px] font-mono text-[#13ff43] border border-green-900/50 px-2 py-1 rounded hover:bg-[#001a06]"
+          >
+            DISMISS_BANNER
+          </button>
         </div>
       )}
 
@@ -1284,48 +1290,47 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       )}
 
-      {/* Top bar */}
-      {bid && (
-        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-[#000a02]/80 backdrop-blur-sm border-b border-green-900/40">
-          <div className="flex items-center gap-3">
-            <Link href={`/bid/${bidId}`} className="text-[#00ff41] font-black text-sm tracking-widest hover:text-white transition-colors">
-              ← CEDAR_HACK
-            </Link>
-            <span className="text-[10px] text-[#a98a7d] font-mono hidden sm:inline">
-              OPERATOR_MODE // {bid.bidNumber}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-1.5 max-w-[min(100%,52rem)]">
-            {(
-              [
-                { key: 'soil' as const, label: 'SOIL' },
-                { key: 'naip' as const, label: 'RGB' },
-                { key: 'naipCIR' as const, label: 'CIR' },
-                { key: 'naipNDVI' as const, label: 'NDVI' },
-                { key: 'hologram' as const, label: 'HOLO' },
-              ] as const
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => toggleLayer(key)}
-                className={`text-[9px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
-                  layers[key]
-                    ? 'text-[#13ff43] border-[#13ff43] bg-[#001a06]/90'
-                    : 'text-[#a98a7d] border-green-900/40 hover:text-white'
-                }`}
-                title={`Toggle ${label} layer`}
-              >
-                {layers[key] ? `${label}_ON` : `${label}_OFF`}
-              </button>
-            ))}
-            <span className={`w-2 h-2 rounded-full shrink-0 ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
-            <span className="text-[10px] font-mono text-[#a98a7d]">
-              {state.gpsActive ? 'GPS_LOCKED' : 'GPS_OFF'}
-            </span>
-          </div>
+      {/* Top bar — always visible so layer controls are never missing */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 py-2 bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link href={bid ? `/bid/${bidId}` : '/bids'} className="text-[#00ff41] font-black text-xs sm:text-sm tracking-widest hover:text-white transition-colors shrink-0">
+            ← CEDAR_HACK
+          </Link>
+          <span className="text-[9px] sm:text-[10px] text-[#a98a7d] font-mono truncate">
+            {bid ? `OPERATOR // ${bid.bidNumber}` : 'LOADING_BID...'}
+          </span>
         </div>
-      )}
+        <div className="flex flex-wrap items-center justify-end gap-1 max-w-[min(100%,56rem)]">
+          {(
+            [
+              { key: 'soil' as const, label: 'SOIL' },
+              { key: 'naip' as const, label: 'RGB' },
+              { key: 'naipCIR' as const, label: 'CIR' },
+              { key: 'naipNDVI' as const, label: 'NDVI' },
+              { key: 'hologram' as const, label: 'HOLO' },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              disabled={!bid || !mapReady}
+              onClick={() => toggleLayer(key)}
+              className={`text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                layers[key]
+                  ? 'text-[#13ff43] border-[#13ff43] bg-[#001a06]/90'
+                  : 'text-[#a98a7d] border-green-900/40 hover:text-white'
+              }`}
+              title={!bid || !mapReady ? 'Wait for map' : `Toggle ${label} layer`}
+            >
+              {layers[key] ? `${label}_ON` : `${label}_OFF`}
+            </button>
+          ))}
+          <span className={`w-2 h-2 rounded-full shrink-0 ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
+          <span className="text-[9px] sm:text-[10px] font-mono text-[#a98a7d] hidden sm:inline">
+            {state.gpsActive ? 'GPS' : 'NO_GPS'}
+          </span>
+        </div>
+      </div>
 
       {/* HUD panel */}
       {bid && hudOpen && (
