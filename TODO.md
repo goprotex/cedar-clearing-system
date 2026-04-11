@@ -25,9 +25,9 @@ in production (trees invisible / WebGL context issues with Mapbox shared GL cont
 
 ### Files
 
-- `src/lib/tree-layer.ts` — `TreeLayer3D` class, shaders, `extractTreesFromAnalysis()`
 - `src/components/map/MapContainer.tsx` — Layer toggle logic, hologram mode
 - `src/app/operate/[id]/OperatorClient.tsx` — Operator mode (uses 2D cedar overlay)
+- Note: `src/lib/tree-layer.ts` was removed; hologram mode now uses 2D cedar fill-extrusion overlay
 
 ## Operate Mode
 
@@ -37,8 +37,9 @@ in production (trees invisible / WebGL context issues with Mapbox shared GL cont
       regressions.
 - [ ] **NDVI overlay performance on mobile** — The NAIP NDVI raster tiles load from USGS
       ImageServer which can be slow. Consider caching or pre-rendering tiles.
-- [ ] **GPS trail persistence** — The operator trail is only stored in memory
-      (`trailCoordsRef`). Should persist to localStorage alongside cleared cells.
+- [x] **GPS trail persistence** — Trail saved to `ccc_operator_trail_${jobId}` in
+      localStorage on every GPS point via `saveOperatorTrailToStorage()`, restored on
+      mount via `loadOperatorTrailFromStorage()`. Survives refresh and tab close.
 
 ## General
 
