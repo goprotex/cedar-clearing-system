@@ -40,3 +40,34 @@ export async function updateSession(request: NextRequest) {
 
   return supabaseResponse;
 }
+
+/**
+ * @deprecated Prefer `updateSession` from root `middleware.ts` so `getUser()` runs and cookies refresh.
+ * Kept as a named export so older `middleware.ts` that still `import { createClient }` continues to build.
+ */
+export function createClient(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        supabaseResponse = NextResponse.next({
+          request,
+        });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options),
+        );
+      },
+    },
+  });
+
+  return { supabase, response: supabaseResponse };
+}
