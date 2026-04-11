@@ -24,6 +24,29 @@ type BootstrapResponse = {
 
 type OperatorPosition = BootstrapResponse['operators'][string][number];
 
+/** Merge polled positions with existing state, keyed by user_id, keeping the newer fix. */
+function mergeOperatorsByJob(
+  prev: Record<string, OperatorPosition[]>,
+  polled: Record<string, OperatorPosition[]>,
+): Record<string, OperatorPosition[]> {
+  const out = { ...prev };
+  for (const [jobId, incoming] of Object.entries(polled)) {
+    if (incoming.length === 0) continue;
+    const byUser = new Map<string, OperatorPosition>();
+    for (const op of prev[jobId] ?? []) byUser.set(op.user_id, op);
+    for (const op of incoming) {
+      const cur = byUser.get(op.user_id);
+      const nextTs = Date.parse(op.updated_at);
+      const curTs = cur ? Date.parse(cur.updated_at) : NaN;
+      if (!cur || (!Number.isNaN(nextTs) && (Number.isNaN(curTs) || nextTs >= curTs))) {
+        byUser.set(op.user_id, op);
+      }
+    }
+    out[jobId] = Array.from(byUser.values());
+  }
+  return out;
+}
+
 const MapboxMap = dynamic(() => import('./MonitorMap'), {
   ssr: false,
   loading: () => (
@@ -265,14 +288,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       }
 
       if (cancelled) return;
-      setOperatorsByJob(prev => {
-        const merged = { ...prev };
-        for (const [jobId, ops] of Object.entries(next)) {
-          const existing = merged[jobId] ?? [];
-          if (existing.length === 0) merged[jobId] = ops;
-        }
-        return merged;
-      });
+      setOperatorsByJob((prev) => mergeOperatorsByJob(prev, next));
       setTrailsByJob(trails);
     };
 
@@ -318,29 +334,45 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     const jobIds = jobs.map((j) => j.id).filter(Boolean);
     if (!jobIds.length) return;
 
+    const applyOperatorRow = (payload: { new: Record<string, unknown> }) => {
+      const row = payload.new as {
+        job_id?: string; user_id?: string; lng?: number; lat?: number;
+        heading?: number | null; heading_deg?: number | null;
+        speed_mps?: number | null; accuracy_m?: number | null; updated_at?: string;
+      } | null;
+      if (!row || typeof row.job_id !== 'string' || typeof row.user_id !== 'string' || typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
+      const jobId = row.job_id;
+      const userId = row.user_id;
+      const lng = row.lng;
+      const lat = row.lat;
+      const heading =
+        typeof row.heading === 'number' ? row.heading
+          : typeof row.heading_deg === 'number' ? row.heading_deg : null;
+      setOperatorsByJob((prev) => {
+        const next = { ...prev };
+        const arr = next[jobId] ? [...next[jobId]] : [];
+        const idx = arr.findIndex((o) => o.user_id === userId);
+        const entry: OperatorPosition = {
+          user_id: userId,
+          lng,
+          lat,
+          heading,
+          speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
+          accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
+          updated_at: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
+        };
+        if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+        next[jobId] = arr;
+        return next;
+      });
+    };
+
+    const filter = `job_id=in.(${jobIds.join(',')})`;
     const channel = supabase
       .channel(`monitor-ops-${jobIds.join('-').slice(0, 80)}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_operator_positions', filter: `job_id=in.(${jobIds.join(',')})` },
-        (payload) => {
-          const row = payload.new as { job_id: string; user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string } | null;
-          if (!row || typeof row.job_id !== 'string' || typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
-          setOperatorsByJob((prev) => {
-            const next = { ...prev };
-            const arr = next[row.job_id] ? [...next[row.job_id]] : [];
-            const idx = arr.findIndex((o) => o.user_id === row.user_id);
-            const entry: OperatorPosition = {
-              user_id: row.user_id, lng: row.lng, lat: row.lat,
-              heading: typeof row.heading === 'number' ? row.heading : null,
-              speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
-              accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
-              updated_at: row.updated_at,
-            };
-            if (idx >= 0) arr[idx] = entry; else arr.push(entry);
-            next[row.job_id] = arr;
-            return next;
-          });
-        }
-      ).subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_operator_positions', filter }, applyOperatorRow)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_operator_positions', filter }, applyOperatorRow)
+      .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
   }, [jobs]);
