@@ -159,9 +159,9 @@ export default function SysHealthClient() {
 
   return (
     <AppShell>
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">SYS_HEALTH</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">SYS_HEALTH</h1>
           <p className="text-[#ffb693] text-xs font-mono">
             DIAGNOSTICS & SERVICE STATUS
           </p>
@@ -169,7 +169,7 @@ export default function SysHealthClient() {
         <button
           onClick={runAllChecks}
           disabled={isRunning}
-          className="bg-[#FF6B00] text-black font-black px-4 py-2 text-xs uppercase tracking-widest hover:bg-white transition-colors disabled:opacity-50"
+          className="bg-[#FF6B00] text-black font-black px-4 py-2 text-xs uppercase tracking-widest hover:bg-white transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
         >
           {isRunning ? 'SCANNING...' : 'RUN_DIAGNOSTICS'}
         </button>

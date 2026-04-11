@@ -41,8 +41,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
-      <header className="fixed top-0 w-full z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center h-16 px-4 md:px-6">
+    <div className="min-h-[100dvh] min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center min-h-16 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]">
         <div className="flex items-center gap-4 md:gap-6">
           <button
             className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
@@ -122,7 +122,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile slide-out drawer */}
       <aside
-        className={`fixed left-0 top-0 h-full w-72 border-r-2 border-[#353534] bg-[#131313] flex flex-col pt-20 pb-4 px-2 z-40 transition-transform duration-300 md:hidden ${
+        className={`fixed left-0 top-0 h-full w-[min(100vw-2.5rem,18rem)] max-w-[85vw] border-r-2 border-[#353534] bg-[#131313] flex flex-col pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] px-2 z-40 transition-transform duration-300 md:hidden ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -184,7 +184,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] flex-col pt-20 pb-4 px-2 z-40 hidden md:flex">
+      <aside className="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] flex-col pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-2 z-40 hidden md:flex">
         <div className="px-4 mb-8">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
@@ -247,7 +247,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="md:ml-64 pt-20 p-6 min-h-screen">
+      <main className="w-full min-w-0 max-w-[100vw] md:ml-64 pt-[calc(5rem+env(safe-area-inset-top,0px))] px-4 sm:px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] min-h-[100dvh] min-h-screen">
         {children}
       </main>
     </div>

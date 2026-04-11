@@ -78,9 +78,9 @@ export default function IntelClient() {
 
   return (
     <AppShell>
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">INTEL_DASHBOARD</h1>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">INTEL_DASHBOARD</h1>
           <p className="text-[#ffb693] text-xs font-mono">
             AGGREGATED ANALYTICS // {metrics.totalBids} BIDS ANALYZED
           </p>
@@ -142,11 +142,12 @@ export default function IntelClient() {
           {metrics.monthlyData.length === 0 ? (
             <div className="text-center py-8 text-[#5a4136] text-xs">NO_DATA</div>
           ) : (
-            <div className="flex items-end gap-2 h-40">
+            <div className="overflow-x-auto -mx-1 px-1 pb-1">
+            <div className="flex items-end gap-2 h-40 min-w-[min(100%,28rem)]">
               {metrics.monthlyData.map((d) => {
                 const height = (d.revenue / maxRevenue) * 100;
                 return (
-                  <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
+                  <div key={d.month} className="flex-1 min-w-[3.25rem] flex flex-col items-center gap-1">
                     <div className="text-[9px] font-mono text-[#a98a7d]">{formatCurrency(d.revenue)}</div>
                     <div className="w-full bg-[#353534] relative" style={{ height: '100px' }}>
                       <div
@@ -159,6 +160,7 @@ export default function IntelClient() {
                   </div>
                 );
               })}
+            </div>
             </div>
           )}
         </div>
@@ -175,7 +177,7 @@ export default function IntelClient() {
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] text-[#5a4136] font-mono w-4">{i + 1}.</span>
                     <div>
-                      <div className="text-sm font-bold truncate max-w-[140px]">{c.name}</div>
+                      <div className="text-sm font-bold truncate max-w-[min(200px,45vw)]">{c.name}</div>
                       <div className="text-[10px] text-[#5a4136] font-mono">{c.bids} bids</div>
                     </div>
                   </div>

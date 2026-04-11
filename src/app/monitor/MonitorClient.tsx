@@ -445,17 +445,17 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   return (
     <div className={`bg-[#131313] text-[#e5e2e1] ${fullscreen ? 'fixed inset-0 z-[60] overflow-hidden' : 'min-h-screen'}`}>
       {!fullscreen && (
-        <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6">
-          <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
-            <p className="text-[#ffb693] text-xs font-mono">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-6 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
+            <p className="text-[#ffb693] text-[10px] sm:text-xs font-mono break-words">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
             {bootstrapScope === 'company' && (
               <p className="text-[9px] font-mono text-[#13ff43]/80 mt-1">COMPANY_SCOPE — ALL COMPANY JOBS</p>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right shrink-0">
             <div className="text-[10px] font-mono text-[#a98a7d]">ALL_JOBS_PROGRESS</div>
-            <div className="text-sm font-black text-[#13ff43]">{totals.pct}%</div>
+            <div className="text-2xl sm:text-3xl font-black text-[#13ff43] tabular-nums">{totals.pct}%</div>
           </div>
         </div>
       )}
@@ -465,7 +465,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       )}
 
       <div className={fullscreen ? 'absolute inset-0' : 'flex flex-col lg:flex-row gap-6'}>
-        <div className={fullscreen ? 'absolute inset-0' : 'flex-1 border-2 border-[#353534] relative'} style={fullscreen ? undefined : { minHeight: '70vh' }}>
+        <div className={fullscreen ? 'absolute inset-0' : 'flex-1 border-2 border-[#353534] relative min-h-0'} style={fullscreen ? undefined : { minHeight: 'min(70vh, 720px)' }}>
           {mapboxToken ? (
             <MapboxMap
               accessToken={mapboxToken}
@@ -479,8 +479,8 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               flyToJobId={flyToJobId}
             />
           ) : (
-            <div className="w-full h-full min-h-[70vh] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d]">
-              <div className="text-center space-y-2 border-2 border-[#353534] p-8">
+            <div className="w-full h-full min-h-[min(70vh,720px)] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d] px-4">
+              <div className="text-center space-y-2 border-2 border-[#353534] p-4 sm:p-8 max-w-lg">
                 <p className="text-lg font-black uppercase tracking-tighter">SATELLITE_FEED_OFFLINE</p>
                 <p className="text-sm font-mono">
                   Add <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">.env.local</code>
@@ -495,9 +495,9 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           )}
 
           {/* Layer control — floating panel on the map */}
-          <div className="absolute bottom-4 left-4 z-10">
+          <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom,0px))] left-[max(1rem,env(safe-area-inset-left,0px))] z-10 max-w-[calc(100vw-2rem)]">
             {layersPanelOpen ? (
-              <div className="backdrop-blur rounded-lg shadow-lg p-2 min-w-[180px] bg-slate-900/90">
+              <div className="backdrop-blur rounded-lg shadow-lg p-2 min-w-[180px] max-h-[min(60vh,420px)] overflow-y-auto bg-slate-900/90">
                 <div className="flex items-center justify-between px-1 pb-1">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Layers</span>
                   <button onClick={() => setLayersPanelOpen(false)} className="text-slate-400 hover:text-white text-xs leading-none">✕</button>
@@ -533,7 +533,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
           {/* Fullscreen TV overlay */}
           {fullscreen && (
-            <div className="absolute top-3 left-3 z-20 holo-panel backdrop-blur-sm rounded-lg px-4 py-3 space-y-2">
+            <div className="absolute top-[max(0.75rem,env(safe-area-inset-top,0px))] left-[max(0.75rem,env(safe-area-inset-left,0px))] z-20 holo-panel backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2 sm:py-3 space-y-2 max-w-[calc(100vw-2rem)]">
               <div className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Office Monitor</div>
               <div className="flex items-center gap-3">
                 <div className="text-xs font-mono text-[#a98a7d]">ALL_JOBS</div>

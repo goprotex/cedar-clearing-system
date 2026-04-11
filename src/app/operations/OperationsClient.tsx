@@ -77,13 +77,13 @@ export default function OperationsClient() {
 
   return (
     <AppShell>
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">OPERATIONS</h1>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">OPERATIONS</h1>
           <p className="text-[#a98a7d] text-xs font-mono mt-1">ACTIVE_JOBS // CREW // PREFERENCES</p>
         </div>
-        <div className="text-right text-[10px] font-mono text-[#a98a7d] flex flex-col items-end gap-1">
-          {authLoading ? 'AUTH…' : email ? <span className="text-[#13ff43] truncate max-w-[220px] inline-block align-bottom" title={email}>SIGNED_IN</span> : <span>LOCAL_ONLY</span>}
+        <div className="text-left lg:text-right text-[10px] font-mono text-[#a98a7d] flex flex-col items-start lg:items-end gap-1 min-w-0">
+          {authLoading ? 'AUTH…' : email ? <span className="text-[#13ff43] truncate max-w-full sm:max-w-[220px] inline-block align-bottom" title={email}>SIGNED_IN</span> : <span>LOCAL_ONLY</span>}
           <Link href="/dashboard" className="text-[#FF6B00] hover:underline">
             Team / roles
           </Link>

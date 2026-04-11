@@ -140,9 +140,9 @@ export default function DashboardClient() {
 
   return (
     <AppShell>
-      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">EMPLOYEE_DASHBOARD</h1>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">EMPLOYEE_DASHBOARD</h1>
           <p className="text-[#a98a7d] text-xs font-mono mt-1">ROSTER // ROLES // JOB ASSIGNMENTS</p>
         </div>
         <div className="flex flex-wrap gap-3 text-[10px] font-mono">
