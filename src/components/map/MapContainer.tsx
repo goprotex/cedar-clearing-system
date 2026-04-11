@@ -297,7 +297,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         type: 'symbol',
         source: 'pastures',
         layout: {
-          'text-field': ['concat', ['get', 'name'], '\n', ['get', 'acreageLabel']],
+          'text-field': ['concat', ['get', 'mapLabel'], '\n', ['get', 'acreageLabel']],
           'text-size': 13,
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
           'text-anchor': 'center',
@@ -750,6 +750,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     const source = map.getSource('pastures') as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
 
+    const clientLast = (currentBid.clientName || '').trim().split(/\s+/).pop() || '';
+
     const features: GeoJSON.Feature[] = currentBid.pastures
       .filter((p) => p.polygon.geometry.coordinates.length > 0)
       .map((p) => ({
@@ -758,6 +760,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         properties: {
           pastureId: p.id,
           name: p.name,
+          mapLabel: clientLast || p.name,
           acreageLabel: `${p.acreage} ac`,
           color: VEGETATION_COLORS[p.vegetationType] || '#22c55e',
           selected: p.id === selectedPastureId,
@@ -765,7 +768,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }));
 
     source.setData({ type: 'FeatureCollection', features });
-  }, [currentBid.pastures, selectedPastureId]);
+  }, [currentBid.pastures, currentBid.clientName, selectedPastureId]);
 
   // ── Sync cedar analysis overlay data ──
   useEffect(() => {
