@@ -1,7 +1,7 @@
 import JobClient from './JobClient';
 
 export const metadata = {
-  title: 'Job — Cedar Hack',
+  title: 'Run job — Cedar Hack',
 };
 
 export default async function JobPage({ params }: { params: Promise<{ id: string }> }) {

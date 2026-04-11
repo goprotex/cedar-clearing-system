@@ -130,6 +130,12 @@ export default function OperationsClient() {
                         Bid
                       </Link>
                       <Link
+                        href={`/job/${j.id}`}
+                        className="text-[10px] font-bold uppercase tracking-wider border border-[#353534] px-2 py-1 text-[#e5e2e1] hover:border-[#FF6B00] hover:text-[#FF6B00]"
+                      >
+                        Run job
+                      </Link>
+                      <Link
                         href={`/operate/${bidId}`}
                         className="text-[10px] font-bold uppercase tracking-wider border border-[#353534] px-2 py-1 text-[#e5e2e1] hover:border-[#FF6B00] hover:text-[#FF6B00]"
                       >
