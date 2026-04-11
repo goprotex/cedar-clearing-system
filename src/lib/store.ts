@@ -66,6 +66,8 @@ function createDefaultBid(): Bid {
     id: uuidv4(),
     bidNumber: generateBidNumber(),
     status: 'draft',
+    clientId: null,
+    companyId: null,
     clientName: '',
     clientEmail: '',
     clientPhone: '',

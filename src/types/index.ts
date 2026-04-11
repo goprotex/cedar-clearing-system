@@ -236,6 +236,10 @@ export interface Bid {
    * Stored client-side in Phase 1; server is source of truth once jobs are enabled.
    */
   jobId?: string;
+  /** Linked `public.clients` row; requires company context to resolve on save. */
+  clientId?: string | null;
+  /** From DB or inferred when saving a CRM-linked bid. */
+  companyId?: string | null;
   // Client
   clientName: string;
   clientEmail: string;
