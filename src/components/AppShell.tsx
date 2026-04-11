@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
   { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
-  { href: '/map-radar', label: 'MAP_RADAR', icon: '🛰️' },
+  { href: '/operations', label: 'OPERATIONS', icon: '📟' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
   { href: '/archive', label: 'ARCHIVE', icon: '📦' },
@@ -21,7 +21,7 @@ const HEADER_NAV = [
   { href: '/fleet', label: 'FLEET' },
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
-  { href: '/map-radar', label: 'RADAR' },
+  { href: '/operations', label: 'OPS' },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

@@ -8,7 +8,7 @@ const LANDING_NAV = [
   { href: '/fleet', label: 'FLEET' },
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
-  { href: '/map-radar', label: 'RADAR' },
+  { href: '/operations', label: 'OPS' },
 ];
 
 export default function Home() {
