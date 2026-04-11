@@ -42,6 +42,6 @@ in production (trees invisible / WebGL context issues with Mapbox shared GL cont
 
 ## General
 
-- [ ] **PDF generation** — "GENERATE_PDF" button is a placeholder (Phase 4)
+- [x] **PDF generation** — Bid PDF via jsPDF (cover, overview, pasture details, summary, terms, signatures)
 - [ ] **Supabase integration** — Currently all data is in localStorage. Move to Supabase
       for multi-device sync.
