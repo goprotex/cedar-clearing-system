@@ -27,7 +27,7 @@ const HEADER_NAV = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { email: authEmail } = useAuth();
+  const { email: authEmail, loading: authLoading } = useAuth();
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
@@ -75,7 +75,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             SYS_STATUS: OPERATIONAL
           </span>
           <div className="hidden md:flex items-center gap-2">
-            {authEmail ? (
+            {authLoading ? null : authEmail ? (
               <>
                 <span className="text-[10px] text-[#a98a7d] font-mono truncate max-w-[160px]" title={authEmail}>
                   USER: {authEmail}
