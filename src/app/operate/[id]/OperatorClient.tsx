@@ -118,6 +118,41 @@ function saveOperatorSession(bidId: string, clearedCellIds: string[], clearedCel
   localStorage.setItem(storageKey(bidId), JSON.stringify({ clearedCellIds, clearedCells }));
 }
 
+function operatorTrailStorageKey(jobId: string) {
+  return `ccc_operator_trail_${jobId}`;
+}
+
+/** Load and validate GPS trail points from localStorage (survives refresh / tab close). */
+function loadOperatorTrailFromStorage(jobId: string): [number, number][] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(operatorTrailStorageKey(jobId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: [number, number][] = [];
+    for (const item of parsed) {
+      if (!Array.isArray(item) || item.length < 2) continue;
+      const lng = Number(item[0]);
+      const lat = Number(item[1]);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+      if (Math.abs(lng) > 180 || Math.abs(lat) > 90) continue;
+      out.push([lng, lat]);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function saveOperatorTrailToStorage(jobId: string, coords: [number, number][]) {
+  try {
+    localStorage.setItem(operatorTrailStorageKey(jobId), JSON.stringify(coords));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 function haversineDistM(lng1: number, lat1: number, lng2: number, lat2: number): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -203,18 +238,11 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     return () => { cancelled = true; };
   }, [bidId]);
 
-  // Restore persisted trail from localStorage
+  // Restore persisted GPS trail (same key used when appending points in processPosition)
   useEffect(() => {
     const jobId = jobIdFromBidId(bidId);
-    try {
-      const raw = localStorage.getItem(`ccc_operator_trail_${jobId}`);
-      if (raw) {
-        const coords = JSON.parse(raw) as [number, number][];
-        if (Array.isArray(coords) && coords.length > 0) {
-          trailCoordsRef.current = coords;
-        }
-      }
-    } catch { /* ignore */ }
+    const coords = loadOperatorTrailFromStorage(jobId);
+    if (coords.length > 0) trailCoordsRef.current = coords;
   }, [bidId]);
 
   // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
@@ -674,6 +702,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     };
   }, [state.bid]);
 
+  // If trail was restored from storage before the map finished loading, paint it once ready
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !map.isStyleLoaded()) return;
+    const c = trailCoordsRef.current;
+    if (c.length < 2) return;
+    const trailSource = map.getSource('trail') as mapboxgl.GeoJSONSource | undefined;
+    if (!trailSource) return;
+    trailSource.setData({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: c },
+      properties: {},
+    });
+  }, [mapReady, state.bid]);
+
   // Layer toggles (soil, NAIP variants, hologram) — aligned with bid / scout maps
   useEffect(() => {
     const map = mapRef.current;
@@ -1118,11 +1161,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
     trailCoordsRef.current.push([lng, lat]);
 
-    // Persist trail to localStorage so monitor can display it
     const jobId = jobIdFromBidId(bidId);
-    try {
-      localStorage.setItem(`ccc_operator_trail_${jobId}`, JSON.stringify(trailCoordsRef.current));
-    } catch { /* storage full */ }
+    saveOperatorTrailToStorage(jobId, trailCoordsRef.current);
 
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -1195,6 +1235,11 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   // Reset session
   const resetSession = useCallback(() => {
     localStorage.removeItem(storageKey(bidId));
+    try {
+      localStorage.removeItem(operatorTrailStorageKey(jobIdFromBidId(bidId)));
+    } catch {
+      /* ignore */
+    }
     setState(prev => ({ ...prev, clearedCellIds: new Set(), clearedCells: [], totalClearedAcres: 0, sessionStart: Date.now() }));
     trailCoordsRef.current = [];
     setConfirmReset(false);
