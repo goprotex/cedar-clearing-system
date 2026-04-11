@@ -9,7 +9,7 @@ import {
   calculateSoilDifficulty,
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
-import { extractTreesFromAnalysis } from '@/lib/tree-layer';
+import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
 import {
   buildSpectralChunkBboxes,
   mergeCedarChunkResults,

@@ -5,7 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 import type { Bid } from '@/types';
-import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
+import { extractTreesFromAnalysis, type TreePosition } from '@/lib/cedar-tree-data';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
