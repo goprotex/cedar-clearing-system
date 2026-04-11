@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
 
 const LANDING_NAV = [
   { href: '/bids', label: 'ESTIMATOR' },
@@ -13,6 +14,7 @@ const LANDING_NAV = [
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { email: authEmail, loading: authLoading } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
@@ -44,13 +46,27 @@ export default function Home() {
             </Link>
           ))}
         </nav>
-        <Link
-          href="/bids"
-          className="bg-[#FF6B00] text-black px-4 md:px-6 py-2 font-bold uppercase tracking-widest hover:bg-white transition-all text-xs md:text-sm"
-        >
-          LAUNCH
-          <span className="hidden sm:inline">_SYSTEM</span>
-        </Link>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {!authLoading && (
+            <Link
+              href={authEmail ? '/logout' : '/login'}
+              className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-2 border-2 transition-all whitespace-nowrap ${
+                authEmail
+                  ? 'border-[#353534] text-[#a98a7d] hover:text-white'
+                  : 'border-[#13ff43] text-[#13ff43] hover:bg-[#13ff43] hover:text-black'
+              }`}
+            >
+              {authEmail ? 'Log out' : 'Sign in'}
+            </Link>
+          )}
+          <Link
+            href="/bids"
+            className="bg-[#FF6B00] text-black px-3 sm:px-6 py-2 font-bold uppercase tracking-widest hover:bg-white transition-all text-xs md:text-sm"
+          >
+            LAUNCH
+            <span className="hidden sm:inline">_SYSTEM</span>
+          </Link>
+        </div>
       </header>
 
       {/* Mobile dropdown menu */}
@@ -80,10 +96,19 @@ export default function Home() {
           <Link
             href="/sys-health"
             onClick={() => setMenuOpen(false)}
-            className="uppercase tracking-tight font-bold text-[#13ff43] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm"
+            className="uppercase tracking-tight font-bold text-[#13ff43] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm border-b border-[#353534]/50"
           >
             SYS_HEALTH
           </Link>
+          {!authLoading && (
+            <Link
+              href={authEmail ? '/logout' : '/login'}
+              onClick={() => setMenuOpen(false)}
+              className="uppercase tracking-tight font-black text-[#FF6B00] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm"
+            >
+              {authEmail ? 'Log out' : 'Sign in'}
+            </Link>
+          )}
         </nav>
       </div>
 
