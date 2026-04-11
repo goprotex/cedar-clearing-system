@@ -45,6 +45,13 @@ function LoginPageInner() {
           <div className="text-xs font-mono text-[#a98a7d] mt-1">
             Sign in to enable multi-user Jobs and shared progress tracking.
           </div>
+          <p className="text-[10px] text-[#5a4136] mt-3 leading-relaxed border border-[#353534]/80 p-2.5 rounded-sm">
+            <span className="text-[#a98a7d]">How sign-in works:</span>{' '}
+            <strong className="text-[#e5e2e1]">Magic link</strong> — no password; we email you a link.{' '}
+            <strong className="text-[#e5e2e1]">Sign up</strong> — choose email + password (at least 8 characters).{' '}
+            <strong className="text-[#e5e2e1]">Sign in</strong> — use the password you set at sign up.{' '}
+            After you are logged in, open <strong className="text-[#ffb693]">Settings</strong> to change password or email.
+          </p>
         </div>
 
         {envMissing && (
@@ -82,10 +89,38 @@ function LoginPageInner() {
               placeholder="••••••••"
               className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono text-[#e5e2e1] placeholder:text-[#5a4136] focus:border-[#FF6B00] outline-none"
             />
-            {mode === 'password-signup' && (
+            {(mode === 'password-signup' || mode === 'password-signin') && (
               <div className="text-[10px] font-mono text-[#a98a7d]">
-                Password auth must be enabled in Supabase Auth settings.
+                {mode === 'password-signup'
+                  ? 'Use at least 8 characters. If email confirmation is on in Supabase, confirm your email before signing in.'
+                  : 'Use the password you chose at sign up (8+ characters).'}
               </div>
+            )}
+            {mode === 'password-signin' && (
+              <button
+                type="button"
+                disabled={envMissing || busy || !email.trim()}
+                onClick={async () => {
+                  try {
+                    setBusy(true);
+                    setErr(null);
+                    setMessage(null);
+                    if (envMissing) throw new Error('Supabase env vars are missing.');
+                    const supabase = createClient();
+                    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent('/settings')}`;
+                    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+                    if (error) throw error;
+                    setMessage('If an account exists for that email, we sent a reset link. Open it, then set a new password on Settings.');
+                  } catch (e) {
+                    setErr(e instanceof Error ? e.message : 'Request failed.');
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="text-[10px] font-mono text-[#FF6B00] hover:underline disabled:opacity-40 disabled:no-underline text-left"
+              >
+                Forgot password? Email me a reset link
+              </button>
             )}
           </div>
         )}
@@ -136,7 +171,8 @@ function LoginPageInner() {
             envMissing ||
             busy ||
             !email.trim() ||
-            ((mode === 'password-signin' || mode === 'password-signup') && password.length < 6)
+            (mode === 'password-signup' && password.length < 8) ||
+            (mode === 'password-signin' && password.length < 1)
           }
           onClick={async () => {
             try {
