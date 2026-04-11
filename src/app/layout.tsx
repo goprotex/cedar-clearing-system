@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} dark h-full antialiased`}
+      className={`${spaceGrotesk.variable} dark h-full antialiased scroll-smooth`}
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-space-grotesk)] bg-[#131313] text-[#e5e2e1]"><AuthProvider>{children}</AuthProvider><Toaster position="bottom-right" richColors /></body>
     </html>
