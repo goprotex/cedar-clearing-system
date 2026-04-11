@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 import { bidToRow, pastureToRow } from '@/lib/db';
 import type { Bid, BidSummary, Pasture } from '@/types';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth.user) {
@@ -37,8 +35,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
 
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth.user) {

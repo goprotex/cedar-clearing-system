@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 import { parseJobIdFromPath, parseJsonBody } from '@/lib/jobs';
 
@@ -13,8 +12,7 @@ export async function POST(req: Request) {
 
   if (!type) return NextResponse.json({ error: 'Missing event type' }, { status: 400 });
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

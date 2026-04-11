@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(req: Request) {
@@ -11,8 +10,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL('/login?error=missing_code', url.origin));
   }
 
-  const cookieStore = await cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
