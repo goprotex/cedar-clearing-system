@@ -253,15 +253,14 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       if (map.getLayer('sky')) { try { map.removeLayer('sky'); } catch {} }
     }
 
-    // Cedar cells
-    const cedarVis = layers.cedarAI || layers.hologram;
+    // Cedar cells — respect the toggle directly
     for (const id of ['monitor-cedar-fill', 'monitor-cedar-border']) {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', cedarVis ? 'visible' : 'none');
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.cedarAI ? 'visible' : 'none');
     }
 
     // Pastures
     for (const id of ['monitor-pastures-fill', 'monitor-pastures-border', 'monitor-pastures-label']) {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.pastures || layers.hologram ? 'visible' : 'none');
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.pastures ? 'visible' : 'none');
     }
 
     // ── Hologram mode ──
