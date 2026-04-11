@@ -16,10 +16,10 @@ import {
   CEDAR_MAX_SAMPLES_PER_CHUNK,
 } from '@/lib/cedar-chunk';
 import {
-  clearCedarChunkResume,
+  clearCedarChunkResumeHybrid,
   hashPasturePolygon,
-  loadCedarChunkResume,
-  saveCedarChunkResume,
+  loadCedarChunkResumeHybrid,
+  saveCedarChunkResumeHybrid,
   chunkBboxesEqual,
   CEDAR_RESUME_VERSION,
 } from '@/lib/cedar-analysis-resume';
@@ -341,7 +341,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
   },
 
   removePasture: (id) => {
-    clearCedarChunkResume(get().currentBid.id, id);
+    void clearCedarChunkResumeHybrid(get().currentBid.id, id);
     set((state) => ({
       currentBid: {
         ...state.currentBid,
@@ -356,7 +356,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
   selectPasture: (id) => set({ selectedPastureId: id }),
 
   setPasturePolygon: (id, polygon, acreage, centroid) => {
-    clearCedarChunkResume(get().currentBid.id, id);
+    void clearCedarChunkResumeHybrid(get().currentBid.id, id);
     set((state) => ({
       currentBid: {
         ...state.currentBid,
@@ -551,7 +551,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
     let startIndex = 0;
 
     if (useChunks) {
-      const saved = loadCedarChunkResume(bidId, pastureId);
+      const saved = await loadCedarChunkResumeHybrid(bidId, pastureId);
       if (
         saved &&
         saved.bidId === bidId &&
@@ -632,7 +632,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
             }
           );
           parts.push(chunk);
-          saveCedarChunkResume({
+          await saveCedarChunkResumeHybrid({
             v: CEDAR_RESUME_VERSION,
             bidId,
             pastureId,
@@ -647,7 +647,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       const data =
         parts.length === 1 ? parts[0] : mergeCedarChunkResults(parts, pasture.acreage);
-      clearCedarChunkResume(bidId, pastureId);
+      await clearCedarChunkResumeHybrid(bidId, pastureId);
       set({ analysisProgress: { active: true, step: 'Processing results...', detail: 'Classifying vegetation: cedar, oak, grass, brush, bare ground' } });
       get().updatePasture(pastureId, { cedarAnalysis: data });
 

@@ -75,3 +75,78 @@ export function clearCedarChunkResume(bidId: string, pastureId: string): void {
     /* ignore */
   }
 }
+
+function pickNewerResume(
+  a: CedarChunkResumeState,
+  b: CedarChunkResumeState
+): CedarChunkResumeState {
+  if (a.parts.length !== b.parts.length) {
+    return a.parts.length >= b.parts.length ? a : b;
+  }
+  return (a.updatedAt ?? 0) >= (b.updatedAt ?? 0) ? a : b;
+}
+
+/**
+ * Load checkpoint: prefers Supabase (when configured) and merges with localStorage
+ * so the best partial progress wins across devices.
+ */
+export async function loadCedarChunkResumeHybrid(
+  bidId: string,
+  pastureId: string
+): Promise<CedarChunkResumeState | null> {
+  const local = loadCedarChunkResume(bidId, pastureId);
+
+  let remote: CedarChunkResumeState | null = null;
+  try {
+    const res = await fetch(
+      `/api/cedar-checkpoint?bidId=${encodeURIComponent(bidId)}&pastureId=${encodeURIComponent(pastureId)}`
+    );
+    if (res.ok) {
+      const data = (await res.json()) as {
+        configured?: boolean;
+        checkpoint?: CedarChunkResumeState | null;
+      };
+      if (data.checkpoint && typeof data.checkpoint === 'object') {
+        remote = data.checkpoint;
+      }
+    }
+  } catch {
+    /* offline or API missing */
+  }
+
+  if (remote && local) {
+    const merged = pickNewerResume(remote, local);
+    if (merged !== local) {
+      saveCedarChunkResume(merged);
+    }
+    return merged;
+  }
+  return remote ?? local;
+}
+
+/** Save to localStorage and Supabase (when API is configured). */
+export async function saveCedarChunkResumeHybrid(state: CedarChunkResumeState): Promise<void> {
+  saveCedarChunkResume(state);
+  try {
+    await fetch('/api/cedar-checkpoint', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
+  } catch {
+    /* remote optional */
+  }
+}
+
+/** Clear local + remote checkpoint. */
+export async function clearCedarChunkResumeHybrid(bidId: string, pastureId: string): Promise<void> {
+  clearCedarChunkResume(bidId, pastureId);
+  try {
+    await fetch(
+      `/api/cedar-checkpoint?bidId=${encodeURIComponent(bidId)}&pastureId=${encodeURIComponent(pastureId)}`,
+      { method: 'DELETE' }
+    );
+  } catch {
+    /* ignore */
+  }
+}

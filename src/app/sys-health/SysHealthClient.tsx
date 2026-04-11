@@ -62,6 +62,14 @@ const INITIAL_SERVICES: ServiceCheck[] = [
     lastChecked: null,
     description: 'Sentinel-2 seasonal analysis pipeline',
   },
+  {
+    name: 'CEDAR_CHECKPOINT',
+    endpoint: '/api/cedar-checkpoint?health=1',
+    status: 'unchecked',
+    latency: null,
+    lastChecked: null,
+    description: 'Supabase resume storage for chunked spectral analysis (needs service role)',
+  },
 ];
 
 function getStorageUsed(): string {
