@@ -427,11 +427,14 @@ function applyTileConsensus(
 // ── API handler ──
 
 export async function POST(req: NextRequest) {
+  const reqId = Math.random().toString(36).slice(2, 8);
+  const t0 = Date.now();
   try {
     const body = await req.json();
     const { coordinates, acreage, month: bodyMonth, latitude: bodyLat } = body;
 
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
+      console.warn(`[cedar-detect:${reqId}] 400: missing coordinates`);
       return NextResponse.json({ error: 'Polygon coordinates required' }, { status: 400 });
     }
 
@@ -465,11 +468,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (samplePoints.length === 0) {
+      console.warn(`[cedar-detect:${reqId}] 400: zero sample points, bbox=${JSON.stringify(bbox)}`);
       return NextResponse.json(
         { error: 'No sample points generated. Polygon may be too small.' },
         { status: 400 }
       );
     }
+
+    console.log(`[cedar-detect:${reqId}] start: ${samplePoints.length} pts, ${ac.toFixed(1)} ac, bbox=[${bbox.map(n => n.toFixed(4))}]`);
 
     function naipWaveCooldown(): Promise<void> {
       const ms =
@@ -640,6 +646,8 @@ export async function POST(req: NextRequest) {
 
         const sampledCount = results.length;
 
+        console.log(`[cedar-detect:${reqId}] NAIP done: ${results.length}/${totalPoints} pts, earlyStop=${earlyStop}, elapsed=${Date.now() - t0}ms`);
+
         send('progress', {
           phase: 'consensus',
           message: 'Running tile consensus refinement...',
@@ -658,6 +666,7 @@ export async function POST(req: NextRequest) {
         const subPoints: GeoJSON.Feature<GeoJSON.Point>[] = [];
 
         const timeForSentinel = hardDeadline - Date.now() > SENTINEL_MIN_MS;
+        console.log(`[cedar-detect:${reqId}] sentinel: timeForSentinel=${timeForSentinel}, remainMs=${hardDeadline - Date.now()}`);
 
         if (timeForSentinel) {
           send('progress', {
@@ -845,12 +854,15 @@ export async function POST(req: NextRequest) {
           lowTrust: s.lowTrust,
         }));
 
+        console.log(`[cedar-detect:${reqId}] sending result: ${total} samples, cedar=${summary.cedar.count}, elapsed=${Date.now() - t0}ms`);
         send('result', { summary, samples });
         stopHeartbeat();
         controller.close();
+        console.log(`[cedar-detect:${reqId}] stream closed OK, total elapsed=${Date.now() - t0}ms`);
         } catch (streamErr) {
           stopHeartbeat();
           const message = streamErr instanceof Error ? streamErr.message : 'Spectral stream failed';
+          console.error(`[cedar-detect:${reqId}] stream error: ${message}, elapsed=${Date.now() - t0}ms`);
           try {
             controller.enqueue(
               encoder.encode(`event: error\ndata: ${JSON.stringify({ message })}\n\n`)
@@ -872,6 +884,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
+    console.error(`[cedar-detect:${reqId}] outer error: ${err instanceof Error ? err.message : err}, elapsed=${Date.now() - t0}ms`);
     return NextResponse.json(
       { error: 'Analysis failed', detail: err instanceof Error ? err.message : 'Unknown error' },
       { status: 500 }

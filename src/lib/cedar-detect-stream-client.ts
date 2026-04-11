@@ -15,9 +15,12 @@ const STREAM_STALL_TIMEOUT_MS = 90_000;
  */
 export async function readCedarDetectSse(
   res: Response,
-  onProgress?: (payload: Record<string, unknown>) => void
+  onProgress?: (payload: Record<string, unknown>) => void,
+  logTag?: string,
 ): Promise<CedarAnalysis> {
+  const tag = logTag ?? 'sse';
   if (!res.body) {
+    console.error(`[${tag}] no response body`);
     throw new Error('Spectral analysis: no response body from server.');
   }
   const reader = res.body.getReader();
@@ -26,6 +29,9 @@ export async function readCedarDetectSse(
   let buffer = '';
   let resultData: CedarAnalysis | null = null;
   let streamError: string | null = null;
+  let chunkCount = 0;
+  let totalBytes = 0;
+  let lastEventType = '';
 
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
   let stalled = false;
@@ -34,17 +40,25 @@ export async function readCedarDetectSse(
     if (stallTimer) clearTimeout(stallTimer);
     stallTimer = setTimeout(() => {
       stalled = true;
+      console.warn(`[${tag}] stall detected after ${STREAM_STALL_TIMEOUT_MS}ms — cancelling reader (chunks=${chunkCount}, bytes=${totalBytes})`);
       try { reader.cancel(); } catch { /* already closed */ }
     }, STREAM_STALL_TIMEOUT_MS);
   }
 
   resetStallTimer();
 
+  console.log(`[${tag}] starting SSE read`);
+
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log(`[${tag}] reader done: chunks=${chunkCount}, bytes=${totalBytes}, hasResult=${!!resultData}, hasError=${!!streamError}`);
+        break;
+      }
 
+      chunkCount++;
+      totalBytes += value.byteLength;
       resetStallTimer();
 
       buffer += decoder.decode(value, { stream: true });
@@ -59,6 +73,7 @@ export async function readCedarDetectSse(
         } else if (line.startsWith('data: ') && eventType) {
           try {
             const payload = JSON.parse(line.slice(6).trim()) as Record<string, unknown>;
+            lastEventType = eventType;
             if (eventType === 'progress') {
               onProgress?.(payload);
             } else if (eventType === 'error') {
@@ -66,11 +81,16 @@ export async function readCedarDetectSse(
                 typeof payload.message === 'string'
                   ? payload.message
                   : 'Spectral analysis failed on the server.';
+              console.error(`[${tag}] server error event: ${streamError}`);
             } else if (eventType === 'result') {
+              console.log(`[${tag}] result event received: samples=${Array.isArray(payload.samples) ? (payload.samples as unknown[]).length : 'n/a'}, hasSummary=${!!payload.summary}`);
               resultData = normalizeCedarAnalysisPayload(payload);
+              if (!resultData) {
+                console.error(`[${tag}] normalizeCedarAnalysisPayload returned null! payload keys: ${Object.keys(payload).join(', ')}, summary keys: ${payload.summary ? Object.keys(payload.summary as object).join(', ') : 'MISSING'}`);
+              }
             }
-          } catch {
-            /* skip malformed line */
+          } catch (parseErr) {
+            console.warn(`[${tag}] SSE parse error for event '${eventType}': ${parseErr instanceof Error ? parseErr.message : parseErr}, lineLen=${line.length}`);
           }
           eventType = '';
         }
@@ -81,10 +101,12 @@ export async function readCedarDetectSse(
   }
 
   if (streamError) {
+    console.error(`[${tag}] throwing server error: ${streamError}`);
     throw new Error(streamError);
   }
   if (!resultData) {
     const reason = stalled ? 'stream_stall' : 'stream_ended';
+    console.error(`[${tag}] no result: reason=${reason}, lastEvent=${lastEventType}, chunks=${chunkCount}, bytes=${totalBytes}, bufferLen=${buffer.length}`);
     const err = new Error(
       stalled
         ? 'Spectral analysis stream stalled — your device may have suspended the connection. Retrying…'
@@ -93,6 +115,7 @@ export async function readCedarDetectSse(
     (err as Error & { reason: string }).reason = reason;
     throw err;
   }
+  console.log(`[${tag}] success: ${resultData.summary?.totalSamples ?? '?'} samples`);
   return resultData;
 }
 
@@ -114,12 +137,18 @@ export async function fetchCedarDetectChunkWithRetry(
   onProgress?: (payload: Record<string, unknown>) => void
 ): Promise<CedarAnalysis> {
   let lastError: Error | null = null;
+  const tag = `chunk-${Math.random().toString(36).slice(2, 6)}`;
 
   for (let attempt = 0; attempt < MAX_CHUNK_RETRIES; attempt++) {
+    const attemptTag = `${tag}-a${attempt}`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CHUNK_FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(() => {
+      console.warn(`[${attemptTag}] fetch timeout after ${CHUNK_FETCH_TIMEOUT_MS}ms — aborting`);
+      controller.abort();
+    }, CHUNK_FETCH_TIMEOUT_MS);
 
     try {
+      console.log(`[${attemptTag}] fetching cedar-detect: ${acreage.toFixed(1)} ac, lat=${latitude.toFixed(4)}`);
       const res = await fetch('/api/cedar-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,16 +156,19 @@ export async function fetchCedarDetectChunkWithRetry(
         signal: controller.signal,
       });
 
+      console.log(`[${attemptTag}] response: status=${res.status}, ok=${res.ok}, type=${res.headers.get('content-type')}`);
+
       if (!res.ok) {
         let msg = `Spectral analysis failed (${res.status})`;
         try {
           const errBody = (await res.json()) as { error?: string; detail?: string };
           if (errBody.error) msg = errBody.detail ? `${errBody.error}: ${errBody.detail}` : errBody.error;
         } catch { /* ignore */ }
+        console.error(`[${attemptTag}] non-ok response: ${msg}`);
         throw new Error(msg);
       }
 
-      const result = await readCedarDetectSse(res, onProgress);
+      const result = await readCedarDetectSse(res, onProgress, attemptTag);
       return result;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
@@ -151,11 +183,14 @@ export async function fetchCedarDetectChunkWithRetry(
         lastError.message.includes('The operation was aborted') ||
         lastError.message.includes('stream may have been cut off');
 
+      console.error(`[${attemptTag}] error: name=${lastError.name}, reason=${(lastError as Error & { reason?: string }).reason ?? '-'}, msg=${lastError.message}, retryable=${isRetryable}, attemptsLeft=${MAX_CHUNK_RETRIES - 1 - attempt}`);
+
       if (!isRetryable || attempt >= MAX_CHUNK_RETRIES - 1) {
         throw lastError;
       }
 
       const delayMs = 2000 + attempt * 1500 + Math.random() * 1000;
+      console.log(`[${attemptTag}] retrying in ${Math.round(delayMs)}ms...`);
       await new Promise((r) => setTimeout(r, delayMs));
     } finally {
       clearTimeout(timeout);
