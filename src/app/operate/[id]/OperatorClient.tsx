@@ -155,8 +155,6 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const preHoloLayersRef = useRef<Pick<Record<OperateLayerKey, boolean>, 'naip' | 'naipCIR' | 'naipNDVI'> | null>(null);
   const treeLayerRef = useRef<TreeLayer3D | null>(null);
   const holoRotationRef = useRef<number | null>(null);
-  const layersRef = useRef(layers);
-  layersRef.current = layers;
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
@@ -929,9 +927,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     }
   }, [layers, mapReady, state.bid]);
 
-  // Slow bearing drift while hologram is on (starts/stops with hologram toggle only)
+  // Slow bearing drift in all modes (same rate as hologram on bid / scout maps)
   useEffect(() => {
-    if (!layers.hologram || !mapReady) {
+    if (!mapReady) {
       if (holoRotationRef.current) {
         cancelAnimationFrame(holoRotationRef.current);
         holoRotationRef.current = null;
@@ -939,7 +937,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
     const spin = () => {
-      if (!mapRef.current || !layersRef.current.hologram) return;
+      if (!mapRef.current) return;
       mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
       holoRotationRef.current = requestAnimationFrame(spin);
     };
@@ -950,12 +948,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         holoRotationRef.current = null;
       }
     };
-  }, [layers.hologram, mapReady]);
+  }, [mapReady]);
 
-  // Hologram spin: pause on interaction, resume after idle (same idea as bid map)
+  // Pause rotation on user interaction, resume after idle (bid map pattern)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !layers.hologram) return;
+    if (!map || !map.isStyleLoaded() || !mapReady) return;
 
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -966,9 +964,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
       if (resumeTimer) clearTimeout(resumeTimer);
       resumeTimer = setTimeout(() => {
-        if (!mapRef.current || !layersRef.current.hologram) return;
+        if (!mapRef.current) return;
         const spin = () => {
-          if (!mapRef.current || !layersRef.current.hologram) return;
+          if (!mapRef.current) return;
           mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
           holoRotationRef.current = requestAnimationFrame(spin);
         };
@@ -986,7 +984,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.off('wheel', pause);
       if (resumeTimer) clearTimeout(resumeTimer);
     };
-  }, [layers.hologram, mapReady]);
+  }, [mapReady]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
