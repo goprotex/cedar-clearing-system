@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import JobTeamPanel from '@/components/operations/JobTeamPanel';
+import JobNotesAndProgressPanel from '@/components/operations/JobNotesAndProgressPanel';
 import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
 
 type CompanyProfile = {
@@ -132,6 +133,10 @@ export default function DashboardClient() {
     () => [...jobs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [jobs],
   );
+
+  const patchJob = (jobId: string, patch: Partial<ActiveJobSummary>) => {
+    setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, ...patch } : j)));
+  };
 
   return (
     <AppShell>
@@ -271,8 +276,9 @@ export default function DashboardClient() {
                             <span className="text-[10px] font-mono text-[#a98a7d] shrink-0">{expandedJobId === j.id ? '−' : '+'}</span>
                           </button>
                           {expandedJobId === j.id && (
-                            <div className="px-3 pb-3 border-t border-[#353534]">
+                            <div className="px-3 pb-3 border-t border-[#353534] space-y-1">
                               <JobTeamPanel jobId={j.id} />
+                              <JobNotesAndProgressPanel job={j} onJobPatch={(p) => patchJob(j.id, p)} />
                             </div>
                           )}
                         </div>

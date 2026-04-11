@@ -6,6 +6,7 @@ import AppShell from '@/components/AppShell';
 import { useAuth } from '@/components/AuthProvider';
 import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
 import JobTeamPanel from '@/components/operations/JobTeamPanel';
+import JobNotesAndProgressPanel from '@/components/operations/JobNotesAndProgressPanel';
 
 type BootstrapResponse = {
   jobs: ActiveJobSummary[];
@@ -69,6 +70,10 @@ export default function OperationsClient() {
     return { total, cleared, pct: pct(cleared, total) };
   }, [jobs]);
 
+  const patchJob = (jobId: string, patch: Partial<ActiveJobSummary>) => {
+    setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, ...patch } : j)));
+  };
+
   return (
     <AppShell>
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-4 mb-8">
@@ -125,6 +130,14 @@ export default function OperationsClient() {
                     <div className="mt-2 w-full h-1.5 bg-[#353534] rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-[#13ff43] to-[#00cc33]" style={{ width: `${p}%` }} />
                     </div>
+                    {(j.work_started_at || j.manual_machine_hours != null || j.manual_fuel_gallons != null) && (
+                      <div className="mt-2 text-[9px] font-mono text-[#5a4136] flex flex-wrap gap-x-3 gap-y-0.5">
+                        {j.work_started_at && <span>Start: {new Date(j.work_started_at).toLocaleDateString()}</span>}
+                        {j.work_completed_at && <span>End: {new Date(j.work_completed_at).toLocaleDateString()}</span>}
+                        {j.manual_machine_hours != null && <span>{j.manual_machine_hours} mach.hr</span>}
+                        {j.manual_fuel_gallons != null && <span>{j.manual_fuel_gallons} gal</span>}
+                      </div>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2 items-center">
                       <Link
                         href={`/bid/${bidId}`}
@@ -149,11 +162,14 @@ export default function OperationsClient() {
                         onClick={() => setExpandedJobId((id) => (id === j.id ? null : j.id))}
                         className="text-[10px] font-bold uppercase tracking-wider border border-[#5a4136] px-2 py-1 text-[#a98a7d] hover:border-[#FF6B00] hover:text-[#FF6B00] ml-auto"
                       >
-                        {expandedJobId === j.id ? 'Hide team' : 'Team'}
+                        {expandedJobId === j.id ? 'Hide details' : 'Details'}
                       </button>
                     </div>
                     {expandedJobId === j.id && (
-                      <JobTeamPanel jobId={j.id} />
+                      <div className="mt-2 space-y-1">
+                        <JobTeamPanel jobId={j.id} />
+                        <JobNotesAndProgressPanel job={j} onJobPatch={(p) => patchJob(j.id, p)} />
+                      </div>
                     )}
                   </li>
                 );

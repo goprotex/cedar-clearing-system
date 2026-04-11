@@ -11,6 +11,10 @@ type MonitorJob = {
   bid_snapshot: unknown;
   cedar_total_cells: number;
   cedar_cleared_cells: number;
+  work_started_at: string | null;
+  work_completed_at: string | null;
+  manual_machine_hours: number | null;
+  manual_fuel_gallons: number | null;
 };
 
 function isCompanySupervisorRole(role: string | null | undefined): boolean {
@@ -96,7 +100,9 @@ export async function GET() {
 
   const { data: jobs, error: jobsErr } = await supabase
     .from('jobs')
-    .select('id, bid_id, title, status, created_at, bid_snapshot, cedar_total_cells, cedar_cleared_cells')
+    .select(
+      'id, bid_id, title, status, created_at, bid_snapshot, cedar_total_cells, cedar_cleared_cells, work_started_at, work_completed_at, manual_machine_hours, manual_fuel_gallons',
+    )
     .in('id', jobIds)
     .order('created_at', { ascending: false });
   if (jobsErr) return NextResponse.json({ error: jobsErr.message }, { status: 500 });

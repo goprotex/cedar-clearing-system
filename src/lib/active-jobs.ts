@@ -9,6 +9,10 @@ export type ActiveJobSummary = {
   bid_snapshot: Bid;
   cedar_total_cells: number;
   cedar_cleared_cells: number;
+  work_started_at?: string | null;
+  work_completed_at?: string | null;
+  manual_machine_hours?: number | null;
+  manual_fuel_gallons?: number | null;
 };
 
 export function mergeJobsById(remote: ActiveJobSummary[], local: ActiveJobSummary[]): ActiveJobSummary[] {
@@ -54,6 +58,10 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
         bid_snapshot: bid,
         cedar_total_cells: cedarTotal,
         cedar_cleared_cells: job.cedar_cleared_cells ?? 0,
+        work_started_at: null,
+        work_completed_at: null,
+        manual_machine_hours: null,
+        manual_fuel_gallons: null,
       });
     }
   } catch { /* ignore */ }
@@ -98,6 +106,10 @@ export function loadJobsFromOperatorStorage(existingIds: Set<string>): ActiveJob
       bid_snapshot: bid,
       cedar_total_cells: cedarTotal,
       cedar_cleared_cells: 0,
+      work_started_at: null,
+      work_completed_at: null,
+      manual_machine_hours: null,
+      manual_fuel_gallons: null,
     });
   };
 
