@@ -33,9 +33,9 @@ function saveStore(data: Record<string, OperatorData>) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { jobId, lng, lat, accuracy_m, heading_deg, speed_mps, timestamp, trailPoint } = body as {
+    const { jobId, lng, lat, accuracy_m, heading_deg, heading, speed_mps, timestamp, trailPoint } = body as {
       jobId?: string; lng?: number; lat?: number;
-      accuracy_m?: number | null; heading_deg?: number | null; speed_mps?: number | null;
+      accuracy_m?: number | null; heading_deg?: number | null; heading?: number | null; speed_mps?: number | null;
       timestamp?: number; trailPoint?: [number, number];
     };
 
@@ -51,10 +51,11 @@ export async function POST(req: Request) {
       if (trail.length > 10000) trail.splice(0, trail.length - 10000);
     }
 
+    const hdg = typeof heading === 'number' ? heading : heading_deg ?? null;
     store[jobId] = {
       jobId, lng, lat,
       accuracy_m: accuracy_m ?? null,
-      heading_deg: heading_deg ?? null,
+      heading_deg: hdg,
       speed_mps: speed_mps ?? null,
       timestamp: timestamp ?? Date.now(),
       trail,

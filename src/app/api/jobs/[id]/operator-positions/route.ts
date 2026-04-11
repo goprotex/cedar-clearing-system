@@ -57,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     lng: number;
     lat: number;
     accuracy_m: number | null;
+    heading: number | null;
     heading_deg: number | null;
     speed_mps: number | null;
   }> | null;
@@ -65,14 +66,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Missing lng/lat' }, { status: 400 });
   }
 
-  // DB column is `heading` (see migrations); OperatorClient sends `heading_deg`.
+  // DB column is `heading`; accept both `heading` and `heading_deg` from clients.
+  const heading =
+    typeof b.heading === 'number' ? b.heading
+      : typeof b.heading_deg === 'number' ? b.heading_deg : null;
+
   const { error: upsertErr } = await supabase.from('job_operator_positions').upsert({
     job_id: id,
     user_id: userId,
     lng: b.lng,
     lat: b.lat,
     accuracy_m: b.accuracy_m ?? null,
-    heading: b.heading_deg ?? null,
+    heading,
     speed_mps: b.speed_mps ?? null,
   }, { onConflict: 'job_id,user_id' });
   if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 });
