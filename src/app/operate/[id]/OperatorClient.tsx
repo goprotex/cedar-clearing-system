@@ -6,6 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis, type TreePosition } from '@/lib/tree-layer';
+import { treeFeaturesForMapboxExtrusion } from '@/lib/operate-mapbox-trees';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
 import { loadBidFromSupabase, getAuthUserId } from '@/lib/db';
@@ -451,6 +452,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
                 'fill-extrusion-base': 0,
               },
             });
+
+            // Mapbox-native 3D tree stand-ins (fill-extrusion cylinders) — sit on terrain DEM, above cell prisms
+            if (map.getTerrain()) {
+              try {
+                const treeList = extractTreesFromAnalysis(bid.pastures);
+                const treeFc = treeFeaturesForMapboxExtrusion(treeList, { maxTrees: 2800, circleSteps: 10 });
+                map.addSource('operate-trees-3d', { type: 'geojson', data: treeFc });
+                map.addLayer({
+                  id: 'operate-trees-3d',
+                  type: 'fill-extrusion',
+                  source: 'operate-trees-3d',
+                  paint: {
+                    'fill-extrusion-color': ['get', 'color'],
+                    'fill-extrusion-height': ['get', 'height_m'],
+                    'fill-extrusion-base': 0,
+                    'fill-extrusion-opacity': 0.9,
+                  },
+                });
+              } catch {
+                /* optional */
+              }
+            }
           }
 
           map.addLayer({
