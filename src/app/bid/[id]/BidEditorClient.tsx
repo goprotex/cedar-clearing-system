@@ -137,7 +137,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   // All hooks above — safe to early-return now
   if (!mounted) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#131313] text-[#a98a7d]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-[#131313] text-[#a98a7d] px-4">
         <div className="text-center">
           <div className="text-[#FF6B00] text-2xl font-black uppercase tracking-widest mb-2">LOADING_BID</div>
           <div className="text-xs font-mono">INITIALIZING_ESTIMATOR...</div>
@@ -147,20 +147,20 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#131313] text-[#e5e2e1]">
+    <div className="min-h-[100dvh] h-[100dvh] flex flex-col bg-[#131313] text-[#e5e2e1] overflow-x-hidden">
       {/* Top bar */}
-      <header className="h-14 bg-[#131313] border-b-2 border-[#353534] text-[#FFB693] flex items-center justify-between px-3 md:px-4 shrink-0">
-        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+      <header className="min-h-14 bg-[#131313] border-b-2 border-[#353534] text-[#FFB693] flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 md:px-4 shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-wrap">
           <Link href="/bids" className="text-[#FF6B00] font-bold text-lg hover:text-white tracking-widest uppercase shrink-0">
             CH
           </Link>
           <span className="text-[#353534] shrink-0">|</span>
-          <span className="font-mono font-bold text-sm truncate">{currentBid.bidNumber}</span>
+          <span className="font-mono font-bold text-sm truncate max-w-[40vw] sm:max-w-none">{currentBid.bidNumber}</span>
           <Select
             value={currentBid.status}
             onValueChange={(v) => updateBidField('status', v as BidStatus)}
           >
-            <SelectTrigger className={`h-7 w-24 md:w-28 text-xs bg-transparent border ${STATUS_COLORS[currentBid.status]} shrink-0`}>
+            <SelectTrigger className={`h-7 w-[5.5rem] sm:w-24 md:w-28 text-xs bg-transparent border ${STATUS_COLORS[currentBid.status]} shrink-0`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -173,28 +173,36 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
             {'//'} {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end">
           <Link
             href={`/operate/${currentBid.id}`}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs border border-[#13ff43]/50 text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-bold uppercase tracking-widest transition-all rounded-sm hidden sm:inline-flex"
+            className="inline-flex items-center gap-1 px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs border border-[#13ff43]/50 text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-bold uppercase tracking-widest transition-all rounded-sm"
             title="Launch fullscreen operator mode with GPS tracking"
           >
-            🚜 OPERATE
+            🚜 <span className="hidden sm:inline">OPERATE</span>
+            <span className="sm:hidden">OP</span>
           </Link>
           <Button
             variant="outline"
             size="sm"
-            className="text-xs border-[#353534] text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-black uppercase tracking-widest hidden sm:inline-flex"
+            className="text-[10px] sm:text-xs border-[#353534] text-[#13ff43] hover:bg-[#13ff43] hover:text-black font-black uppercase tracking-widest px-2 sm:px-3"
             onClick={convertToJob}
             disabled={convertBusy}
             title="Convert this bid into a shared job for multi-user progress tracking"
           >
-            {convertBusy ? 'CREATING_JOB…' : 'CONVERT_TO_JOB'}
+            {convertBusy ? (
+              <span>CREATING…</span>
+            ) : (
+              <>
+                <span className="sm:hidden">TO_JOB</span>
+                <span className="hidden sm:inline">CONVERT_TO_JOB</span>
+              </>
+            )}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="text-xs border-[#353534] text-[#a98a7d] hover:bg-[#353534] hover:text-white font-bold uppercase tracking-widest hidden sm:inline-flex"
+            className="text-[10px] sm:text-xs border-[#353534] text-[#a98a7d] hover:bg-[#353534] hover:text-white font-bold uppercase tracking-widest hidden sm:inline-flex"
             onClick={handleSave}
           >
             SAVE_DRAFT
@@ -202,28 +210,29 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
           <Button
             variant="outline"
             size="sm"
-            className="text-xs border-[#353534] text-[#a98a7d] hover:bg-[#353534] hover:text-white font-bold sm:hidden"
+            className="text-[10px] sm:text-xs border-[#353534] text-[#a98a7d] hover:bg-[#353534] hover:text-white font-bold sm:hidden px-2"
             onClick={handleSave}
           >
             SAVE
           </Button>
           <Button
             size="sm"
-            className="text-xs bg-[#FF6B00] text-black font-black hover:bg-white uppercase tracking-widest hidden sm:inline-flex"
+            className="text-[10px] sm:text-xs bg-[#FF6B00] text-black font-black hover:bg-white uppercase tracking-widest px-2 sm:px-3"
             onClick={() => {
               handleSave();
               toast.info('PDF generation coming in Phase 4');
             }}
           >
-            GENERATE_PDF
+            <span className="sm:hidden">PDF</span>
+            <span className="hidden sm:inline">GENERATE_PDF</span>
           </Button>
         </div>
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Map (takes remaining space) */}
-        <div className="h-[40vh] md:h-auto md:flex-1 relative shrink-0">
+        <div className="h-[min(42vh,320px)] min-h-[200px] md:min-h-0 md:h-auto md:flex-1 relative shrink-0">
           {mapboxToken ? (
             <MapContainer accessToken={mapboxToken} />
           ) : (
@@ -245,12 +254,12 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
 
         {/* Right sidebar */}
         <div className="w-full md:w-[400px] bg-[#131313] border-t-2 md:border-t-0 md:border-l-2 border-[#353534] flex flex-col shrink-0 overflow-hidden flex-1 md:flex-none">
-          <Tabs defaultValue="pastures" className="flex flex-col h-full overflow-hidden">
-            <TabsList className="mx-3 mt-3 shrink-0 bg-[#1c1b1b] border border-[#353534]">
-              <TabsTrigger value="pastures" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Pastures</TabsTrigger>
-              <TabsTrigger value="options" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Options</TabsTrigger>
-              <TabsTrigger value="details" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Details</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black">Settings</TabsTrigger>
+          <Tabs defaultValue="pastures" className="flex flex-col h-full min-h-0 overflow-hidden">
+            <TabsList className="mx-2 sm:mx-3 mt-3 shrink-0 bg-[#1c1b1b] border border-[#353534] flex w-[calc(100%-1rem)] sm:w-auto max-w-full min-w-0 overflow-x-auto flex-nowrap justify-start gap-0.5 p-0.5">
+              <TabsTrigger value="pastures" className="text-[11px] sm:text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black shrink-0 px-2 sm:px-3">Pastures</TabsTrigger>
+              <TabsTrigger value="options" className="text-[11px] sm:text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black shrink-0 px-2 sm:px-3">Options</TabsTrigger>
+              <TabsTrigger value="details" className="text-[11px] sm:text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black shrink-0 px-2 sm:px-3">Details</TabsTrigger>
+              <TabsTrigger value="settings" className="text-[11px] sm:text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black shrink-0 px-2 sm:px-3">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="pastures" className="flex-1 min-h-0 flex flex-col overflow-hidden mt-0">

@@ -47,12 +47,12 @@ export default function ScheduleClient() {
 
   return (
     <AppShell>
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">SCHEDULE</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-6 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">SCHEDULE</h1>
           <p className="text-[#a98a7d] text-xs font-mono mt-1">NEXT 60 DAYS · YOUR JOBS</p>
         </div>
-        <Link href="/operations" className="text-[10px] font-mono text-[#FF6B00] hover:underline">
+        <Link href="/operations" className="text-[10px] font-mono text-[#FF6B00] hover:underline shrink-0">
           Operations →
         </Link>
       </div>

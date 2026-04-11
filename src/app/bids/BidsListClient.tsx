@@ -38,17 +38,17 @@ export default function BidsListClient() {
   return (
     <AppShell>
       {/* Title Row */}
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">ACTIVE_BIDS</h1>
-          <p className="text-[#ffb693] text-xs font-mono">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">ACTIVE_BIDS</h1>
+          <p className="text-[#ffb693] text-[10px] sm:text-xs font-mono">
             {savedBids.length} RECORDS // STATUS: MONITORING
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button
             onClick={handleNewBid}
-            className="bg-[#FF6B00] text-black font-black text-xs uppercase tracking-widest hover:bg-white transition-all px-6 py-2"
+            className="bg-[#FF6B00] text-black font-black text-xs uppercase tracking-widest hover:bg-white transition-all px-4 sm:px-6 py-2 w-full sm:w-auto"
           >
             + NEW_BID
           </Button>

@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
   { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
+  { href: '/dashboard', label: 'TEAM', icon: '👥' },
   { href: '/operations', label: 'OPERATIONS', icon: '📟' },
   { href: '/schedule', label: 'SCHEDULE', icon: '📅' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
 const HEADER_NAV = [
   { href: '/bids', label: 'ESTIMATOR' },
   { href: '/monitor', label: 'MONITOR' },
+  { href: '/dashboard', label: 'TEAM' },
   { href: '/fleet', label: 'FLEET' },
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
@@ -39,8 +41,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
-      <header className="fixed top-0 w-full z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center h-16 px-4 md:px-6">
+    <div className="min-h-[100dvh] min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center min-h-16 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]">
         <div className="flex items-center gap-4 md:gap-6">
           <button
             className="md:hidden flex flex-col justify-center items-center w-8 h-8 gap-[5px]"
@@ -55,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="text-xl md:text-2xl font-bold text-[#FF6B00] tracking-widest uppercase">
             CEDAR_HACK
           </Link>
-          <div className="hidden md:flex gap-6 text-xs font-bold">
+          <div className="hidden sm:flex flex-wrap gap-3 md:gap-6 text-xs font-bold items-center">
             {HEADER_NAV.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
@@ -74,29 +76,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-[10px] text-[#a98a7d] font-mono hidden md:inline">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <span className="text-[10px] text-[#a98a7d] font-mono hidden lg:inline">
             SYS_STATUS: OPERATIONAL
           </span>
-          <div className="hidden md:flex items-center gap-2">
-            {authLoading ? null : authEmail ? (
+          <div className="flex items-center gap-2">
+            {authLoading ? (
+              <span className="text-[10px] font-mono text-[#5a4136]">…</span>
+            ) : authEmail ? (
               <>
-                <span className="text-[10px] text-[#a98a7d] font-mono truncate max-w-[160px]" title={authEmail}>
-                  USER: {authEmail}
+                <span className="hidden sm:inline text-[10px] text-[#a98a7d] font-mono truncate max-w-[160px]" title={authEmail}>
+                  {authEmail}
                 </span>
                 <Link
                   href="/logout"
-                  className="text-[10px] font-mono border border-[#353534] px-2 py-1 text-[#a98a7d] hover:text-white hover:bg-[#353534]"
+                  className="text-[10px] font-mono border border-[#353534] px-2 py-1.5 text-[#a98a7d] hover:text-white hover:bg-[#353534] whitespace-nowrap"
                 >
-                  LOGOUT
+                  Log out
                 </Link>
               </>
             ) : (
               <Link
                 href="/login"
-                className="text-[10px] font-mono border border-[#353534] px-2 py-1 text-[#a98a7d] hover:text-white hover:bg-[#353534]"
+                className="text-[10px] font-black uppercase tracking-wider bg-[#FF6B00] text-black px-3 py-1.5 hover:bg-white whitespace-nowrap"
               >
-                LOGIN
+                Sign in
               </Link>
             )}
           </div>
@@ -118,13 +122,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile slide-out drawer */}
       <aside
-        className={`fixed left-0 top-0 h-full w-72 border-r-2 border-[#353534] bg-[#131313] flex flex-col pt-20 pb-4 px-2 z-40 transition-transform duration-300 md:hidden ${
+        className={`fixed left-0 top-0 h-full w-[min(100vw-2.5rem,18rem)] max-w-[85vw] border-r-2 border-[#353534] bg-[#131313] flex flex-col pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] px-2 z-40 transition-transform duration-300 md:hidden ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="px-4 mb-6">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
+        </div>
+
+        <div className="px-4 mb-3 md:hidden">
+          {authLoading ? null : authEmail ? (
+            <div className="text-[10px] font-mono text-[#a98a7d] truncate mb-2" title={authEmail}>{authEmail}</div>
+          ) : null}
+          <Link
+            href={authEmail ? '/logout' : '/login'}
+            onClick={() => setMobileMenuOpen(false)}
+            className={`block text-center text-xs font-black uppercase tracking-widest py-2 border-2 ${
+              authEmail ? 'border-[#353534] text-[#a98a7d]' : 'border-[#FF6B00] bg-[#FF6B00] text-black'
+            }`}
+          >
+            {authEmail ? 'Log out' : 'Sign in'}
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
@@ -165,7 +184,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] flex-col pt-20 pb-4 px-2 z-40 hidden md:flex">
+      <aside className="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] flex-col pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-2 z-40 hidden md:flex">
         <div className="px-4 mb-8">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
@@ -191,7 +210,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto pt-4 border-t border-[#353534] px-2 space-y-2">
+        <div className="mt-auto pt-4 border-t border-[#353534] px-2 space-y-3">
+          <div className="px-2">
+            {authLoading ? (
+              <span className="text-[10px] font-mono text-[#5a4136]">Auth…</span>
+            ) : authEmail ? (
+              <>
+                <div className="text-[9px] font-mono text-[#5a4136] truncate mb-1" title={authEmail}>{authEmail}</div>
+                <Link
+                  href="/logout"
+                  className="block text-center text-[10px] font-black uppercase tracking-widest border border-[#353534] py-2 text-[#a98a7d] hover:text-white hover:bg-[#353534]"
+                >
+                  Log out
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="block text-center text-[10px] font-black uppercase tracking-widest bg-[#FF6B00] text-black py-2 hover:bg-white"
+              >
+                Sign in
+              </Link>
+            )}
+          </div>
           <Link
             href="/sys-health"
             className={`flex items-center gap-3 p-2 text-[10px] uppercase font-bold transition-all ${
@@ -206,7 +247,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="md:ml-64 pt-20 p-6 min-h-screen">
+      <main className="w-full min-w-0 max-w-[100vw] md:ml-64 pt-[calc(5rem+env(safe-area-inset-top,0px))] px-4 sm:px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] min-h-[100dvh] min-h-screen">
         {children}
       </main>
     </div>

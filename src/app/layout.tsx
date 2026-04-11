@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import AuthProvider from "@/components/AuthProvider";
+import AuthRequiredGate from "@/components/AuthRequiredGate";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -15,6 +16,12 @@ export const metadata: Metadata = {
   description: "AI-Powered Clearing Company Operating System",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,9 +30,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} dark h-full antialiased`}
+      className={`${spaceGrotesk.variable} dark h-full antialiased scroll-smooth overflow-x-hidden`}
     >
-      <body className="min-h-full flex flex-col font-[family-name:var(--font-space-grotesk)] bg-[#131313] text-[#e5e2e1]"><AuthProvider>{children}</AuthProvider><Toaster position="bottom-right" richColors /></body>
+      <body className="min-h-full flex flex-col font-[family-name:var(--font-space-grotesk)] bg-[#131313] text-[#e5e2e1] overflow-x-hidden">
+        <AuthProvider>
+          <AuthRequiredGate>{children}</AuthRequiredGate>
+        </AuthProvider>
+        <Toaster position="bottom-right" richColors />
+      </body>
     </html>
   );
 }

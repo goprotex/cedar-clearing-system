@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { canAccessJob } from '@/lib/job-access';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -9,19 +10,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Ensure membership
-  const { data: membership, error: membershipErr } = await supabase
-    .from('job_members')
-    .select('job_id')
-    .eq('job_id', id)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (membershipErr) return NextResponse.json({ error: membershipErr.message }, { status: 500 });
-  if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!(await canAccessJob(supabase, userId, id))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
-    .select('id, bid_id, title, status, created_at, bid_snapshot, cedar_total_cells, cedar_cleared_cells')
+    .select(
+      'id, bid_id, title, status, created_at, bid_snapshot, cedar_total_cells, cedar_cleared_cells, work_started_at, work_completed_at, manual_machine_hours, manual_fuel_gallons',
+    )
     .eq('id', id)
     .single();
   if (jobErr) return NextResponse.json({ error: jobErr.message }, { status: 500 });

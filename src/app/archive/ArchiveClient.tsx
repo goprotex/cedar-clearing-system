@@ -91,9 +91,9 @@ export default function ArchiveClient() {
 
   return (
     <AppShell>
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">ARCHIVE</h1>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">ARCHIVE</h1>
           <p className="text-[#ffb693] text-xs font-mono">
             {archived.length} CLOSED RECORDS // {formatCurrency(totalArchivedRevenue)} BOOKED
           </p>
@@ -142,7 +142,7 @@ export default function ArchiveClient() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search bids..."
-          className="bg-transparent border border-[#353534] px-3 py-1.5 text-xs font-mono text-[#e5e2e1] placeholder:text-[#5a4136] focus:border-[#FF6B00] outline-none w-48"
+          className="bg-transparent border border-[#353534] px-3 py-1.5 text-xs font-mono text-[#e5e2e1] placeholder:text-[#5a4136] focus:border-[#FF6B00] outline-none w-full min-w-0 sm:w-48"
         />
       </div>
 

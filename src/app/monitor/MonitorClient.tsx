@@ -2,21 +2,25 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
+import { mergeJobsById, loadLocalStorageJobs, loadJobsFromOperatorStorage, type ActiveJobSummary } from '@/lib/active-jobs';
+import { fetchApiAuthed } from '@/lib/auth-client';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
+import type { MonitorTelemetryRow } from '@/types/monitor-bootstrap';
 import type { LayerKey } from './MonitorMap';
 
 type BootstrapJob = ActiveJobSummary;
 
-type BootstrapResponse = {
-  jobs: BootstrapJob[];
-  cleared: Record<string, string[]>;
-  operators: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
+type OperatorPosition = {
+  user_id: string;
+  lng: number;
+  lat: number;
+  heading: number | null;
+  speed_mps: number | null;
+  accuracy_m: number | null;
+  updated_at: string;
 };
 
-type OperatorPosition = BootstrapResponse['operators'][string][number];
-
-/** Merge polled positions with existing state, keyed by user_id, keeping the newer fix. */
+/** Merge polled positions with existing state: newer timestamp wins; drop generic `operator` when a real user_id exists. */
 function mergeOperatorsByJob(
   prev: Record<string, OperatorPosition[]>,
   polled: Record<string, OperatorPosition[]>,
@@ -26,7 +30,10 @@ function mergeOperatorsByJob(
     if (incoming.length === 0) continue;
     const byUser = new Map<string, OperatorPosition>();
     for (const op of prev[jobId] ?? []) byUser.set(op.user_id, op);
+    const prevHasRealUser = (prev[jobId] ?? []).some((o) => o.user_id !== 'operator');
+    const polledHasRealUser = incoming.some((o) => o.user_id !== 'operator');
     for (const op of incoming) {
+      if (op.user_id === 'operator' && (prevHasRealUser || polledHasRealUser)) continue;
       const cur = byUser.get(op.user_id);
       const nextTs = Date.parse(op.updated_at);
       const curTs = cur ? Date.parse(cur.updated_at) : NaN;
@@ -34,6 +41,7 @@ function mergeOperatorsByJob(
         byUser.set(op.user_id, op);
       }
     }
+    if (prevHasRealUser || polledHasRealUser) byUser.delete('operator');
     out[jobId] = Array.from(byUser.values());
   }
   return out;
@@ -77,7 +85,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
+        const res = await fetchApiAuthed('/api/settings');
         if (!res.ok) return;
         const data = (await res.json()) as { profile?: { preferences?: { monitor_tv_default?: boolean } } | null };
         if (cancelled) return;
@@ -86,7 +94,9 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     })();
     return () => { cancelled = true; };
   }, [fullscreenProp]);
-  const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
+  const [operatorsByJob, setOperatorsByJob] = useState<Record<string, OperatorPosition[]>>({});
+  const [telemetryByJob, setTelemetryByJob] = useState<Record<string, MonitorTelemetryRow[]>>({});
+  const [bootstrapScope, setBootstrapScope] = useState<'membership' | 'company' | null>(null);
   const [trailsByJob, setTrailsByJob] = useState<Record<string, [number, number][]>>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [flyToJobId, setFlyToJobId] = useState<string | null>(null);
@@ -136,9 +146,15 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       try {
         setBusy(true);
         setErr(null);
-        const res = await fetch('/api/monitor/bootstrap', { cache: 'no-store' });
+        const res = await fetchApiAuthed('/api/monitor/bootstrap');
         if (!res.ok) throw new Error(await res.text());
-        const data = (await res.json()) as BootstrapResponse;
+        const data = (await res.json()) as {
+          jobs: BootstrapJob[];
+          clearedByJob: Record<string, string[]>;
+          operatorsByJob: Record<string, OperatorPosition[]>;
+          telemetryByJob?: Record<string, MonitorTelemetryRow[]>;
+          scope?: 'membership' | 'company';
+        };
         if (cancelled) return;
 
         let remoteJobs = data.jobs ?? [];
@@ -149,17 +165,25 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           remoteJobs = loadLocalStorageJobs();
         }
         const next: Record<string, Set<string>> = {};
-        for (const [jobId, cellIds] of Object.entries(data.cleared ?? {})) {
+        for (const [jobId, cellIds] of Object.entries(data.clearedByJob ?? {})) {
           next[jobId] = new Set(cellIds);
         }
-        setOperatorsByJob(data.operators ?? {});
+        setOperatorsByJob(data.operatorsByJob ?? {});
+        setTelemetryByJob(data.telemetryByJob ?? {});
+        setBootstrapScope(data.scope ?? 'membership');
+
+        const mergedIds = new Set(remoteJobs.map((j) => j.id));
+        remoteJobs = [...remoteJobs, ...loadJobsFromOperatorStorage(mergedIds)];
 
         setJobs(remoteJobs);
         setClearedByJob(next);
       } catch (e) {
         if (cancelled) return;
         // Fall back to local jobs
-        const localJobs = loadLocalStorageJobs();
+        const idSet = new Set<string>();
+        let localJobs = loadLocalStorageJobs();
+        for (const j of localJobs) idSet.add(j.id);
+        localJobs = [...localJobs, ...loadJobsFromOperatorStorage(idSet)];
         if (localJobs.length > 0) {
           setJobs(localJobs);
           setErr(null);
@@ -354,6 +378,52 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     return () => { void supabase.removeChannel(channel); };
   }, [jobs]);
 
+  // Realtime: job telemetry (future machine/engine stats — table may be empty until wired)
+  useEffect(() => {
+    if (!jobs.length) return;
+    const supabase = (supabaseRef.current ??= createSupabaseClient());
+    const jobIds = jobs.map((j) => j.id).filter(Boolean);
+    if (!jobIds.length) return;
+
+    const applyTelemetryRow = (payload: { new: Record<string, unknown> }) => {
+      const row = payload.new as {
+        job_id?: string;
+        source_key?: string;
+        kind?: string;
+        data?: Record<string, unknown>;
+        updated_at?: string;
+      } | null;
+      if (!row || typeof row.job_id !== 'string') return;
+      const jobId = row.job_id;
+      const entry: MonitorTelemetryRow = {
+        source_key: typeof row.source_key === 'string' ? row.source_key : 'default',
+        kind: (row.kind === 'machine' || row.kind === 'engine' || row.kind === 'progress' || row.kind === 'custom')
+          ? row.kind
+          : 'custom',
+        data: row.data && typeof row.data === 'object' ? row.data : {},
+        updated_at: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
+      };
+      setTelemetryByJob((prev) => {
+        const next = { ...prev };
+        const list = [...(next[jobId] ?? [])];
+        const sk = entry.source_key;
+        const i = list.findIndex((t) => t.source_key === sk);
+        if (i >= 0) list[i] = entry; else list.push(entry);
+        next[jobId] = list;
+        return next;
+      });
+    };
+
+    const filter = `job_id=in.(${jobIds.join(',')})`;
+    const channel = supabase
+      .channel(`monitor-telem-${jobIds.join('-').slice(0, 72)}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_telemetry_latest', filter }, applyTelemetryRow)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_telemetry_latest', filter }, applyTelemetryRow)
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [jobs]);
+
   const totals = useMemo(() => {
     const total = jobs.reduce((s, j) => s + (j.cedar_total_cells ?? 0), 0);
     const cleared = jobs.reduce((s, j) => s + (j.cedar_cleared_cells ?? 0), 0);
@@ -375,14 +445,17 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   return (
     <div className={`bg-[#131313] text-[#e5e2e1] ${fullscreen ? 'fixed inset-0 z-[60] overflow-hidden' : 'min-h-screen'}`}>
       {!fullscreen && (
-        <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6">
-          <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
-            <p className="text-[#ffb693] text-xs font-mono">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-6 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
+            <p className="text-[#ffb693] text-[10px] sm:text-xs font-mono break-words">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
+            {bootstrapScope === 'company' && (
+              <p className="text-[9px] font-mono text-[#13ff43]/80 mt-1">COMPANY_SCOPE — ALL COMPANY JOBS</p>
+            )}
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right shrink-0">
             <div className="text-[10px] font-mono text-[#a98a7d]">ALL_JOBS_PROGRESS</div>
-            <div className="text-sm font-black text-[#13ff43]">{totals.pct}%</div>
+            <div className="text-2xl sm:text-3xl font-black text-[#13ff43] tabular-nums">{totals.pct}%</div>
           </div>
         </div>
       )}
@@ -392,7 +465,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       )}
 
       <div className={fullscreen ? 'absolute inset-0' : 'flex flex-col lg:flex-row gap-6'}>
-        <div className={fullscreen ? 'absolute inset-0' : 'flex-1 border-2 border-[#353534] relative'} style={fullscreen ? undefined : { minHeight: '70vh' }}>
+        <div className={fullscreen ? 'absolute inset-0' : 'flex-1 border-2 border-[#353534] relative min-h-0'} style={fullscreen ? undefined : { minHeight: 'min(70vh, 720px)' }}>
           {mapboxToken ? (
             <MapboxMap
               accessToken={mapboxToken}
@@ -406,8 +479,8 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               flyToJobId={flyToJobId}
             />
           ) : (
-            <div className="w-full h-full min-h-[70vh] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d]">
-              <div className="text-center space-y-2 border-2 border-[#353534] p-8">
+            <div className="w-full h-full min-h-[min(70vh,720px)] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d] px-4">
+              <div className="text-center space-y-2 border-2 border-[#353534] p-4 sm:p-8 max-w-lg">
                 <p className="text-lg font-black uppercase tracking-tighter">SATELLITE_FEED_OFFLINE</p>
                 <p className="text-sm font-mono">
                   Add <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to <code className="bg-[#353534] px-1.5 py-0.5 text-[#FF6B00]">.env.local</code>
@@ -422,9 +495,9 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           )}
 
           {/* Layer control — floating panel on the map */}
-          <div className="absolute bottom-4 left-4 z-10">
+          <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom,0px))] left-[max(1rem,env(safe-area-inset-left,0px))] z-10 max-w-[calc(100vw-2rem)]">
             {layersPanelOpen ? (
-              <div className="backdrop-blur rounded-lg shadow-lg p-2 min-w-[180px] bg-slate-900/90">
+              <div className="backdrop-blur rounded-lg shadow-lg p-2 min-w-[180px] max-h-[min(60vh,420px)] overflow-y-auto bg-slate-900/90">
                 <div className="flex items-center justify-between px-1 pb-1">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Layers</span>
                   <button onClick={() => setLayersPanelOpen(false)} className="text-slate-400 hover:text-white text-xs leading-none">✕</button>
@@ -460,7 +533,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
           {/* Fullscreen TV overlay */}
           {fullscreen && (
-            <div className="absolute top-3 left-3 z-20 holo-panel backdrop-blur-sm rounded-lg px-4 py-3 space-y-2">
+            <div className="absolute top-[max(0.75rem,env(safe-area-inset-top,0px))] left-[max(0.75rem,env(safe-area-inset-left,0px))] z-20 holo-panel backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2 sm:py-3 space-y-2 max-w-[calc(100vw-2rem)]">
               <div className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Office Monitor</div>
               <div className="flex items-center gap-3">
                 <div className="text-xs font-mono text-[#a98a7d]">ALL_JOBS</div>
@@ -526,6 +599,12 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
                         <span>{j.cedar_cleared_cells} cleared</span>
                         <span>{j.cedar_total_cells} total</span>
                       </div>
+                      {telemetryByJob[j.id]?.length ? (
+                        <div className="mt-1 text-[9px] font-mono text-[#5a4136] border-t border-[#353534] pt-1">
+                          Telemetry ({telemetryByJob[j.id].length}):{' '}
+                          {telemetryByJob[j.id].map((t) => t.kind).join(', ')}
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })}

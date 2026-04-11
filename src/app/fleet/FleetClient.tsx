@@ -155,9 +155,9 @@ export default function FleetClient() {
 
   return (
     <AppShell>
-      <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-8">
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">FLEET_SYNC</h1>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-end border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">FLEET_SYNC</h1>
           <p className="text-[#ffb693] text-xs font-mono">
             {fleet.length} UNITS // REAL-TIME TELEMETRY
           </p>

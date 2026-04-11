@@ -319,6 +319,10 @@ export interface Job {
   bid_snapshot: Bid;
   cedar_total_cells: number;
   cedar_cleared_cells: number;
+  work_started_at?: string | null;
+  work_completed_at?: string | null;
+  manual_machine_hours?: number | null;
+  manual_fuel_gallons?: number | null;
 }
 
 export interface JobEvent {

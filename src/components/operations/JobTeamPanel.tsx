@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 type Member = { user_id: string; role: 'owner' | 'worker' | 'viewer'; email: string | null; created_at: string };
 type PendingInvite = { id: string; email: string; role: string; created_at: string; expires_at: string };
@@ -11,6 +12,7 @@ export default function JobTeamPanel({ jobId }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [myRole, setMyRole] = useState<string | null>(null);
+  const [canManageTeam, setCanManageTeam] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [pending, setPending] = useState<PendingInvite[]>([]);
 
@@ -24,11 +26,12 @@ export default function JobTeamPanel({ jobId }: Props) {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/team`, { cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/team`);
       if (res.status === 401) {
         setErr('Sign in to view team.');
         setMembers([]);
         setMyRole(null);
+        setCanManageTeam(false);
         setPending([]);
         return;
       }
@@ -36,6 +39,7 @@ export default function JobTeamPanel({ jobId }: Props) {
         setErr('This job is not on your Supabase account yet. Convert the bid to a job while signed in, then refresh.');
         setMembers([]);
         setMyRole(null);
+        setCanManageTeam(false);
         setPending([]);
         return;
       }
@@ -43,8 +47,14 @@ export default function JobTeamPanel({ jobId }: Props) {
         const t = await res.text();
         throw new Error(t || res.statusText);
       }
-      const data = (await res.json()) as { myRole: string; members: Member[]; pendingInvites: PendingInvite[] | null };
+      const data = (await res.json()) as {
+        myRole: string | null;
+        canManageTeam?: boolean;
+        members: Member[];
+        pendingInvites: PendingInvite[] | null;
+      };
       setMyRole(data.myRole);
+      setCanManageTeam(Boolean(data.canManageTeam));
       setMembers(data.members ?? []);
       setPending(data.pendingInvites ?? []);
     } catch (e) {
@@ -63,9 +73,8 @@ export default function JobTeamPanel({ jobId }: Props) {
     setInviteErr(null);
     setInviteLink(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
         method: 'POST',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), role: inviteRole }),
       });
@@ -86,9 +95,8 @@ export default function JobTeamPanel({ jobId }: Props) {
 
   const cancelInvite = async (inviteId: string) => {
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
         method: 'DELETE',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteId }),
       });
@@ -105,9 +113,8 @@ export default function JobTeamPanel({ jobId }: Props) {
   const updateRole = async (userId: string, role: string) => {
     if (role !== 'owner' && role !== 'worker' && role !== 'viewer') return;
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
         method: 'PATCH',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, role }),
       });
@@ -122,9 +129,8 @@ export default function JobTeamPanel({ jobId }: Props) {
   const removeMember = async (userId: string) => {
     if (!window.confirm('Remove this person from the job?')) return;
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
         method: 'DELETE',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
@@ -148,7 +154,7 @@ export default function JobTeamPanel({ jobId }: Props) {
     );
   }
 
-  const isOwner = myRole === 'owner';
+  const canEdit = canManageTeam;
 
   return (
     <div className="mt-3 pl-2 border-l-2 border-[#FF6B00]/40 space-y-3">
@@ -159,7 +165,7 @@ export default function JobTeamPanel({ jobId }: Props) {
             <span className="text-[#e5e2e1] truncate flex-1 min-w-0" title={m.email ?? m.user_id}>
               {m.email ?? m.user_id.slice(0, 8)}
             </span>
-            {isOwner ? (
+            {canEdit ? (
               <>
                 <select
                   value={m.role}
@@ -185,7 +191,7 @@ export default function JobTeamPanel({ jobId }: Props) {
         ))}
       </ul>
 
-      {isOwner && (
+      {canEdit && (
         <>
           <div className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] pt-1">Invite by email</div>
           <div className="flex flex-wrap gap-2 items-end">
@@ -246,8 +252,8 @@ export default function JobTeamPanel({ jobId }: Props) {
         </>
       )}
 
-      {!isOwner && (
-        <p className="text-[10px] text-[#5a4136]">Only owners can invite or change roles.</p>
+      {!canEdit && (
+        <p className="text-[10px] text-[#5a4136]">Only job owners or company managers can invite or change crew roles.</p>
       )}
     </div>
   );
