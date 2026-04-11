@@ -88,6 +88,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   const [busy, setBusy] = useState(true);
   const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
   const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
+  const [trailsByJob, setTrailsByJob] = useState<Record<string, [number, number][]>>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [flyToJobId, setFlyToJobId] = useState<string | null>(null);
 
@@ -237,13 +238,28 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         const merged = { ...prev };
         for (const [jobId, ops] of Object.entries(next)) {
           const existing = merged[jobId] ?? [];
-          // Only add local operator if no Supabase operators exist for this job
-          if (existing.length === 0) {
-            merged[jobId] = ops;
-          }
+          if (existing.length === 0) merged[jobId] = ops;
         }
         return merged;
       });
+
+      // Load operator trails
+      const trails: Record<string, [number, number][]> = {};
+      for (const job of jobs) {
+        const bidId = job.id.startsWith('job_') ? job.id.slice(4) : job.id;
+        for (const key of [`ccc_operator_trail_${job.id}`, `ccc_operator_trail_job_${bidId}`]) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw) continue;
+            const coords = JSON.parse(raw) as [number, number][];
+            if (Array.isArray(coords) && coords.length >= 2) {
+              trails[job.id] = coords;
+              break;
+            }
+          } catch { /* ignore */ }
+        }
+      }
+      setTrailsByJob(trails);
     };
 
     poll();
@@ -358,6 +374,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               jobs={jobs}
               clearedByJob={clearedByJob}
               operatorsByJob={operatorsByJob}
+              trailsByJob={trailsByJob}
               radarOn={layers.radar}
               cedarOn={layers.cedarAI}
               layers={layers}

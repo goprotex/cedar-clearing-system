@@ -22,6 +22,7 @@ type Props = {
   jobs: JobLike[];
   clearedByJob: Record<string, Set<string>>;
   operatorsByJob: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
+  trailsByJob: Record<string, [number, number][]>;
   cedarOn: boolean;
   radarOn: boolean;
   layers: Record<LayerKey, boolean>;
@@ -33,7 +34,7 @@ function fc(features: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
-export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, layers, flyToJobId, onMapReady }: Props) {
+export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, flyToJobId, onMapReady }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const operatorMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -111,6 +112,10 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.addLayer({ id: 'monitor-pastures-fill', type: 'fill', source: 'monitor-pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.08 } });
       map.addLayer({ id: 'monitor-pastures-border', type: 'line', source: 'monitor-pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-opacity': 0.8, 'line-dasharray': [2, 1] } });
       map.addLayer({ id: 'monitor-pastures-label', type: 'symbol', source: 'monitor-pastures', layout: { 'text-field': ['concat', ['get', 'jobTitle'], '\n', ['get', 'name'], ' — ', ['get', 'acreLabel']], 'text-size': 13, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-anchor': 'center' }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
+
+      // Operator trails
+      map.addSource('operator-trails', { type: 'geojson', data: fc([]) });
+      map.addLayer({ id: 'operator-trails-line', type: 'line', source: 'operator-trails', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.7 } });
 
       // Click handlers
       map.on('click', 'monitor-pastures-fill', (e) => {
@@ -415,6 +420,21 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.off('wheel', pause);
     };
   }, [layers.hologram, mapLoaded]);
+
+  // ── Operator trails ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const src = map.getSource('operator-trails') as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+
+    const features: GeoJSON.Feature[] = [];
+    for (const [jobId, coords] of Object.entries(trailsByJob)) {
+      if (!coords || coords.length < 2) continue;
+      features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { jobId } });
+    }
+    src.setData(fc(features));
+  }, [trailsByJob, mapLoaded]);
 
   // ── 3D holographic trees: add/remove/update when hologram toggles or data changes ──
   useEffect(() => {

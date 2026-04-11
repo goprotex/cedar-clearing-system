@@ -183,6 +183,20 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     return () => { cancelled = true; };
   }, [bidId]);
 
+  // Restore persisted trail from localStorage
+  useEffect(() => {
+    const jobId = jobIdFromBidId(bidId);
+    try {
+      const raw = localStorage.getItem(`ccc_operator_trail_${jobId}`);
+      if (raw) {
+        const coords = JSON.parse(raw) as [number, number][];
+        if (Array.isArray(coords) && coords.length > 0) {
+          trailCoordsRef.current = coords;
+        }
+      }
+    } catch { /* ignore */ }
+  }, [bidId]);
+
   // Try to enable shared progress (Supabase-backed) if this bid has a Job and the user is authenticated.
   useEffect(() => {
     if (!state.bid) return;
@@ -448,7 +462,11 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             },
           });
 
-          map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } });
+          // Restore persisted trail if available
+          const trailData = trailCoordsRef.current.length >= 2
+            ? trailCoordsRef.current
+            : [];
+          map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: trailData }, properties: {} } });
           map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
         } catch (err) {
           setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
@@ -625,6 +643,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     }
 
     trailCoordsRef.current.push([lng, lat]);
+
+    // Persist trail to localStorage so monitor can display it
+    const jobId = jobIdFromBidId(bidId);
+    try {
+      localStorage.setItem(`ccc_operator_trail_${jobId}`, JSON.stringify(trailCoordsRef.current));
+    } catch { /* storage full */ }
+
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
       const trailSource = map.getSource('trail') as mapboxgl.GeoJSONSource | undefined;
