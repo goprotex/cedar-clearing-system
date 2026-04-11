@@ -18,6 +18,10 @@ const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 200
 const OPERATOR_STYLE_HIGH = 'mapbox://styles/mapbox/satellite-streets-v12';
 const OPERATOR_STYLE_LOW = 'mapbox://styles/mapbox/satellite-v9';
 const OPERATOR_PUBLISH_MS = 2500;
+/** Limit trail GeoJSON updates so GPS + setData doesn’t fight map gestures. */
+const TRAIL_MAP_MIN_INTERVAL_MS = 200;
+/** Avoid re-rendering the whole tree on every GPS tick (janks pinch/rotate). */
+const HUD_GPS_STATE_MIN_INTERVAL_MS = 350;
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
 
 const VEGETATION_COLORS: Record<string, string> = {
@@ -196,6 +200,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
   const lastPublishRef = useRef<number>(0);
+  const lastTrailMapDrawRef = useRef<number>(0);
+  const lastHudGpsEmitRef = useRef<number>(0);
   const supabaseSessionRef = useRef(false);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
@@ -207,6 +213,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const layersRef = useRef(layers);
+  layersRef.current = layers;
 
   // Load bid from Supabase (preferred) or localStorage (fallback)
   useEffect(() => {
@@ -985,9 +994,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     }
   }, [layers, mapReady, state.bid]);
 
-  // Slow bearing drift in all modes (same rate as hologram on bid / scout maps)
+  // Slow bearing drift only in HOLO mode — constant spin in “normal” operate fights pinch/rotate.
   useEffect(() => {
-    if (!mapReady) {
+    if (!mapReady || !layers.hologram) {
       if (holoRotationRef.current) {
         cancelAnimationFrame(holoRotationRef.current);
         holoRotationRef.current = null;
@@ -995,7 +1004,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
     const spin = () => {
-      if (!mapRef.current) return;
+      if (!mapRef.current || !layersRef.current.hologram) return;
       mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
       holoRotationRef.current = requestAnimationFrame(spin);
     };
@@ -1006,12 +1015,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         holoRotationRef.current = null;
       }
     };
-  }, [mapReady]);
+  }, [mapReady, layers.hologram]);
 
-  // Pause rotation on user interaction, resume after idle (bid map pattern)
+  // Pause HOLO spin on gesture; resume after idle
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !mapReady) return;
+    if (!map || !map.isStyleLoaded() || !mapReady || !layers.hologram) return;
 
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -1022,9 +1031,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
       if (resumeTimer) clearTimeout(resumeTimer);
       resumeTimer = setTimeout(() => {
-        if (!mapRef.current) return;
+        if (!mapRef.current || !layersRef.current.hologram) return;
         const spin = () => {
-          if (!mapRef.current) return;
+          if (!mapRef.current || !layersRef.current.hologram) return;
           mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
           holoRotationRef.current = requestAnimationFrame(spin);
         };
@@ -1042,7 +1051,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.off('wheel', pause);
       if (resumeTimer) clearTimeout(resumeTimer);
     };
-  }, [mapReady]);
+  }, [mapReady, layers.hologram]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -1180,10 +1189,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     saveOperatorTrailToStorage(jobId, trailCoordsRef.current);
 
     const map = mapRef.current;
-    if (map && map.isStyleLoaded()) {
+    const t = Date.now();
+    if (
+      map &&
+      map.isStyleLoaded() &&
+      trailCoordsRef.current.length >= 2 &&
+      t - lastTrailMapDrawRef.current >= TRAIL_MAP_MIN_INTERVAL_MS
+    ) {
+      lastTrailMapDrawRef.current = t;
       const trailSource = map.getSource('trail') as mapboxgl.GeoJSONSource | undefined;
-      if (trailSource && trailCoordsRef.current.length >= 2) {
-        trailSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: trailCoordsRef.current }, properties: {} });
+      if (trailSource) {
+        trailSource.setData({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: trailCoordsRef.current },
+          properties: {},
+        });
       }
     }
   }, [bidId, updateCedarSource, sharedEnabled]);
@@ -1208,15 +1228,30 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       (pos) => {
         const lng = pos.coords.longitude;
         const lat = pos.coords.latitude;
-        setState(prev => ({
-          ...prev, gpsActive: true,
-          operatorPos: [lng, lat],
-          accuracy: pos.coords.accuracy,
-          heading: pos.coords.heading,
-          speed: pos.coords.speed,
-        }));
+        const now = Date.now();
+        const acc = pos.coords.accuracy;
+        const heading = pos.coords.heading;
+        const speed = pos.coords.speed;
 
-        // Move marker
+        // Throttle React state: full tree re-renders steal the main thread from Mapbox gestures.
+        const lastHud = lastHudGpsEmitRef.current;
+        const shouldEmitHud =
+          now - lastHud >= HUD_GPS_STATE_MIN_INTERVAL_MS ||
+          !stateRef.current.operatorPos ||
+          haversineDistM(lng, lat, stateRef.current.operatorPos[0], stateRef.current.operatorPos[1]) > 3;
+        if (shouldEmitHud) {
+          lastHudGpsEmitRef.current = now;
+          setState(prev => ({
+            ...prev,
+            gpsActive: true,
+            operatorPos: [lng, lat],
+            accuracy: acc,
+            heading,
+            speed,
+          }));
+        }
+
+        // Move marker every tick (no React) so position feels live without re-renders.
         if (markerRef.current) {
           markerRef.current.setLngLat([lng, lat]);
         } else if (mapRef.current) {
@@ -1342,7 +1377,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* Map loading indicator — helps diagnose initialization failures */}
       {bid && !mapReady && !mapError && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-[#000a02]/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-green-900/40">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 pointer-events-none bg-[#000a02]/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-green-900/40">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-[#00ff41] rounded-full animate-pulse" />
             <span className="text-[10px] font-mono text-[#a98a7d]">LOADING_MAP...</span>
@@ -1350,9 +1385,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       )}
 
-      {/* Top bar — always visible so layer controls are never missing */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 py-2 bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      {/* Top bar — pointer-events-none on strip so the map receives pan/pinch in the gaps; controls opt in */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 py-2 pointer-events-none bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 pointer-events-auto">
           <Link href={bid ? `/bid/${bidId}` : '/bids'} className="text-[#00ff41] font-black text-xs sm:text-sm tracking-widest hover:text-white transition-colors shrink-0">
             ← CEDAR_HACK
           </Link>
@@ -1360,7 +1395,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             {bid ? `OPERATOR // ${bid.bidNumber}` : 'LOADING_BID...'}
           </span>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-1 max-w-[min(100%,56rem)]">
+        <div className="flex flex-wrap items-center justify-end gap-1 max-w-[min(100%,56rem)] pointer-events-auto">
           {(
             [
               { key: 'soil' as const, label: 'SOIL' },
@@ -1392,9 +1427,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       </div>
 
-      {/* HUD panel */}
+      {/* HUD panel — pass-through outside the card so the map isn’t blocked on phones */}
       {bid && hudOpen && (
-        <div className="absolute top-14 left-3 z-10 holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3">
+        <div className="absolute top-14 left-3 z-10 pointer-events-none">
+          <div className="holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3 pointer-events-auto">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Field HUD</span>
             <button onClick={() => setHudOpen(false)} className="text-[#a98a7d] hover:text-white text-xs">✕</button>
@@ -1466,6 +1502,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
               </div>
             );
           })}
+          </div>
         </div>
       )}
 
