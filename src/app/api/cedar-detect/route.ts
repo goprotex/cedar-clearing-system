@@ -412,10 +412,20 @@ function applyTileConsensus(
 
 // ── API handler ──
 
+function isValidClipBbox(b: unknown): b is [number, number, number, number] {
+  return (
+    Array.isArray(b) &&
+    b.length === 4 &&
+    b.every((x) => typeof x === 'number' && Number.isFinite(x)) &&
+    b[0] < b[2] &&
+    b[1] < b[3]
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { coordinates, acreage } = body;
+    const { coordinates, acreage, clipBbox } = body;
 
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
       return NextResponse.json({ error: 'Polygon coordinates required' }, { status: 400 });
@@ -425,10 +435,25 @@ export async function POST(req: NextRequest) {
     const bbox = turf.bbox(polygon);
     const ac = acreage || turf.area(polygon) / 4047;
 
+    let gridBbox = bbox;
+    if (clipBbox !== undefined && clipBbox !== null) {
+      if (!isValidClipBbox(clipBbox)) {
+        return NextResponse.json({ error: 'clipBbox must be [minLng, minLat, maxLng, maxLat]' }, { status: 400 });
+      }
+      const clipped = turf.bboxClip(polygon, clipBbox);
+      if (!clipped || turf.area(clipped) <= 0) {
+        return NextResponse.json(
+          { error: 'clipBbox does not overlap the pasture polygon' },
+          { status: 400 }
+        );
+      }
+      gridBbox = turf.bbox(clipped);
+    }
+
     // 15m uniform grid — dense wall-to-wall coverage, no gaps
     const spacingKm = 0.015; // 15m between sample points
 
-    const grid = turf.pointGrid(bbox, spacingKm, { units: 'kilometers' });
+    const grid = turf.pointGrid(gridBbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );

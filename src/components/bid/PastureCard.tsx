@@ -372,6 +372,11 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                   Tile consensus: {pasture.cedarAnalysis.summary.tileConsensus.tileCount} tiles ({pasture.cedarAnalysis.summary.tileConsensus.tileSizeM}m, {pasture.cedarAnalysis.summary.tileConsensus.tileOverlapPct}% overlap) · {pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedCells} cells refined ({pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedPct}%)
                 </div>
               )}
+              {pasture.cedarAnalysis.summary.chunkedRun && (
+                <div className="text-[10px] text-muted-foreground">
+                  Analyzed in {pasture.cedarAnalysis.summary.chunkedRun.chunkCount} regions (≤{pasture.cedarAnalysis.summary.chunkedRun.maxSamplesPerChunk.toLocaleString()} samples each), merged for full pasture
+                </div>
+              )}
             </div>
 
             <div className="text-center">

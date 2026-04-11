@@ -10,6 +10,11 @@ import {
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
 import { extractTreesFromAnalysis } from '@/lib/tree-layer';
+import {
+  buildSpectralChunkBboxes,
+  mergeCedarChunkResults,
+  CEDAR_MAX_SAMPLES_PER_CHUNK,
+} from '@/lib/cedar-chunk';
 
 function generateBidNumber(): string {
   const now = new Date();
@@ -66,12 +71,18 @@ function isRetryableCedarHttpStatus(status: number): boolean {
   );
 }
 
+type CedarDetectBody = {
+  coordinates: number[][][];
+  acreage: number;
+  clipBbox?: [number, number, number, number];
+};
+
 /**
  * POST /api/cedar-detect with retries: handles gateway timeouts, truncated JSON,
  * and transient NAIP/upstream failures. Validates a complete CedarAnalysis shape.
  */
 async function fetchCedarAnalysisWithRetries(
-  body: { coordinates: number[][][]; acreage: number },
+  body: CedarDetectBody,
   onAttempt: (attempt: number, maxAttempts: number) => void
 ): Promise<CedarAnalysis> {
   let lastMessage = 'Spectral analysis failed';
@@ -520,22 +531,69 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
     try {
-      set({ analysisProgress: { active: true, step: 'Running spectral analysis...', detail: `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution` } });
-      const body = {
-        coordinates: pasture.polygon.geometry.coordinates,
-        acreage: pasture.acreage,
-      };
-      const data = await fetchCedarAnalysisWithRetries(body, (attempt, max) => {
-        if (attempt > 1) {
+      const coords = pasture.polygon.geometry.coordinates;
+      const chunkBboxes = buildSpectralChunkBboxes(coords, pasture.acreage);
+      const useChunks = chunkBboxes.length > 0;
+      const totalChunks = useChunks ? chunkBboxes.length : 1;
+
+      set({
+        analysisProgress: {
+          active: true,
+          step: 'Running spectral analysis...',
+          detail: useChunks
+            ? `Large pasture — ${totalChunks} regions (max ~${CEDAR_MAX_SAMPLES_PER_CHUNK.toLocaleString()} samples each)`
+            : `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution`,
+        },
+      });
+
+      const parts: CedarAnalysis[] = [];
+
+      if (!useChunks) {
+        const data = await fetchCedarAnalysisWithRetries(
+          { coordinates: coords, acreage: pasture.acreage },
+          (attempt, max) => {
+            if (attempt > 1) {
+              set({
+                analysisProgress: {
+                  active: true,
+                  step: 'Retrying spectral analysis…',
+                  detail: `Attempt ${attempt} of ${max} — connection or imagery service was interrupted`,
+                },
+              });
+            }
+          }
+        );
+        parts.push(data);
+      } else {
+        for (let i = 0; i < chunkBboxes.length; i++) {
+          const clipBbox = chunkBboxes[i] as [number, number, number, number];
           set({
             analysisProgress: {
               active: true,
-              step: 'Retrying spectral analysis…',
-              detail: `Attempt ${attempt} of ${max} — connection or imagery service was interrupted`,
+              step: `Spectral analysis — region ${i + 1} of ${totalChunks}`,
+              detail: 'Fetching NAIP pixels and classifying vegetation…',
             },
           });
+          const chunk = await fetchCedarAnalysisWithRetries(
+            { coordinates: coords, acreage: pasture.acreage, clipBbox },
+            (attempt, max) => {
+              if (attempt > 1) {
+                set({
+                  analysisProgress: {
+                    active: true,
+                    step: `Retrying region ${i + 1} of ${totalChunks}…`,
+                    detail: `Attempt ${attempt} of ${max} — connection or imagery service was interrupted`,
+                  },
+                });
+              }
+            }
+          );
+          parts.push(chunk);
         }
-      });
+      }
+
+      const data =
+        parts.length === 1 ? parts[0] : mergeCedarChunkResults(parts, pasture.acreage);
       set({ analysisProgress: { active: true, step: 'Processing results...', detail: 'Classifying vegetation: cedar, oak, grass, brush, bare ground' } });
       get().updatePasture(pastureId, { cedarAnalysis: data });
 
