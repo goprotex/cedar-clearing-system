@@ -1,14 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "@/components/ui/sonner";
 import AuthProvider from "@/components/AuthProvider";
 import AuthRequiredGate from "@/components/AuthRequiredGate";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
+// Self-hosted Space Grotesk variable font — avoids build-time Google Fonts
+// fetch (which can 403 from CI egress IPs).
+const spaceGrotesk = localFont({
+  src: "../../public/fonts/SpaceGrotesk.ttf",
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: "300 700",
+  display: "swap",
 });
 
 export const viewport: Viewport = {
