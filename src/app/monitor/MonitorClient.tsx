@@ -347,24 +347,26 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   ];
 
   return (
-    <div className={`min-h-screen bg-[#131313] text-[#e5e2e1] ${fullscreen ? 'fixed inset-0 z-[60] p-0 overflow-hidden' : ''}`}>
-      <div className={`${fullscreen ? 'hidden' : 'flex'} justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6`}>
-        <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
-          <p className="text-[#ffb693] text-xs font-mono">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
+    <div className={`bg-[#131313] text-[#e5e2e1] ${fullscreen ? 'fixed inset-0 z-[60] overflow-hidden' : 'min-h-screen'}`}>
+      {!fullscreen && (
+        <div className="flex justify-between items-end border-l-4 border-[#FF6B00] pl-4 mb-6">
+          <div>
+            <h1 className="text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
+            <p className="text-[#ffb693] text-xs font-mono">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-mono text-[#a98a7d]">ALL_JOBS_PROGRESS</div>
+            <div className="text-sm font-black text-[#13ff43]">{totals.pct}%</div>
+          </div>
         </div>
-        <div className="text-right">
-          <div className="text-[10px] font-mono text-[#a98a7d]">ALL_JOBS_PROGRESS</div>
-          <div className="text-sm font-black text-[#13ff43]">{totals.pct}%</div>
-        </div>
-      </div>
+      )}
 
-      {err && (
+      {err && !fullscreen && (
         <div className="border border-red-500/50 bg-red-950/40 p-3 text-sm mb-4">{err}</div>
       )}
 
-      <div className={`flex ${fullscreen ? 'flex-col' : 'flex-col lg:flex-row'} gap-6 ${fullscreen ? 'h-full' : ''}`}>
-        <div className={`flex-1 border-2 border-[#353534] relative ${fullscreen ? 'h-full' : ''}`} style={fullscreen ? undefined : { minHeight: '70vh' }}>
+      <div className={fullscreen ? 'absolute inset-0' : 'flex flex-col lg:flex-row gap-6'}>
+        <div className={fullscreen ? 'absolute inset-0' : 'flex-1 border-2 border-[#353534] relative'} style={fullscreen ? undefined : { minHeight: '70vh' }}>
           {mapboxToken ? (
             <MapboxMap
               accessToken={mapboxToken}
