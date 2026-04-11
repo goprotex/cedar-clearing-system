@@ -91,7 +91,7 @@ export async function PATCH(req: Request) {
   let role = current?.role ?? 'operator';
   let phone: string | null = current?.phone ?? null;
   let avatar_url: string | null = current?.avatar_url ?? null;
-  let preferences: Record<string, unknown> = { ...prevPrefs };
+  const preferences: Record<string, unknown> = { ...prevPrefs };
 
   if (typeof b.full_name === 'string') {
     full_name = b.full_name.trim().slice(0, 200);

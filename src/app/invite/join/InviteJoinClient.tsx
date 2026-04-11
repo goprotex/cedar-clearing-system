@@ -7,25 +7,38 @@ import { useSearchParams } from 'next/navigation';
 function InviteJoinInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token') ?? '';
-  const [status, setStatus] = useState<'idle' | 'working' | 'ok' | 'err'>('idle');
+
+  if (!token.trim()) {
+    return (
+      <div className="min-h-screen bg-[#131313] text-[#e5e2e1] flex items-center justify-center p-6">
+        <div className="w-full max-w-md border-2 border-[#353534] bg-[#0e0e0e] p-6 space-y-4">
+          <div className="text-[#FF6B00] text-xl font-black uppercase tracking-widest">JOB_INVITE</div>
+          <p className="text-sm text-red-300">Missing invite token in URL.</p>
+          <Link href="/login" className="block text-center text-[#FF6B00] text-sm underline">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return <InviteAcceptFlow token={token.trim()} />;
+}
+
+function InviteAcceptFlow({ token }: { token: string }) {
+  const [status, setStatus] = useState<'working' | 'ok' | 'err'>('working');
   const [message, setMessage] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token.trim()) {
-      setStatus('err');
-      setMessage('Missing invite token in URL.');
-      return;
-    }
     let cancelled = false;
     (async () => {
-      setStatus('working');
       try {
         const res = await fetch('/api/jobs/invites/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ token: token.trim() }),
+          body: JSON.stringify({ token }),
         });
         const data = (await res.json().catch(() => ({}))) as { error?: string; jobId?: string; bidId?: string };
         if (cancelled) return;

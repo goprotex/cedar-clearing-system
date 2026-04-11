@@ -60,18 +60,21 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastUpdatedAt = useRef(currentBid.updatedAt);
 
-  // Load bid from localStorage on mount
   useEffect(() => {
+    queueMicrotask(() => {
+      setMounted(true);
+    });
+  }, []);
+
+  // Load bid from localStorage after mount
+  useEffect(() => {
+    if (!mounted) return;
     loadBid(bidId);
-    // If no saved data was found for this ID, the store still holds
-    // the previous (stale) bid. Reset to a fresh bid whose id matches this route
-    // (required for `/operate` and any deep-linked bid id).
     const state = useBidStore.getState();
     if (state.currentBid.id !== bidId) {
       useBidStore.getState().newBidWithId(bidId);
     }
-    setMounted(true);
-  }, [bidId, loadBid]);
+  }, [bidId, loadBid, mounted]);
 
   useEffect(() => {
     if (currentBid.updatedAt !== lastUpdatedAt.current && currentBid.pastures.length > 0) {
@@ -128,7 +131,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
             </SelectContent>
           </Select>
           <span className="text-[10px] text-[#5a4136] font-mono hidden lg:inline truncate">
-            // {currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
+            {'// '}{currentBid.clientName || 'NO_CLIENT'} — {currentBid.propertyName || 'NO_PROPERTY'}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">

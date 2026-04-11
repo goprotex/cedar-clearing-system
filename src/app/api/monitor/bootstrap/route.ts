@@ -137,7 +137,7 @@ export async function GET(req: Request) {
     });
   }
 
-  let telemetryByJob: Record<string, MonitorTelemetryRow[]> = {};
+  const telemetryByJob: Record<string, MonitorTelemetryRow[]> = {};
   const { data: telemRows, error: telemErr } = await supabase
     .from('job_telemetry_latest')
     .select('job_id, source_key, kind, data, updated_at')

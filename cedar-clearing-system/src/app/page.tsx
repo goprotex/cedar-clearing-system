@@ -106,7 +106,7 @@ export default function Home() {
           <div className="flex items-end justify-between mb-16">
             <div>
               <h2 className="text-[#ffb693] text-xs font-mono tracking-[0.5em] uppercase mb-4">
-                // TACTICAL_MODULES
+                {'// TACTICAL_MODULES'}
               </h2>
               <h3 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">
                 Industrial Grid
