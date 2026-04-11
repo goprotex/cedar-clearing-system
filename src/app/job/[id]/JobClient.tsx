@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
+import JobExecutionPanel from '@/components/job/JobExecutionPanel';
 import type { Job, JobEvent } from '@/types';
 import { loadLocalJobBundle } from '@/lib/jobs';
 
@@ -203,6 +204,12 @@ export default function JobClient({ jobId }: { jobId: string }) {
               <div className="text-sm font-bold">{job.title}</div>
             </div>
           </div>
+
+          <JobExecutionPanel
+            jobId={job.id}
+            isRemote={isRemote}
+            bidSnapshot={job.bid_snapshot}
+          />
         </>
       )}
 

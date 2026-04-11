@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
   { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
   { href: '/operations', label: 'OPERATIONS', icon: '📟' },
+  { href: '/schedule', label: 'SCHEDULE', icon: '📅' },
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
   { href: '/archive', label: 'ARCHIVE', icon: '📦' },
@@ -23,6 +24,7 @@ const HEADER_NAV = [
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
   { href: '/operations', label: 'OPS' },
+  { href: '/schedule', label: 'SCHEDULE' },
   { href: '/settings', label: 'SETTINGS' },
 ];
 
