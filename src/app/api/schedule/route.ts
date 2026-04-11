@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 
 /** Cross-job schedule for the signed-in user (next ~60 days + past 7 days). */
 export async function GET(req: Request) {
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

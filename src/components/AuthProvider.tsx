@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 
 type AuthContextValue = {
@@ -30,7 +31,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setLoading(false);
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
       setEmail(session?.user?.email ?? null);
       setLoading(false);
     });

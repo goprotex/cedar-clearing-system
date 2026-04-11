@@ -5,7 +5,7 @@ const ALLOWED = new Set(['active', 'paused', 'completed', 'cancelled']);
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;

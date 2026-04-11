@@ -14,7 +14,7 @@ function isValidEmail(email: string): boolean {
 /** Owner creates an invite; returns one-time token for the share link. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
@@ -69,7 +69,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 /** Owner cancels a pending invite */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;

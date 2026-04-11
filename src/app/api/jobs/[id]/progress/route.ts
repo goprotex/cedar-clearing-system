@@ -4,7 +4,7 @@ import { canAccessJob } from '@/lib/job-access';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

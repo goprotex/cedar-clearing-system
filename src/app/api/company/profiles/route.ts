@@ -14,8 +14,8 @@ export type CompanyProfileRow = {
 };
 
 /** List profiles in the caller's company (owners and managers only). */
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(req: Request) {
+  const supabase = await createClient(req);
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -7,7 +7,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; workOrderId: string }> },
 ) {
   const { id: jobId, workOrderId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -43,11 +43,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; workOrderId: string }> },
 ) {
   const { id: jobId, workOrderId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { isCompanyAdmin } from '@/lib/company-admin';
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;

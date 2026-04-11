@@ -15,7 +15,7 @@ type Body = {
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ userId: string }> }) {
   const { userId: targetId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
