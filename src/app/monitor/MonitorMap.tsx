@@ -366,6 +366,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
   }, [layers, mapLoaded]);
 
   // Hologram auto-rotation: start when hologram on, stop when off.
+  // Delayed 1.3s to let the easeTo pitch animation finish first.
   // Pauses for 3s on user interaction then resumes.
   useEffect(() => {
     const map = mapRef.current;
@@ -376,30 +377,35 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       return;
     }
 
+    let alive = true;
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
     const startRotation = () => {
-      if (rotationRef.current) return;
+      if (!alive || rotationRef.current) return;
       const spin = () => {
-        if (!mapRef.current) return;
+        if (!alive || !mapRef.current) return;
         mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
         rotationRef.current = requestAnimationFrame(spin);
       };
       rotationRef.current = requestAnimationFrame(spin);
     };
 
-    startRotation();
-
-    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
     const pause = () => {
       if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
       if (resumeTimer) clearTimeout(resumeTimer);
       resumeTimer = setTimeout(startRotation, 3000);
     };
 
+    // Wait for the easeTo animation to finish before starting rotation
+    const startDelay = setTimeout(startRotation, 1400);
+
     map.on('mousedown', pause);
     map.on('touchstart', pause);
     map.on('wheel', pause);
 
     return () => {
+      alive = false;
+      clearTimeout(startDelay);
       if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
       if (resumeTimer) clearTimeout(resumeTimer);
       map.off('mousedown', pause);
