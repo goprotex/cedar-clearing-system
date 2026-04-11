@@ -457,7 +457,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             if (map.getTerrain()) {
               try {
                 const treeList = extractTreesFromAnalysis(bid.pastures);
-                const treeFc = treeFeaturesForMapboxExtrusion(treeList, { maxTrees: 2800, circleSteps: 10 });
+                const treeFc = treeFeaturesForMapboxExtrusion(treeList, { maxTrees: 2400, circleSteps: 12 });
                 map.addSource('operate-trees-3d', { type: 'geojson', data: treeFc });
                 map.addLayer({
                   id: 'operate-trees-3d',
@@ -466,8 +466,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
                   paint: {
                     'fill-extrusion-color': ['get', 'color'],
                     'fill-extrusion-height': ['get', 'height_m'],
-                    'fill-extrusion-base': 0,
-                    'fill-extrusion-opacity': 0.9,
+                    'fill-extrusion-base': ['get', 'base_m'],
+                    'fill-extrusion-opacity': 0.92,
                   },
                 });
               } catch {
