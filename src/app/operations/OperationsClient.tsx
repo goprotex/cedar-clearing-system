@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/components/AuthProvider';
 import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
+import JobTeamPanel from '@/components/operations/JobTeamPanel';
 
 type BootstrapResponse = {
   jobs: ActiveJobSummary[];
@@ -20,6 +21,7 @@ export default function OperationsClient() {
   const [jobs, setJobs] = useState<ActiveJobSummary[]>([]);
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +122,7 @@ export default function OperationsClient() {
                     <div className="mt-2 w-full h-1.5 bg-[#353534] rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-[#13ff43] to-[#00cc33]" style={{ width: `${p}%` }} />
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2 items-center">
                       <Link
                         href={`/bid/${bidId}`}
                         className="text-[10px] font-bold uppercase tracking-wider border border-[#353534] px-2 py-1 text-[#e5e2e1] hover:border-[#FF6B00] hover:text-[#FF6B00]"
@@ -139,7 +141,17 @@ export default function OperationsClient() {
                       >
                         Monitor
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedJobId((id) => (id === j.id ? null : j.id))}
+                        className="text-[10px] font-bold uppercase tracking-wider border border-[#5a4136] px-2 py-1 text-[#a98a7d] hover:border-[#FF6B00] hover:text-[#FF6B00] ml-auto"
+                      >
+                        {expandedJobId === j.id ? 'Hide team' : 'Team'}
+                      </button>
                     </div>
+                    {expandedJobId === j.id && (
+                      <JobTeamPanel jobId={j.id} />
+                    )}
                   </li>
                 );
               })}
@@ -157,7 +169,7 @@ export default function OperationsClient() {
           <section className="border-2 border-[#353534] p-5">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] mb-2">Team</h2>
             <p className="text-xs text-[#a98a7d] leading-relaxed">
-              Crew and roles will tie to Supabase org members when that ships. For now, use shared jobs and scout monitor for live positions.
+              Open a job above and expand <span className="text-[#ffb693]">Team</span> to invite crew by email (owners only). Invitees must sign in with that email and open the one-time link.
             </p>
           </section>
 
@@ -180,7 +192,7 @@ export default function OperationsClient() {
       </div>
 
       <p className="text-[10px] font-mono text-[#5a4136] max-w-2xl">
-        Replaced the old map-radar demo (standalone map + local recon notes). Weather and live layers live on scout monitor; estimation stays in bids.
+        Job crew is stored in Supabase. Local-only jobs stay on this device until you convert the bid to a job while signed in.
       </p>
     </AppShell>
   );
