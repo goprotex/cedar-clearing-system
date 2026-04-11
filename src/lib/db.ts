@@ -85,8 +85,8 @@ export interface PastureRow {
 export function bidToRow(bid: Bid, userId?: string): Omit<BidRow, 'created_at' | 'updated_at'> {
   return {
     id: bid.id,
-    company_id: null,
-    client_id: null,
+    company_id: bid.companyId ?? null,
+    client_id: bid.clientId ?? null,
     created_by: userId ?? null,
     bid_number: bid.bidNumber,
     status: bid.status,
@@ -120,6 +120,8 @@ export function rowToBid(row: BidRow, pastures: Pasture[]): Bid {
     id: row.id,
     bidNumber: row.bid_number,
     status: row.status as Bid['status'],
+    clientId: row.client_id ?? null,
+    companyId: row.company_id ?? null,
     clientName: row.client_name ?? '',
     clientEmail: row.client_email ?? '',
     clientPhone: row.client_phone ?? '',
@@ -218,7 +220,20 @@ export async function saveBidToSupabase(
   bid: Bid,
   userId: string,
 ): Promise<{ error: string | null }> {
-  const bidRow = bidToRow(bid, userId);
+  let companyId = bid.companyId ?? null;
+  if (companyId === null && userId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .maybeSingle();
+    companyId = profile?.company_id ?? null;
+  }
+
+  const bidRow = bidToRow(
+    companyId !== bid.companyId ? { ...bid, companyId } : bid,
+    userId,
+  );
 
   const { error: bidErr } = await supabase
     .from('bids')
