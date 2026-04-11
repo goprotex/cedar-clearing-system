@@ -96,6 +96,62 @@ function loadLocalJobs(): BootstrapJob[] {
   return results;
 }
 
+/** Jobs implied by operator GPS keys in localStorage (operate mode writes these even when no `ccc_job_*` exists). */
+function loadJobsFromOperatorStorage(existingIds: Set<string>): BootstrapJob[] {
+  if (typeof window === 'undefined') return [];
+  const posPrefix = 'ccc_operator_pos_';
+  const trailPrefix = 'ccc_operator_trail_';
+  const out: BootstrapJob[] = [];
+  const seen = new Set(existingIds);
+
+  const tryAdd = (jobId: string) => {
+    if (!jobId || seen.has(jobId)) return;
+    const bidId = jobId.startsWith('job_') ? jobId.slice(4) : jobId;
+    const bidRaw = localStorage.getItem(`ccc_bid_${bidId}`);
+    if (!bidRaw) return;
+    let bid: Bid;
+    try {
+      bid = JSON.parse(bidRaw) as Bid;
+    } catch {
+      return;
+    }
+    if (!bid.pastures?.length) return;
+
+    let cedarTotal = 0;
+    for (const p of bid.pastures) {
+      for (const f of (p.cedarAnalysis?.gridCells?.features ?? [])) {
+        const cls = (f as { properties?: { classification?: string } }).properties?.classification;
+        if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') cedarTotal++;
+      }
+    }
+
+    seen.add(jobId);
+    out.push({
+      id: jobId,
+      title: `${bid.propertyName || 'Property'} — ${bid.bidNumber} (GPS)`,
+      status: 'active',
+      created_at: bid.updatedAt || bid.createdAt || new Date().toISOString(),
+      bid_snapshot: bid,
+      cedar_total_cells: cedarTotal,
+      cedar_cleared_cells: 0,
+    });
+  };
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith(posPrefix)) {
+        tryAdd(key.slice(posPrefix.length));
+      } else if (key.startsWith(trailPrefix)) {
+        tryAdd(key.slice(trailPrefix.length));
+      }
+    }
+  } catch { /* ignore */ }
+
+  return out;
+}
+
 export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscreen?: boolean } = {}) {
   const [jobs, setJobs] = useState<BootstrapJob[]>([]);
   const [clearedByJob, setClearedByJob] = useState<Record<string, Set<string>>>({});
@@ -169,12 +225,18 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           remoteJobs = loadLocalJobs();
         }
 
+        const mergedIds = new Set(remoteJobs.map((j) => j.id));
+        remoteJobs = [...remoteJobs, ...loadJobsFromOperatorStorage(mergedIds)];
+
         setJobs(remoteJobs);
         setClearedByJob(next);
       } catch (e) {
         if (cancelled) return;
         // Fall back to local jobs
-        const localJobs = loadLocalJobs();
+        const idSet = new Set<string>();
+        let localJobs = loadLocalJobs();
+        for (const j of localJobs) idSet.add(j.id);
+        localJobs = [...localJobs, ...loadJobsFromOperatorStorage(idSet)];
         if (localJobs.length > 0) {
           setJobs(localJobs);
           setErr(null);
@@ -332,29 +394,35 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     const jobIds = jobs.map((j) => j.id).filter(Boolean);
     if (!jobIds.length) return;
 
+    const applyOperatorRow = (payload: { new: Record<string, unknown> }) => {
+      const row = payload.new as {
+        job_id: string; user_id: string; lng: number; lat: number;
+        heading?: number | null; speed_mps?: number | null; accuracy_m?: number | null; updated_at: string;
+      } | null;
+      if (!row || typeof row.job_id !== 'string' || typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
+      setOperatorsByJob((prev) => {
+        const next = { ...prev };
+        const arr = next[row.job_id] ? [...next[row.job_id]] : [];
+        const idx = arr.findIndex((o) => o.user_id === row.user_id);
+        const entry: OperatorPosition = {
+          user_id: row.user_id, lng: row.lng, lat: row.lat,
+          heading: typeof row.heading === 'number' ? row.heading : null,
+          speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
+          accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
+          updated_at: row.updated_at,
+        };
+        if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+        next[row.job_id] = arr;
+        return next;
+      });
+    };
+
+    const filter = `job_id=in.(${jobIds.join(',')})`;
     const channel = supabase
       .channel(`monitor-ops-${jobIds.join('-').slice(0, 80)}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_operator_positions', filter: `job_id=in.(${jobIds.join(',')})` },
-        (payload) => {
-          const row = payload.new as { job_id: string; user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string } | null;
-          if (!row || typeof row.job_id !== 'string' || typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
-          setOperatorsByJob((prev) => {
-            const next = { ...prev };
-            const arr = next[row.job_id] ? [...next[row.job_id]] : [];
-            const idx = arr.findIndex((o) => o.user_id === row.user_id);
-            const entry: OperatorPosition = {
-              user_id: row.user_id, lng: row.lng, lat: row.lat,
-              heading: typeof row.heading === 'number' ? row.heading : null,
-              speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
-              accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
-              updated_at: row.updated_at,
-            };
-            if (idx >= 0) arr[idx] = entry; else arr.push(entry);
-            next[row.job_id] = arr;
-            return next;
-          });
-        }
-      ).subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_operator_positions', filter }, applyOperatorRow)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'job_operator_positions', filter }, applyOperatorRow)
+      .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
   }, [jobs]);

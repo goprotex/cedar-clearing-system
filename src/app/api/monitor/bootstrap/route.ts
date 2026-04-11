@@ -54,7 +54,7 @@ export async function GET() {
 
   const { data: operators, error: opErr } = await supabase
     .from('job_operator_positions')
-    .select('job_id, user_id, lng, lat, accuracy_m, heading_deg, speed_mps, updated_at')
+    .select('job_id, user_id, lng, lat, accuracy_m, heading, speed_mps, updated_at')
     .in('job_id', jobIds);
   if (opErr) return NextResponse.json({ error: opErr.message }, { status: 500 });
 
@@ -64,7 +64,7 @@ export async function GET() {
       user_id: row.user_id,
       lng: row.lng,
       lat: row.lat,
-      heading: row.heading_deg ?? null,
+      heading: row.heading ?? null,
       speed_mps: row.speed_mps ?? null,
       accuracy_m: row.accuracy_m ?? null,
       updated_at: row.updated_at,
