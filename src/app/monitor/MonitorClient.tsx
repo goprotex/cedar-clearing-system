@@ -18,11 +18,26 @@ type BootstrapJob = {
 
 type BootstrapResponse = {
   jobs: BootstrapJob[];
-  cleared: Record<string, string[]>;
+  clearedByJob: Record<string, string[]>;
   operators: Record<string, Array<{ user_id: string; lng: number; lat: number; heading: number | null; speed_mps: number | null; accuracy_m: number | null; updated_at: string }>>;
 };
 
 type OperatorPosition = BootstrapResponse['operators'][string][number];
+
+/** Merge polled/local-operator positions with Supabase/bootstrap data; avoid duplicate markers when both exist. */
+function mergeOperatorLists(prevList: OperatorPosition[], polled: OperatorPosition[] | undefined): OperatorPosition[] {
+  if (!polled?.length) return prevList;
+  const map = new Map<string, OperatorPosition>();
+  for (const o of prevList) map.set(o.user_id, o);
+  const prevHasRealUser = prevList.some((o) => o.user_id !== 'operator');
+  const polledHasRealUser = polled.some((o) => o.user_id !== 'operator');
+  for (const o of polled) {
+    if (o.user_id === 'operator' && (prevHasRealUser || polledHasRealUser)) continue;
+    map.set(o.user_id, o);
+  }
+  if (prevHasRealUser || polledHasRealUser) map.delete('operator');
+  return Array.from(map.values());
+}
 
 const MapboxMap = dynamic(() => import('./MonitorMap'), {
   ssr: false,
@@ -144,7 +159,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
         let remoteJobs = data.jobs ?? [];
         const next: Record<string, Set<string>> = {};
-        for (const [jobId, cellIds] of Object.entries(data.cleared ?? {})) {
+        for (const [jobId, cellIds] of Object.entries(data.clearedByJob ?? {})) {
           next[jobId] = new Set(cellIds);
         }
         setOperatorsByJob(data.operators ?? {});
@@ -265,11 +280,10 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       }
 
       if (cancelled) return;
-      setOperatorsByJob(prev => {
+      setOperatorsByJob((prev) => {
         const merged = { ...prev };
         for (const [jobId, ops] of Object.entries(next)) {
-          const existing = merged[jobId] ?? [];
-          if (existing.length === 0) merged[jobId] = ops;
+          merged[jobId] = mergeOperatorLists(merged[jobId] ?? [], ops);
         }
         return merged;
       });
