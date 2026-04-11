@@ -308,7 +308,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     const channel = supabase
       .channel('monitor-job-cleared-cells')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_cleared_cells', filter: `job_id=in.(${jobIds.join(',')})` },
-        (payload) => {
+        (payload: { new: Record<string, unknown> }) => {
           const row = payload.new as { job_id?: string; cell_id?: string } | null;
           if (typeof row?.job_id !== 'string' || typeof row?.cell_id !== 'string') return;
           setClearedByJob((prev) => {
