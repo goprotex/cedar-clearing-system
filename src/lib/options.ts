@@ -45,11 +45,11 @@ export function generateBidOptions(
         clearingMethod: preset.clearingMethod,
         disposalMethod: preset.disposalMethod,
       };
-      const { subtotal, methodMultiplier, estimatedHrsPerAcre } = calculatePastureCost(
+      const { subtotal, methodMultiplier, estimatedHrsPerAcre, billableAcres } = calculatePastureCost(
         modified,
         rateCard
       );
-      return { ...modified, subtotal, methodMultiplier, estimatedHrsPerAcre };
+      return { ...modified, subtotal, methodMultiplier, estimatedHrsPerAcre, billableAcres };
     });
 
     const { totalAmount } = calculateBidTotal(

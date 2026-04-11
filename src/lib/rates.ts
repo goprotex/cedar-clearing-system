@@ -82,10 +82,43 @@ export function calculateSoilDifficulty(soil: SoilData): number {
 
 // ──── Pasture Cost Calculation ────
 
+/**
+ * Acres that drive clearing line-item $: when spectral analysis exists, use estimated cedar acres
+ * (capped by polygon size); otherwise full polygon acreage.
+ */
+export function clearingBillableAcres(
+  pasture: Pick<Pasture, 'acreage' | 'cedarAnalysis'>,
+): number {
+  const ac = pasture.acreage;
+  if (!ac || ac <= 0) return 0;
+  const summary = pasture.cedarAnalysis?.summary;
+  if (
+    !summary ||
+    typeof summary.estimatedCedarAcres !== 'number' ||
+    !Number.isFinite(summary.estimatedCedarAcres)
+  ) {
+    return Math.round(ac * 100) / 100;
+  }
+  const ec = Math.min(ac, Math.max(0, summary.estimatedCedarAcres));
+  return Math.round(ec * 100) / 100;
+}
+
 export function calculatePastureCost(
-  pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'density' | 'terrain' | 'clearingMethod' | 'disposalMethod' | 'soilMultiplier' | 'soilMultiplierOverride' | 'adders'>,
+  pasture: Pick<
+    Pasture,
+    | 'acreage'
+    | 'vegetationType'
+    | 'density'
+    | 'terrain'
+    | 'clearingMethod'
+    | 'disposalMethod'
+    | 'soilMultiplier'
+    | 'soilMultiplierOverride'
+    | 'adders'
+    | 'cedarAnalysis'
+  >,
   rateCard: RateCard
-): { subtotal: number; methodMultiplier: number; estimatedHrsPerAcre: number } {
+): { subtotal: number; methodMultiplier: number; estimatedHrsPerAcre: number; billableAcres: number } {
   const baseRate = rateCard.baseRates[pasture.vegetationType];
   const densityMult = rateCard.densityMultipliers[pasture.density];
   const terrainMult = rateCard.terrainMultipliers[pasture.terrain];
@@ -100,8 +133,10 @@ export function calculatePastureCost(
   // Use the higher of terrain or soil multiplier (they measure similar friction)
   const difficultyMult = Math.max(terrainMult, soilMult);
 
+  const billableAcres = clearingBillableAcres(pasture);
+
   const perAcre = baseRate * densityMult * difficultyMult * methodRateMult + disposalAdder;
-  const baseCost = pasture.acreage * perAcre;
+  const baseCost = billableAcres * perAcre;
 
   // Method-specific adders: quantity × costPerUnit
   const adderTotal = (pasture.adders ?? []).reduce((sum, a) => sum + a.quantity * a.costPerUnit, 0);
@@ -114,7 +149,7 @@ export function calculatePastureCost(
     baseHrs * densityMult * difficultyMult * methodTimeMult * 100
   ) / 100;
 
-  return { subtotal, methodMultiplier: methodRateMult, estimatedHrsPerAcre };
+  return { subtotal, methodMultiplier: methodRateMult, estimatedHrsPerAcre, billableAcres };
 }
 
 // ──── Total Bid Calculation ────
@@ -158,10 +193,10 @@ export function estimateDuration(
   pastures: Pasture[],
   hoursPerDay: number = 8
 ): { low: number; high: number } {
-  const totalHours = pastures.reduce(
-    (sum, p) => sum + p.acreage * p.estimatedHrsPerAcre,
-    0
-  );
+  const totalHours = pastures.reduce((sum, p) => {
+    const acres = p.billableAcres ?? p.acreage;
+    return sum + acres * p.estimatedHrsPerAcre;
+  }, 0);
   const baseDays = totalHours / hoursPerDay;
   return {
     low: Math.ceil(baseDays * 0.85),

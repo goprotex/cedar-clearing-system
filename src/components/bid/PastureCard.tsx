@@ -32,6 +32,9 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
   const [aiResult, setAiResult] = useState<AIRecommendation | null>(null);
 
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
+  const billAc = pasture.billableAcres ?? pasture.acreage;
+  const effBillAc = billAc > 0 ? billAc : pasture.acreage;
+  const $perBillAcre = effBillAc > 0 ? Math.round(pasture.subtotal / effBillAc) : 0;
 
   return (
     <div
@@ -258,7 +261,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                 if (!adderId) return;
                 const def = rateCard.methodAdders.find((d) => d.id === adderId);
                 if (!def) return;
-                const qty = def.unit === 'acre' ? pasture.acreage : 1;
+                const qty = def.unit === 'acre' ? billAc : 1;
                 updatePasture(pasture.id, {
                   adders: [...(pasture.adders ?? []), { adderId, quantity: qty, costPerUnit: def.defaultCost }],
                 });
@@ -485,17 +488,23 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
           </div>
         )}
 
-        {/* Hours estimate + per-acre rate */}
+        {/* Hours estimate + rate (billable acres = spectral cedar when analysis exists) */}
         {pasture.acreage > 0 && (
           <div className="text-xs text-[#a98a7d] space-y-0.5 bg-[#201f1f] border border-[#353534] p-2">
+            {pasture.cedarAnalysis && Math.abs(billAc - pasture.acreage) > 0.05 && (
+              <div className="text-[10px] text-[#ffb693]">
+                Pricing uses <span className="font-mono text-[#e5e2e1]">{billAc.toFixed(1)}</span> cedar ac
+                (spectral) vs <span className="font-mono">{pasture.acreage}</span> ac polygon
+              </div>
+            )}
             <div>
-              <span className="font-medium">Rate:</span> {formatCurrency(Math.round(pasture.subtotal / pasture.acreage))}/acre
+              <span className="font-medium">Rate:</span> {formatCurrency($perBillAcre)}/cedar acre
               {' | '}
-              <span className="font-medium">Time:</span> {pasture.estimatedHrsPerAcre} hrs/acre
+              <span className="font-medium">Time:</span> {pasture.estimatedHrsPerAcre} hrs/ac
             </div>
             <div>
-              Est. {Math.round(pasture.acreage * pasture.estimatedHrsPerAcre)} total hrs
-              ({Math.ceil(pasture.acreage * pasture.estimatedHrsPerAcre / 8)} work days)
+              Est. {Math.round(effBillAc * pasture.estimatedHrsPerAcre)} total hrs
+              ({Math.ceil((effBillAc * pasture.estimatedHrsPerAcre) / 8)} work days)
             </div>
           </div>
         )}

@@ -93,6 +93,8 @@ export interface Pasture {
   subtotal: number;
   methodMultiplier: number;
   estimatedHrsPerAcre: number;
+  /** Acres used for clearing $ (spectral cedar acres when analysis exists, else polygon acreage). */
+  billableAcres: number;
   notes: string;
 }
 

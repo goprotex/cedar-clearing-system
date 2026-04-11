@@ -56,6 +56,7 @@ function createDefaultPasture(sortOrder: number): Pasture {
     subtotal: 0,
     methodMultiplier: 1.0,
     estimatedHrsPerAcre: 1.0,
+    billableAcres: 0,
     notes: '',
   };
 }
@@ -422,8 +423,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
       const { rateCard, currentBid } = state;
       const updatedPastures = currentBid.pastures.map((p) => {
         if (p.acreage === 0) return p;
-        const { subtotal, methodMultiplier, estimatedHrsPerAcre } = calculatePastureCost(p, rateCard);
-        return { ...p, subtotal, methodMultiplier, estimatedHrsPerAcre };
+        const { subtotal, methodMultiplier, estimatedHrsPerAcre, billableAcres } = calculatePastureCost(
+          p,
+          rateCard
+        );
+        return { ...p, subtotal, methodMultiplier, estimatedHrsPerAcre, billableAcres };
       });
 
       const { totalAmount } = calculateBidTotal(
@@ -483,6 +487,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       const data = localStorage.getItem(`ccc_bid_${id}`);
       if (data) {
         set({ currentBid: JSON.parse(data), selectedPastureId: null, drawingMode: false });
+        get().recalculate();
       }
     }
   },
