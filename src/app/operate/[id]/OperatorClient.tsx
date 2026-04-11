@@ -9,6 +9,7 @@ import { HologramMapboxLayers, extractTreesFromAnalysis, type TreePosition } fro
 import type { PastureWall } from '@/lib/cedar-tree-data';
 import { treeFeaturesForMapboxExtrusion } from '@/lib/operate-mapbox-trees';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
+import type { Session } from '@supabase/supabase-js';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
 import { loadBidFromSupabase, getAuthUserId } from '@/lib/db';
 
@@ -245,10 +246,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const sb = createSupabaseBrowser();
-    void sb.auth.getSession().then(({ data }) => {
+    void sb.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       supabaseSessionRef.current = !!data.session;
     });
-    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((_e: string, session: Session | null) => {
       supabaseSessionRef.current = !!session;
     });
     return () => { sub.subscription.unsubscribe(); };
