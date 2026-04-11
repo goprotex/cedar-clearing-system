@@ -219,7 +219,7 @@ export default function ClientsDetailClient({ id }: { id: string }) {
         </div>
         {bids.length === 0 ? (
           <div className="p-8 text-center text-[#a98a7d] text-sm">
-            No bids linked yet. In the estimator, use <span className="text-[#e5e2e1]">CRM client</span> on the bid to link this record.
+            No bids linked yet. Set <span className="text-[#e5e2e1]">client_id</span> on bids to associate them.
           </div>
         ) : (
           <>

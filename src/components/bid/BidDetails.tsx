@@ -1,10 +1,10 @@
 'use client';
 
 import { useBidStore } from '@/lib/store';
-import BidClientLinker from '@/components/bid/BidClientLinker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
 export default function BidDetails() {
   const {
@@ -20,7 +20,6 @@ export default function BidDetails() {
       {/* Client Info */}
       <div className="bg-[#1c1b1b] border border-[#353534] p-4">
         <h3 className="text-[10px] text-[#FF6B00] font-black uppercase tracking-widest mb-3">CLIENT_DATA</h3>
-        <BidClientLinker />
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2">
             <Label className="text-[10px] text-[#a98a7d] uppercase tracking-widest">Name</Label>
