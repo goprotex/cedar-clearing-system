@@ -66,13 +66,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-[10px] text-[#a98a7d] font-mono hidden md:inline">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <Link
+            href="/login"
+            className="text-[10px] sm:text-xs font-black uppercase tracking-widest bg-[#FF6B00] text-black px-3 py-2 hover:bg-white transition-colors whitespace-nowrap"
+          >
+            Sign in
+          </Link>
+          <span className="text-[10px] text-[#a98a7d] font-mono hidden lg:inline">
             SYS_STATUS: OPERATIONAL
           </span>
           <Link
             href="/sys-health"
-            className={`w-2 h-2 rounded-full ${pathname === '/sys-health' ? 'bg-[#FF6B00]' : 'bg-[#13ff43] animate-pulse'}`}
+            className={`w-2 h-2 rounded-full shrink-0 ${pathname === '/sys-health' ? 'bg-[#FF6B00]' : 'bg-[#13ff43] animate-pulse'}`}
             title="System Health"
           />
         </div>
@@ -95,6 +101,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="px-4 mb-6">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
+        </div>
+
+        <div className="px-4 mb-4">
+          <Link
+            href="/login"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block w-full text-center bg-[#FF6B00] text-black text-xs font-black uppercase tracking-widest py-3 hover:bg-white transition-colors"
+          >
+            Sign in
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
@@ -136,9 +152,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] flex-col pt-20 pb-4 px-2 z-40 hidden md:flex">
-        <div className="px-4 mb-8">
+        <div className="px-4 mb-6">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
+        </div>
+
+        <div className="px-4 mb-4">
+          <Link
+            href="/login"
+            className="block w-full text-center bg-[#FF6B00] text-black text-xs font-black uppercase tracking-widest py-3 hover:bg-white transition-colors"
+          >
+            Sign in
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-1">

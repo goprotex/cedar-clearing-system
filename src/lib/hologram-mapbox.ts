@@ -1,56 +1,20 @@
-// Native Mapbox GL layers for hologram mode — trees as fill-extrusion on terrain (no Three.js).
+// Native Mapbox GL layers for hologram mode — cylindrical tree volumes (turf circles) on terrain.
 
 import mapboxgl from 'mapbox-gl';
 import type { MarkedTree } from '@/types';
 import type { PastureWall, TreePosition } from '@/lib/cedar-tree-data';
+import { treeFeaturesForMapboxExtrusion } from '@/lib/operate-mapbox-trees';
 
 export type { PastureWall, TreePosition };
 export { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
 
 type Species = 'cedar' | 'oak' | 'mixed';
 
-const HOLO_COLORS: Record<Species, string> = {
-  cedar: '#00ff66',
-  oak: '#ffaa00',
-  mixed: '#22dd88',
-};
-
 const WALL_HEIGHT_M = 40;
 
 const TREE_SOURCE = 'holo-trees';
 const WALL_SOURCE = 'holo-walls';
 const MARK_SOURCE = 'holo-marks';
-
-function squareRingMeters(lng: number, lat: number, radiusM: number): GeoJSON.Position[] {
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
-  const dx = radiusM / metersPerDegLng;
-  const dy = radiusM / metersPerDegLat;
-  return [
-    [lng - dx, lat - dy],
-    [lng + dx, lat - dy],
-    [lng + dx, lat + dy],
-    [lng - dx, lat + dy],
-    [lng - dx, lat - dy],
-  ];
-}
-
-function treesToFeatureCollection(trees: TreePosition[]): GeoJSON.FeatureCollection {
-  const features: GeoJSON.Feature[] = [];
-  for (const t of trees) {
-    const r = Math.max(t.canopyDiameter / 2, 1.5);
-    const ring = squareRingMeters(t.lng, t.lat, r);
-    features.push({
-      type: 'Feature',
-      properties: {
-        species: t.species,
-        h: Math.max(t.height, 2),
-      },
-      geometry: { type: 'Polygon', coordinates: [ring] },
-    });
-  }
-  return { type: 'FeatureCollection', features };
-}
 
 function wallsToFeatureCollection(walls: PastureWall[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
@@ -95,7 +59,7 @@ function haversineM(lng1: number, lat1: number, lng2: number, lat2: number): num
 }
 
 /**
- * Mapbox-native hologram: fill-extrusion trees + walls aligned to terrain; circles for save/remove marks.
+ * Mapbox-native hologram: stacked cylindrical tree volumes (turf circles) + walls; circles for save/remove marks.
  */
 export class HologramMapboxLayers {
   private map: mapboxgl.Map;
@@ -117,17 +81,9 @@ export class HologramMapboxLayers {
         type: 'fill-extrusion',
         source: TREE_SOURCE,
         paint: {
-          'fill-extrusion-height': ['get', 'h'],
-          'fill-extrusion-base': 0,
-          'fill-extrusion-color': [
-            'match',
-            ['get', 'species'],
-            'cedar',
-            HOLO_COLORS.cedar,
-            'oak',
-            HOLO_COLORS.oak,
-            HOLO_COLORS.mixed,
-          ],
+          'fill-extrusion-height': ['get', 'height_m'],
+          'fill-extrusion-base': ['get', 'base_m'],
+          'fill-extrusion-color': ['get', 'color'],
           'fill-extrusion-opacity': 0.88,
           'fill-extrusion-height-alignment': 'terrain',
           'fill-extrusion-base-alignment': 'terrain',
@@ -176,7 +132,7 @@ export class HologramMapboxLayers {
     this.ensureLayers();
     const src = this.map.getSource(TREE_SOURCE) as mapboxgl.GeoJSONSource | undefined;
     if (src) {
-      src.setData(treesToFeatureCollection(trees));
+      src.setData(treeFeaturesForMapboxExtrusion(trees));
     }
     this.applySpeciesFilters();
   }

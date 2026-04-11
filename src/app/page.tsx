@@ -44,13 +44,21 @@ export default function Home() {
             </Link>
           ))}
         </nav>
-        <Link
-          href="/bids"
-          className="bg-[#FF6B00] text-black px-4 md:px-6 py-2 font-bold uppercase tracking-widest hover:bg-white transition-all text-xs md:text-sm"
-        >
-          LAUNCH
-          <span className="hidden sm:inline">_SYSTEM</span>
-        </Link>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <Link
+            href="/login"
+            className="border-2 border-[#FF6B00] text-[#FF6B00] px-3 sm:px-4 py-2 font-bold uppercase tracking-widest hover:bg-[#FF6B00] hover:text-black transition-all text-[10px] sm:text-xs whitespace-nowrap"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/bids"
+            className="bg-[#FF6B00] text-black px-3 sm:px-6 py-2 font-bold uppercase tracking-widest hover:bg-white transition-all text-[10px] sm:text-sm whitespace-nowrap"
+          >
+            LAUNCH
+            <span className="hidden sm:inline">_SYSTEM</span>
+          </Link>
+        </div>
       </header>
 
       {/* Mobile dropdown menu */}
@@ -67,6 +75,13 @@ export default function Home() {
         style={{ zIndex: 45 }}
       >
         <nav className="flex flex-col py-2">
+          <Link
+            href="/login"
+            onClick={() => setMenuOpen(false)}
+            className="uppercase tracking-tight font-black text-[#FF6B00] bg-[#FF6B00]/10 hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm border-b border-[#353534]/50"
+          >
+            Sign in
+          </Link>
           {LANDING_NAV.map((item) => (
             <Link
               key={item.href}
