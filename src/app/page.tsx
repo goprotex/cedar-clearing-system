@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
 import { motion, useReducedMotion } from 'motion/react';
+import SiteLogo from '@/components/SiteLogo';
 import { HeroBackdrop } from '@/components/landing/HeroBackdrop';
 import { Reveal, Stagger, StaggerItem } from '@/components/landing/Reveal';
 
@@ -87,11 +88,10 @@ export default function Home() {
             <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
           </button>
           <motion.div
-            className="text-xl md:text-2xl font-black text-[#FF6B00] tracking-tighter uppercase"
             whileHover={reduce ? undefined : { scale: 1.02 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           >
-            CEDAR_HACK
+            <SiteLogo />
           </motion.div>
         </div>
         <nav className="hidden md:flex gap-8 items-center">

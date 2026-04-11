@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import SiteLogo from '@/components/SiteLogo';
 
 const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
@@ -56,9 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${mobileMenuOpen ? 'opacity-0' : ''}`} />
             <span className={`block w-5 h-[2px] bg-[#FF6B00] transition-all duration-300 ${mobileMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
           </button>
-          <Link href="/" className="text-xl md:text-2xl font-bold text-[#FF6B00] tracking-widest uppercase">
-            CEDAR_HACK
-          </Link>
+          <SiteLogo />
           <div className="hidden sm:flex flex-wrap gap-x-2 gap-y-1 md:gap-x-4 text-[10px] md:text-xs font-bold items-center max-w-[min(52vw,28rem)] lg:max-w-none justify-end">
             {HEADER_NAV.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
