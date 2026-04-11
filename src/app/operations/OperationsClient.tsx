@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
 import JobTeamPanel from '@/components/operations/JobTeamPanel';
 import JobNotesAndProgressPanel from '@/components/operations/JobNotesAndProgressPanel';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 type BootstrapResponse = {
   jobs: ActiveJobSummary[];
@@ -30,7 +31,7 @@ export default function OperationsClient() {
       try {
         setBusy(true);
         setErr(null);
-        const res = await fetch('/api/monitor/bootstrap', { cache: 'no-store' });
+        const res = await fetchApiAuthed('/api/monitor/bootstrap');
         if (!res.ok) throw new Error(await res.text());
         const data = (await res.json()) as BootstrapResponse;
         if (cancelled) return;

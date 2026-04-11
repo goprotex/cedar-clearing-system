@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 type Member = { user_id: string; role: 'owner' | 'worker' | 'viewer'; email: string | null; created_at: string };
 type PendingInvite = { id: string; email: string; role: string; created_at: string; expires_at: string };
@@ -25,7 +26,7 @@ export default function JobTeamPanel({ jobId }: Props) {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/team`, { cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/team`);
       if (res.status === 401) {
         setErr('Sign in to view team.');
         setMembers([]);
@@ -72,9 +73,8 @@ export default function JobTeamPanel({ jobId }: Props) {
     setInviteErr(null);
     setInviteLink(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
         method: 'POST',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), role: inviteRole }),
       });
@@ -95,9 +95,8 @@ export default function JobTeamPanel({ jobId }: Props) {
 
   const cancelInvite = async (inviteId: string) => {
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/invites`, {
         method: 'DELETE',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteId }),
       });
@@ -114,9 +113,8 @@ export default function JobTeamPanel({ jobId }: Props) {
   const updateRole = async (userId: string, role: string) => {
     if (role !== 'owner' && role !== 'worker' && role !== 'viewer') return;
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
         method: 'PATCH',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, role }),
       });
@@ -131,9 +129,8 @@ export default function JobTeamPanel({ jobId }: Props) {
   const removeMember = async (userId: string) => {
     if (!window.confirm('Remove this person from the job?')) return;
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(jobId)}/members`, {
         method: 'DELETE',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });

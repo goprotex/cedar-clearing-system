@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Job, JobEvent } from '@/types';
 import { loadLocalJobBundle } from '@/lib/jobs';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 function fmt(ts: string) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
@@ -19,7 +20,7 @@ export default function JobClient({ jobId }: { jobId: string }) {
     (async () => {
       try {
         setErr(null);
-        const res = await fetch(`/api/jobs/${jobId}`, { cache: 'no-store' });
+        const res = await fetchApiAuthed(`/api/jobs/${jobId}`);
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) {
           const local = loadLocalJobBundle(jobId);

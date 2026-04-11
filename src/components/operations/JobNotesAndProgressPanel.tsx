@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { fetchApiAuthed } from '@/lib/auth-client';
 import type { ActiveJobSummary } from '@/lib/active-jobs';
 
 type NoteRow = {
@@ -68,10 +69,7 @@ export default function JobNotesAndProgressPanel({ job, onJobPatch }: Props) {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/notes`, {
-        cache: 'no-store',
-        credentials: 'same-origin',
-      });
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(job.id)}/notes`);
       if (res.status === 401) {
         setErr('Sign in to load notes.');
         setNotes([]);
@@ -100,9 +98,8 @@ export default function JobNotesAndProgressPanel({ job, onJobPatch }: Props) {
     setSavingProgress(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/progress`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(job.id)}/progress`, {
         method: 'PATCH',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           work_started_at: workStart ? new Date(workStart).toISOString() : null,
@@ -169,9 +166,8 @@ export default function JobNotesAndProgressPanel({ job, onJobPatch }: Props) {
     setPosting(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/notes`, {
+      const res = await fetchApiAuthed(`/api/jobs/${encodeURIComponent(job.id)}/notes`, {
         method: 'POST',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: text, attachments: pendingUrls }),
       });
@@ -190,9 +186,9 @@ export default function JobNotesAndProgressPanel({ job, onJobPatch }: Props) {
   const deleteNote = async (noteId: string) => {
     if (!window.confirm('Delete this note?')) return;
     try {
-      const res = await fetch(
+      const res = await fetchApiAuthed(
         `/api/jobs/${encodeURIComponent(job.id)}/notes/${encodeURIComponent(noteId)}`,
-        { method: 'DELETE', credentials: 'same-origin' },
+        { method: 'DELETE' },
       );
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? res.statusText);

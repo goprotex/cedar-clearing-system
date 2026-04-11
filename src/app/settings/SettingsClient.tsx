@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import type { UserAppPreferences } from '@/types/profile';
 import { createClient } from '@/utils/supabase/client';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 type SettingsPayload = {
   email: string | null;
@@ -43,7 +44,7 @@ export default function SettingsClient() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetchApiAuthed('/api/settings');
       if (res.status === 401) {
         setEmail(null);
         setFullName('');
@@ -105,9 +106,8 @@ export default function SettingsClient() {
         if (emErr) throw new Error(emErr.message);
       }
 
-      const res = await fetch('/api/settings', {
+      const res = await fetchApiAuthed('/api/settings', {
         method: 'PATCH',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName,

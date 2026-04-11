@@ -6,6 +6,7 @@ import AppShell from '@/components/AppShell';
 import JobTeamPanel from '@/components/operations/JobTeamPanel';
 import JobNotesAndProgressPanel from '@/components/operations/JobNotesAndProgressPanel';
 import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 type CompanyProfile = {
   id: string;
@@ -39,7 +40,7 @@ export default function DashboardClient() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch('/api/company/profiles', { cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetchApiAuthed('/api/company/profiles');
       if (res.status === 401) {
         setProfiles([]);
         setErr('Sign in to view the employee dashboard.');
@@ -69,7 +70,7 @@ export default function DashboardClient() {
     void (async () => {
       try {
         setJobsBusy(true);
-        const res = await fetch('/api/monitor/bootstrap', { cache: 'no-store' });
+        const res = await fetchApiAuthed('/api/monitor/bootstrap');
         if (!res.ok) throw new Error(await res.text());
         const data = (await res.json()) as { jobs: ActiveJobSummary[] };
         if (cancelled) return;
@@ -108,9 +109,8 @@ export default function DashboardClient() {
     setSaving(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/company/profiles/${encodeURIComponent(selectedId)}`, {
+      const res = await fetchApiAuthed(`/api/company/profiles/${encodeURIComponent(selectedId)}`, {
         method: 'PATCH',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: editName,

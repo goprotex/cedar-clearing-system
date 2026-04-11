@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { mergeJobsById, loadLocalStorageJobs, loadJobsFromOperatorStorage, type ActiveJobSummary } from '@/lib/active-jobs';
+import { fetchApiAuthed } from '@/lib/auth-client';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import type { MonitorTelemetryRow } from '@/types/monitor-bootstrap';
 import type { LayerKey } from './MonitorMap';
@@ -84,7 +85,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
+        const res = await fetchApiAuthed('/api/settings');
         if (!res.ok) return;
         const data = (await res.json()) as { profile?: { preferences?: { monitor_tv_default?: boolean } } | null };
         if (cancelled) return;
@@ -145,7 +146,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       try {
         setBusy(true);
         setErr(null);
-        const res = await fetch('/api/monitor/bootstrap', { cache: 'no-store' });
+        const res = await fetchApiAuthed('/api/monitor/bootstrap');
         if (!res.ok) throw new Error(await res.text());
         const data = (await res.json()) as {
           jobs: BootstrapJob[];
