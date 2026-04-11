@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import type { UserAppPreferences } from '@/types/profile';
 
-const PROFILE_ROLES = ['owner', 'operator', 'crew_lead', 'viewer'] as const;
+const PROFILE_ROLES = ['owner', 'manager', 'operator', 'crew_lead', 'viewer'] as const;
 
 export async function GET() {
   const supabase = await createClient();

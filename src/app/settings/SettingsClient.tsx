@@ -165,6 +165,7 @@ export default function SettingsClient() {
                 className="w-full bg-[#1a1a1a] border border-[#353534] px-3 py-2 text-sm"
               >
                 <option value="owner">Owner</option>
+                <option value="manager">Manager</option>
                 <option value="operator">Operator</option>
                 <option value="crew_lead">Crew lead</option>
                 <option value="viewer">Viewer</option>
