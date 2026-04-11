@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { AUTO_MARK_CEDAR_MAX_PINS } from '@/lib/cedar-tree-data';
 
 interface PastureCardProps {
   pasture: Pasture;
@@ -367,6 +368,26 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                   {pasture.cedarAnalysis.summary.highConfidenceCedarCells} cells verified cedar (≥3 band agreement)
                 </div>
               )}
+              <div className="text-[10px] text-[#8a7a72] leading-snug border-t border-[#353534] pt-1.5 mt-1">
+                Cedar inventory: model flags{' '}
+                <span className="text-[#e5e2e1]">{pasture.cedarAnalysis.summary.cedar.count.toLocaleString()}</span>{' '}
+                grid cells (~
+                <span className="text-[#e5e2e1]">{pasture.cedarAnalysis.summary.estimatedCedarAcres}</span> ac). Many real
+                trees share a 15 m cell, and oak/brush can spectrally mask cedar — so field counts are often higher than
+                cell counts.
+                {(pasture.savedTrees?.length ?? 0) > 0 && (
+                  <>
+                    {' '}
+                    Map uses{' '}
+                    <span className="text-[#e5e2e1]">{pasture.savedTrees.length}</span> subtle removal pin
+                    {pasture.savedTrees.length === 1 ? '' : 's'}
+                    {pasture.cedarAnalysis.summary.cedar.count > pasture.savedTrees.length
+                      ? ` (sample, max ${AUTO_MARK_CEDAR_MAX_PINS.toLocaleString()})`
+                      : ' (one per cedar cell)'}
+                    .
+                  </>
+                )}
+              </div>
               {pasture.cedarAnalysis.summary.tileConsensus && (
                 <div className="text-[10px] text-muted-foreground">
                   Tile consensus: {pasture.cedarAnalysis.summary.tileConsensus.tileCount} tiles ({pasture.cedarAnalysis.summary.tileConsensus.tileSizeM}m, {pasture.cedarAnalysis.summary.tileConsensus.tileOverlapPct}% overlap) · {pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedCells} cells refined ({pasture.cedarAnalysis.summary.tileConsensus.consensusImprovedPct}%)

@@ -76,7 +76,6 @@ function marksToFeatureCollection(marked: MarkedTree[]): GeoJSON.FeatureCollecti
       type: 'Feature',
       properties: {
         action: t.action,
-        canopy: Math.max(t.canopyDiameter, 4),
       },
       geometry: { type: 'Point', coordinates: [t.lng, t.lat] },
     });
@@ -160,11 +159,11 @@ export class HologramMapboxLayers {
         type: 'circle',
         source: MARK_SOURCE,
         paint: {
-          'circle-radius': ['*', ['get', 'canopy'], 0.35],
-          'circle-color': ['match', ['get', 'action'], 'save', '#00ff44', '#ff2244'],
-          'circle-opacity': 0.85,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
+          // Fixed, small glyphs — avoid loud red + white rings (was canopy-scaled + 2px white stroke)
+          'circle-radius': 3.2,
+          'circle-color': ['match', ['get', 'action'], 'save', '#3d8b5c', '#a85a5a'],
+          'circle-opacity': 0.62,
+          'circle-stroke-width': 0,
         },
       });
     }

@@ -9,7 +9,7 @@ import {
   calculateSoilDifficulty,
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
-import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
+import { buildAutoMarkedCedarsFromAnalysis } from '@/lib/cedar-tree-data';
 import {
   buildSpectralChunkBboxes,
   mergeCedarChunkResults,
@@ -655,24 +655,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
       set({ analysisProgress: { active: true, step: 'Generating tree positions...', detail: 'Placing 3D trees based on spectral classification results' } });
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
       if (updatedPasture) {
-        const trees = extractTreesFromAnalysis([{
-          cedarAnalysis: data,
-          density: updatedPasture.density,
-        }]);
-        const cedarTrees: MarkedTree[] = trees
-          .filter((t) => t.species === 'cedar')
-          .map((t) => ({
-            id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            lng: t.lng,
-            lat: t.lat,
-            species: t.species,
-            action: 'remove' as const,
-            label: `Remove cedar`,
-            height: t.height,
-            canopyDiameter: t.canopyDiameter,
-          }));
+        const cedarTrees = buildAutoMarkedCedarsFromAnalysis(data);
         if (cedarTrees.length > 0) {
-          set({ analysisProgress: { active: true, step: 'Auto-marking cedars...', detail: `Marking ${cedarTrees.length} cedar trees for removal` } });
+          set({
+            analysisProgress: {
+              active: true,
+              step: 'Auto-marking cedars...',
+              detail: `Placing ${cedarTrees.length} removal pins (one per sampled cedar grid cell — see pasture card for full estimate)`,
+            },
+          });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
       }
