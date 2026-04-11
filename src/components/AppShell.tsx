@@ -43,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [mobileMenuOpen]);
 
   return (
-    <div className="min-h-[100dvh] min-h-screen bg-[#131313] text-[#e5e2e1] scan-line">
+    <div className="min-h-[100dvh] min-h-screen bg-[#131313] text-[#e5e2e1] scan-line overflow-x-hidden">
       <header className="fixed top-0 left-0 right-0 z-50 border-b-2 border-[#353534] bg-[#131313] flex justify-between items-center min-h-16 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]">
         <div className="flex items-center gap-4 md:gap-6">
           <button
@@ -59,7 +59,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="text-xl md:text-2xl font-bold text-[#FF6B00] tracking-widest uppercase">
             CEDAR_HACK
           </Link>
-          <div className="hidden sm:flex flex-wrap gap-3 md:gap-6 text-xs font-bold items-center">
+          <div className="hidden sm:flex flex-wrap gap-x-2 gap-y-1 md:gap-x-4 text-[10px] md:text-xs font-bold items-center max-w-[min(52vw,28rem)] lg:max-w-none justify-end">
             {HEADER_NAV.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
@@ -124,7 +124,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile slide-out drawer */}
       <aside
-        className={`fixed left-0 top-0 h-full w-[min(100vw-2.5rem,18rem)] max-w-[85vw] border-r-2 border-[#353534] bg-[#131313] flex flex-col pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] px-2 z-40 transition-transform duration-300 md:hidden ${
+        className={`fixed left-0 top-0 h-full w-[min(100vw-2.5rem,18rem)] max-w-[85vw] border-r-2 border-[#353534] bg-[#131313] flex flex-col min-w-0 overflow-x-hidden pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] px-2 z-40 transition-transform duration-300 md:hidden ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -148,7 +148,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto">
+        <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden min-h-0 min-w-0">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
@@ -156,14 +156,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.label}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 p-3 text-xs font-bold uppercase tracking-tight transition-all ${
+                className={`flex items-center gap-2 p-3 text-xs font-bold uppercase tracking-tight transition-all min-w-0 ${
                   isActive
                     ? 'bg-[#FF6B00] text-black font-black skew-x-1'
                     : 'text-[#E5E2E1] opacity-70 hover:opacity-100 hover:bg-[#353534] hover:text-[#13FF43]'
                 }`}
               >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
+                <span className="shrink-0">{item.icon}</span>
+                <span className="min-w-0 break-words leading-snug">{item.label}</span>
               </Link>
             );
           })}
@@ -186,27 +186,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 border-r-2 border-[#353534] bg-[#131313] flex-col pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-2 z-40 hidden md:flex">
+      <aside className="fixed left-0 top-0 h-full w-64 max-w-[min(16rem,100vw)] border-r-2 border-[#353534] bg-[#131313] flex flex-col min-w-0 overflow-x-hidden pt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-2 z-40 hidden md:flex">
         <div className="px-4 mb-8">
           <div className="text-lg font-black text-[#FF6B00]">SECTOR_OPS</div>
           <div className="text-[10px] text-[#e5e2e1] opacity-50 tracking-widest">ENTITY_REGISTRY</div>
         </div>
 
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden min-h-0 min-w-0 pr-0.5">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-3 p-3 text-xs font-bold uppercase tracking-tight transition-all ${
+                className={`flex items-start gap-2 p-2.5 text-[11px] font-bold uppercase tracking-tight transition-all min-w-0 ${
                   isActive
                     ? 'bg-[#FF6B00] text-black font-black skew-x-1'
                     : 'text-[#E5E2E1] opacity-70 hover:opacity-100 hover:bg-[#353534] hover:text-[#13FF43]'
                 }`}
               >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
+                <span className="shrink-0 pt-0.5">{item.icon}</span>
+                <span className="min-w-0 break-words leading-snug">{item.label}</span>
               </Link>
             );
           })}

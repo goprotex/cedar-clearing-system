@@ -90,8 +90,8 @@ export default function OperationsClient() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-        <section className="border-2 border-[#353534] p-5 lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10 min-w-0">
+        <section className="border-2 border-[#353534] p-5 lg:col-span-2 min-w-0 overflow-x-hidden">
           <div className="flex items-center justify-between gap-4 mb-4">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">Active jobs</h2>
             <Link
@@ -185,21 +185,21 @@ export default function OperationsClient() {
           )}
         </section>
 
-        <div className="space-y-6">
-          <section className="border-2 border-[#353534] p-5">
+        <div className="space-y-6 min-w-0">
+          <section className="border-2 border-[#353534] p-5 min-w-0 overflow-x-hidden">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] mb-3">Fleet snapshot</h2>
             <div className="text-3xl font-black text-[#13ff43] tabular-nums">{totals.pct}%</div>
             <div className="text-[10px] font-mono text-[#5a4136] mt-1">{totals.cleared} / {totals.total} cells (all listed jobs)</div>
           </section>
 
-          <section className="border-2 border-[#353534] p-5">
+          <section className="border-2 border-[#353534] p-5 min-w-0 overflow-x-hidden">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] mb-2">Team</h2>
-            <p className="text-xs text-[#a98a7d] leading-relaxed">
+            <p className="text-xs text-[#a98a7d] leading-relaxed break-words">
               Open a job above and expand <span className="text-[#ffb693]">Team</span> to invite crew by email (owners only). Invitees must sign in with that email and open the one-time link.
             </p>
           </section>
 
-          <section className="border-2 border-[#353534] p-5">
+          <section className="border-2 border-[#353534] p-5 min-w-0 overflow-x-hidden">
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] mb-3">Settings</h2>
             <ul className="space-y-2 text-xs">
               <li>

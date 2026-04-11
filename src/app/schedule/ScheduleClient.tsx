@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
+import { fetchApiAuthed } from '@/lib/auth-client';
 
 type Block = {
   id: string;
@@ -22,7 +23,7 @@ export default function ScheduleClient() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch('/api/schedule?days=60', { cache: 'no-store', credentials: 'same-origin' });
+        const res = await fetchApiAuthed('/api/schedule?days=60');
         if (res.status === 401) {
           if (!cancelled) {
             setErr('Sign in to see your schedule.');

@@ -14,11 +14,6 @@ const spaceGrotesk = localFont({
   display: "swap",
 });
 
-export const viewport: Viewport = {
-  themeColor: "#131313",
-  colorScheme: "dark",
-};
-
 export const metadata: Metadata = {
   title: "Cedar Hack",
   description: "AI-Powered Clearing Company Operating System",
@@ -42,6 +37,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#131313",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

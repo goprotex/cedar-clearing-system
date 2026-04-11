@@ -1,25 +1,37 @@
 import { createClient } from '@/utils/supabase/client';
 
-/**
- * Ensures the current Supabase session is written to cookies (via @supabase/ssr
- * browser client) so Route Handlers and `createClient()` in server code see the user.
- * Call before fetch('/api/...') if you see 401 while the UI shows signed in.
- */
 export async function syncAuthSessionToCookies(): Promise<void> {
   const supabase = createClient();
   await supabase.auth.getSession();
 }
 
+function withBearer(init: RequestInit | undefined, accessToken: string | undefined): RequestInit {
+  const headers = new Headers(init?.headers);
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  }
+  return {
+    ...init,
+    headers,
+    credentials: 'same-origin',
+    cache: 'no-store',
+  };
+}
+
 /**
- * fetch with credentials; if 401, sync session and retry once (fixes cookie drift).
+ * Authenticated fetch: sends Authorization Bearer from the Supabase session so API routes
+ * see the user even when auth cookies are missing or blocked.
  */
 export async function fetchApiAuthed(url: string, init?: RequestInit): Promise<Response> {
-  await syncAuthSessionToCookies();
-  const base = { ...init, credentials: 'same-origin' as RequestCredentials, cache: 'no-store' as RequestCache };
-  let res = await fetch(url, base);
+  const supabase = createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
+  let res = await fetch(url, withBearer(init, token));
   if (res.status === 401) {
     await syncAuthSessionToCookies();
-    res = await fetch(url, base);
+    const { data: { session: s2 } } = await supabase.auth.getSession();
+    res = await fetch(url, withBearer(init, s2?.access_token));
   }
   return res;
 }

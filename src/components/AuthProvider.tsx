@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { createClient, isSupabaseConfigured } from '@/utils/supabase/client';
 
 type AuthContextValue = {
@@ -16,32 +17,25 @@ export function useAuth() {
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(() => isSupabaseConfigured);
+  const [loading, setLoading] = useState(() => Boolean(isSupabaseConfigured));
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
 
     const supabase = createClient();
     let cancelled = false;
 
     void (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (cancelled) return;
       setEmail(session?.user?.email ?? null);
       setLoading(false);
     })();
 
-    let cancelled = false;
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (cancelled) return;
-      setEmail(data.session?.user?.email ?? null);
-      setLoading(false);
-    })();
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
       setEmail(session?.user?.email ?? null);
       setLoading(false);
     });
