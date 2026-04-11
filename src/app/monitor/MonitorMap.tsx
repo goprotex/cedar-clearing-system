@@ -463,18 +463,19 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       if (originLng !== -99.14) break;
     }
 
-    // Create tree layer if needed
-    if (!treeLayerRef.current || !map.getLayer('3d-trees')) {
-      if (treeLayerRef.current && !map.getLayer('3d-trees')) treeLayerRef.current = null;
-      if (!treeLayerRef.current) {
-        const tl = new TreeLayer3D([originLng, originLat]);
-        treeLayerRef.current = tl;
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          map.addLayer(tl as any);
-        } catch { treeLayerRef.current = null; return; }
-      }
+    // Remove existing tree layer first (terrain changes disrupt WebGL state)
+    if (treeLayerRef.current && map.getLayer('3d-trees')) {
+      try { map.removeLayer('3d-trees'); } catch {}
+      treeLayerRef.current = null;
     }
+
+    // Recreate tree layer
+    const tl2 = new TreeLayer3D([originLng, originLat]);
+    treeLayerRef.current = tl2;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      map.addLayer(tl2 as any);
+    } catch { treeLayerRef.current = null; return; }
 
     const tl = treeLayerRef.current;
     if (!tl) return;
@@ -523,7 +524,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     for (const layerId of ['monitor-cedar-fill', 'monitor-cedar-border', 'holo-mask-fill', 'monitor-pastures-fill', 'monitor-pastures-border', 'monitor-pastures-label']) {
       if (map.getLayer(layerId)) try { map.moveLayer(layerId); } catch {}
     }
-  }, [layers.hologram, mapLoaded, jobs, clearedByJob]);
+  }, [layers.hologram, layers.terrain3d, mapLoaded, jobs, clearedByJob]);
 
   // ── Operator markers ──
   useEffect(() => {
