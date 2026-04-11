@@ -2,19 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import type { Bid } from '@/types';
+import { mergeJobsById, loadLocalStorageJobs, loadJobsFromOperatorStorage, type ActiveJobSummary } from '@/lib/active-jobs';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
 import type { LayerKey } from './MonitorMap';
 
-type BootstrapJob = {
-  id: string;
-  title: string;
-  status: string;
-  created_at: string;
-  bid_snapshot: Bid;
-  cedar_total_cells: number;
-  cedar_cleared_cells: number;
-};
+type BootstrapJob = ActiveJobSummary;
 
 type BootstrapResponse = {
   jobs: BootstrapJob[];
@@ -24,19 +16,31 @@ type BootstrapResponse = {
 
 type OperatorPosition = BootstrapResponse['operators'][string][number];
 
-/** Merge polled/local-operator positions with Supabase/bootstrap data; avoid duplicate markers when both exist. */
-function mergeOperatorLists(prevList: OperatorPosition[], polled: OperatorPosition[] | undefined): OperatorPosition[] {
-  if (!polled?.length) return prevList;
-  const map = new Map<string, OperatorPosition>();
-  for (const o of prevList) map.set(o.user_id, o);
-  const prevHasRealUser = prevList.some((o) => o.user_id !== 'operator');
-  const polledHasRealUser = polled.some((o) => o.user_id !== 'operator');
-  for (const o of polled) {
-    if (o.user_id === 'operator' && (prevHasRealUser || polledHasRealUser)) continue;
-    map.set(o.user_id, o);
+/** Merge polled positions with existing state: newer timestamp wins; drop generic `operator` when a real user_id exists. */
+function mergeOperatorsByJob(
+  prev: Record<string, OperatorPosition[]>,
+  polled: Record<string, OperatorPosition[]>,
+): Record<string, OperatorPosition[]> {
+  const out = { ...prev };
+  for (const [jobId, incoming] of Object.entries(polled)) {
+    if (incoming.length === 0) continue;
+    const byUser = new Map<string, OperatorPosition>();
+    for (const op of prev[jobId] ?? []) byUser.set(op.user_id, op);
+    const prevHasRealUser = (prev[jobId] ?? []).some((o) => o.user_id !== 'operator');
+    const polledHasRealUser = incoming.some((o) => o.user_id !== 'operator');
+    for (const op of incoming) {
+      if (op.user_id === 'operator' && (prevHasRealUser || polledHasRealUser)) continue;
+      const cur = byUser.get(op.user_id);
+      const nextTs = Date.parse(op.updated_at);
+      const curTs = cur ? Date.parse(cur.updated_at) : NaN;
+      if (!cur || (!Number.isNaN(nextTs) && (Number.isNaN(curTs) || nextTs >= curTs))) {
+        byUser.set(op.user_id, op);
+      }
+    }
+    if (prevHasRealUser || polledHasRealUser) byUser.delete('operator');
+    out[jobId] = Array.from(byUser.values());
   }
-  if (prevHasRealUser || polledHasRealUser) map.delete('operator');
-  return Array.from(map.values());
+  return out;
 }
 
 const MapboxMap = dynamic(() => import('./MonitorMap'), {
@@ -56,108 +60,36 @@ function pct(cleared: number, total: number) {
   return Math.max(0, Math.min(100, Math.round((cleared / total) * 100)));
 }
 
-function loadLocalJobs(): BootstrapJob[] {
-  if (typeof window === 'undefined') return [];
-  const results: BootstrapJob[] = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key?.startsWith('ccc_job_') || key.startsWith('ccc_job_bid_') || key.startsWith('ccc_job_events_') || key.startsWith('ccc_job_progress_')) continue;
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const job = JSON.parse(raw) as { id: string; bidId: string; title: string; status: string; createdAt: string; cedar_total_cells?: number; cedar_cleared_cells?: number };
-      if (!job.id || !job.bidId) continue;
-
-      // Load the bid snapshot for this job
-      const bidRaw = localStorage.getItem(`ccc_job_bid_${job.bidId}`);
-      if (!bidRaw) continue;
-      const bid: Bid = JSON.parse(bidRaw);
-      if (!bid.pastures?.length) continue;
-
-      let cedarTotal = 0;
-      for (const p of bid.pastures) {
-        for (const f of (p.cedarAnalysis?.gridCells?.features ?? [])) {
-          const cls = (f as { properties?: { classification?: string } }).properties?.classification;
-          if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') cedarTotal++;
-        }
-      }
-
-      results.push({
-        id: job.id,
-        title: job.title || `Job ${job.id}`,
-        status: job.status || 'active',
-        created_at: job.createdAt || new Date().toISOString(),
-        bid_snapshot: bid,
-        cedar_total_cells: cedarTotal,
-        cedar_cleared_cells: job.cedar_cleared_cells ?? 0,
-      });
-    }
-  } catch { /* localStorage may be unavailable */ }
-  return results;
-}
-
-/** Jobs implied by operator GPS keys in localStorage (operate mode writes these even when no `ccc_job_*` exists). */
-function loadJobsFromOperatorStorage(existingIds: Set<string>): BootstrapJob[] {
-  if (typeof window === 'undefined') return [];
-  const posPrefix = 'ccc_operator_pos_';
-  const trailPrefix = 'ccc_operator_trail_';
-  const out: BootstrapJob[] = [];
-  const seen = new Set(existingIds);
-
-  const tryAdd = (jobId: string) => {
-    if (!jobId || seen.has(jobId)) return;
-    const bidId = jobId.startsWith('job_') ? jobId.slice(4) : jobId;
-    const bidRaw = localStorage.getItem(`ccc_bid_${bidId}`);
-    if (!bidRaw) return;
-    let bid: Bid;
-    try {
-      bid = JSON.parse(bidRaw) as Bid;
-    } catch {
-      return;
-    }
-    if (!bid.pastures?.length) return;
-
-    let cedarTotal = 0;
-    for (const p of bid.pastures) {
-      for (const f of (p.cedarAnalysis?.gridCells?.features ?? [])) {
-        const cls = (f as { properties?: { classification?: string } }).properties?.classification;
-        if (cls === 'cedar' || cls === 'oak' || cls === 'mixed_brush') cedarTotal++;
-      }
-    }
-
-    seen.add(jobId);
-    out.push({
-      id: jobId,
-      title: `${bid.propertyName || 'Property'} — ${bid.bidNumber} (GPS)`,
-      status: 'active',
-      created_at: bid.updatedAt || bid.createdAt || new Date().toISOString(),
-      bid_snapshot: bid,
-      cedar_total_cells: cedarTotal,
-      cedar_cleared_cells: 0,
-    });
-  };
-
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-      if (key.startsWith(posPrefix)) {
-        tryAdd(key.slice(posPrefix.length));
-      } else if (key.startsWith(trailPrefix)) {
-        tryAdd(key.slice(trailPrefix.length));
-      }
-    }
-  } catch { /* ignore */ }
-
-  return out;
-}
-
 export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscreen?: boolean } = {}) {
   const [jobs, setJobs] = useState<BootstrapJob[]>([]);
   const [clearedByJob, setClearedByJob] = useState<Record<string, Set<string>>>({});
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
+
+  // Optional TV layout: ?tv=1 or profile preference (signed-in)
+  useEffect(() => {
+    if (fullscreenProp) return;
+    try {
+      const tv = new URLSearchParams(window.location.search).get('tv');
+      if (tv === '1' || tv === 'true') setFullscreen(true);
+    } catch { /* ignore */ }
+  }, [fullscreenProp]);
+
+  useEffect(() => {
+    if (fullscreenProp) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = (await res.json()) as { profile?: { preferences?: { monitor_tv_default?: boolean } } | null };
+        if (cancelled) return;
+        if (data.profile?.preferences?.monitor_tv_default) setFullscreen(true);
+      } catch { /* not signed in or prefs missing */ }
+    })();
+    return () => { cancelled = true; };
+  }, [fullscreenProp]);
   const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
   const [trailsByJob, setTrailsByJob] = useState<Record<string, [number, number][]>>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
@@ -214,16 +146,17 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         if (cancelled) return;
 
         let remoteJobs = data.jobs ?? [];
+        const localStored = loadLocalStorageJobs();
+        if (localStored.length > 0) {
+          remoteJobs = mergeJobsById(remoteJobs, localStored);
+        } else if (remoteJobs.length === 0) {
+          remoteJobs = loadLocalStorageJobs();
+        }
         const next: Record<string, Set<string>> = {};
         for (const [jobId, cellIds] of Object.entries(data.clearedByJob ?? {})) {
           next[jobId] = new Set(cellIds);
         }
         setOperatorsByJob(data.operators ?? {});
-
-        // If no remote jobs, load converted jobs from localStorage
-        if (remoteJobs.length === 0) {
-          remoteJobs = loadLocalJobs();
-        }
 
         const mergedIds = new Set(remoteJobs.map((j) => j.id));
         remoteJobs = [...remoteJobs, ...loadJobsFromOperatorStorage(mergedIds)];
@@ -234,7 +167,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         if (cancelled) return;
         // Fall back to local jobs
         const idSet = new Set<string>();
-        let localJobs = loadLocalJobs();
+        let localJobs = loadLocalStorageJobs();
         for (const j of localJobs) idSet.add(j.id);
         localJobs = [...localJobs, ...loadJobsFromOperatorStorage(idSet)];
         if (localJobs.length > 0) {
@@ -342,13 +275,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       }
 
       if (cancelled) return;
-      setOperatorsByJob((prev) => {
-        const merged = { ...prev };
-        for (const [jobId, ops] of Object.entries(next)) {
-          merged[jobId] = mergeOperatorLists(merged[jobId] ?? [], ops);
-        }
-        return merged;
-      });
+      setOperatorsByJob((prev) => mergeOperatorsByJob(prev, next));
       setTrailsByJob(trails);
     };
 
@@ -396,23 +323,33 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
     const applyOperatorRow = (payload: { new: Record<string, unknown> }) => {
       const row = payload.new as {
-        job_id: string; user_id: string; lng: number; lat: number;
-        heading?: number | null; speed_mps?: number | null; accuracy_m?: number | null; updated_at: string;
+        job_id?: string; user_id?: string; lng?: number; lat?: number;
+        heading?: number | null; heading_deg?: number | null;
+        speed_mps?: number | null; accuracy_m?: number | null; updated_at?: string;
       } | null;
-      if (!row || typeof row.job_id !== 'string' || typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
+      if (!row || typeof row.job_id !== 'string' || typeof row.user_id !== 'string' || typeof row.lng !== 'number' || typeof row.lat !== 'number') return;
+      const jobId = row.job_id;
+      const userId = row.user_id;
+      const lng = row.lng;
+      const lat = row.lat;
+      const heading =
+        typeof row.heading === 'number' ? row.heading
+          : typeof row.heading_deg === 'number' ? row.heading_deg : null;
       setOperatorsByJob((prev) => {
         const next = { ...prev };
-        const arr = next[row.job_id] ? [...next[row.job_id]] : [];
-        const idx = arr.findIndex((o) => o.user_id === row.user_id);
+        const arr = next[jobId] ? [...next[jobId]] : [];
+        const idx = arr.findIndex((o) => o.user_id === userId);
         const entry: OperatorPosition = {
-          user_id: row.user_id, lng: row.lng, lat: row.lat,
-          heading: typeof row.heading === 'number' ? row.heading : null,
+          user_id: userId,
+          lng,
+          lat,
+          heading,
           speed_mps: typeof row.speed_mps === 'number' ? row.speed_mps : null,
           accuracy_m: typeof row.accuracy_m === 'number' ? row.accuracy_m : null,
-          updated_at: row.updated_at,
+          updated_at: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
         };
         if (idx >= 0) arr[idx] = entry; else arr.push(entry);
-        next[row.job_id] = arr;
+        next[jobId] = arr;
         return next;
       });
     };
