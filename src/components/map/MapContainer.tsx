@@ -56,6 +56,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     cedar: true, oak: true, mixed: true,
   });
   const [markMode, setMarkMode] = useState<'save' | 'remove' | null>(null);
+  /** Off by default — pin dots cluttered the hologram; enable to see auto-marked removals. */
+  const [holoShowRemovalPins, setHoloShowRemovalPins] = useState(false);
 
   const {
     currentBid,
@@ -597,14 +599,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     };
   }, [markMode, layers.hologram, selectedPastureId, currentBid.pastures, markTree, unmarkTree]);
 
-  // ── Sync marked trees to 3D layer ──
+  // ── Sync marked trees to 3D layer (optional — hide pins unless marking or user opts in) ──
   useEffect(() => {
     const tl = treeLayerRef.current;
     if (!tl || !layers.hologram) return;
 
     const allMarked = currentBid.pastures.flatMap((p) => p.savedTrees ?? []);
-    tl.updateMarkedTrees(allMarked);
-  }, [currentBid.pastures, layers.hologram]);
+    const showPins = holoShowRemovalPins || markMode !== null;
+    tl.updateMarkedTrees(showPins ? allMarked : []);
+  }, [currentBid.pastures, layers.hologram, holoShowRemovalPins, markMode]);
 
   // ── Fly to selected pasture when selection changes ──
   useEffect(() => {
@@ -765,6 +768,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                   active={speciesVisible.mixed}
                   onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))}
                 />
+                <label className="flex items-center gap-2 px-2 py-1 mt-1 cursor-pointer text-[10px] text-green-400/80 hover:text-green-300">
+                  <input
+                    type="checkbox"
+                    className="accent-green-500 rounded"
+                    checked={holoShowRemovalPins}
+                    onChange={(e) => setHoloShowRemovalPins(e.target.checked)}
+                  />
+                  Show removal pin dots
+                </label>
               </div>
             )}
           </div>

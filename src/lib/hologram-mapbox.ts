@@ -115,10 +115,9 @@ export class HologramMapboxLayers {
         type: 'circle',
         source: MARK_SOURCE,
         paint: {
-          // Fixed, small glyphs — avoid loud red + white rings (was canopy-scaled + 2px white stroke)
-          'circle-radius': 3.2,
-          'circle-color': ['match', ['get', 'action'], 'save', '#3d8b5c', '#a85a5a'],
-          'circle-opacity': 0.62,
+          'circle-radius': 2.2,
+          'circle-color': ['match', ['get', 'action'], 'save', '#2d6b4a', '#7a4a4a'],
+          'circle-opacity': 0.42,
           'circle-stroke-width': 0,
         },
       });
