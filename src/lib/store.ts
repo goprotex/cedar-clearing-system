@@ -585,7 +585,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
             active: true,
             step: 'Running spectral analysis...',
             detail: useChunks
-              ? `Large pasture — ${totalChunks} regions (max ~${CEDAR_MAX_SAMPLES_PER_CHUNK.toLocaleString()} samples each)`
+              ? `${totalChunks} regions — each request stays small so progress can be saved and resumed`
               : `Sampling NAIP imagery across ${Math.round(pasture.acreage)} acres at 15m resolution`,
           },
         });

@@ -59,7 +59,12 @@ function collectChunkBboxes(
 }
 
 /**
- * Build non-overlapping chunk bboxes that cover the pasture. Empty array = single full request.
+ * Build non-overlapping chunk bboxes that cover the pasture.
+ *
+ * **Always chunks** when there is more than one estimated sample point: each HTTP request
+ * stays small (time-safe) and every run can save resume checkpoints after each region.
+ *
+ * Empty array = degenerate case (~one grid cell): fall back to a single full-polygon request.
  */
 export function buildSpectralChunkBboxes(
   coordinates: number[][][],
@@ -69,12 +74,20 @@ export function buildSpectralChunkBboxes(
   const bbox = turf.bbox(polygon) as [number, number, number, number];
   const est = estimateSampleCountFromAcres(acreage);
 
-  if (est <= CEDAR_MAX_SAMPLES_PER_CHUNK) {
+  // ~One 15m cell: a second region would be empty — use one API call.
+  if (est <= 1) {
     return [];
   }
 
-  const chunks = collectChunkBboxes(polygon, bbox, acreage, CEDAR_MAX_SAMPLES_PER_CHUNK);
-  return chunks.length > 1 ? chunks : [];
+  // Target at least 2 regions: cap each leaf at roughly half the grid (and never above max).
+  // Large pastures still subdivide until each leaf ≤ CEDAR_MAX_SAMPLES_PER_CHUNK.
+  const halfEst = Math.max(1, Math.floor(est / 2));
+  const maxSamplesPerChunk = Math.min(CEDAR_MAX_SAMPLES_PER_CHUNK, halfEst);
+
+  const chunks = collectChunkBboxes(polygon, bbox, acreage, maxSamplesPerChunk);
+
+  // Degenerate bbox (near-zero width/height): recursion may return a single cell — OK.
+  return chunks.length > 0 ? chunks : [];
 }
 
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
