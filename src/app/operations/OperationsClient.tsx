@@ -177,8 +177,13 @@ export default function OperationsClient() {
             <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] mb-3">Settings</h2>
             <ul className="space-y-2 text-xs">
               <li>
-                <Link href="/login" className="text-[#FF6B00] hover:underline font-mono">
-                  {email ? 'Account / re-auth' : 'Sign in'}
+                <Link href="/settings" className="text-[#FF6B00] hover:underline font-mono">
+                  Profile &amp; app preferences
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="text-[#e5e2e1] hover:text-[#13ff43] font-mono">
+                  {email ? 'Re-auth / sign in' : 'Sign in'}
                 </Link>
               </li>
               <li>

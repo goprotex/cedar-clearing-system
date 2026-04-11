@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/fleet', label: 'FLEET_SYNC', icon: '🔗' },
   { href: '/intel', label: 'INTEL', icon: '📊' },
   { href: '/archive', label: 'ARCHIVE', icon: '📦' },
+  { href: '/settings', label: 'SETTINGS', icon: '⚙️' },
 ];
 
 const HEADER_NAV = [
@@ -22,6 +23,7 @@ const HEADER_NAV = [
   { href: '/intel', label: 'INTEL' },
   { href: '/archive', label: 'ARCHIVE' },
   { href: '/operations', label: 'OPS' },
+  { href: '/settings', label: 'SETTINGS' },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

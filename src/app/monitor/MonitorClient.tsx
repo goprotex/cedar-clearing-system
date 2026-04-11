@@ -62,6 +62,30 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [fullscreen, setFullscreen] = useState(Boolean(fullscreenProp));
+
+  // Optional TV layout: ?tv=1 or profile preference (signed-in)
+  useEffect(() => {
+    if (fullscreenProp) return;
+    try {
+      const tv = new URLSearchParams(window.location.search).get('tv');
+      if (tv === '1' || tv === 'true') setFullscreen(true);
+    } catch { /* ignore */ }
+  }, [fullscreenProp]);
+
+  useEffect(() => {
+    if (fullscreenProp) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/settings', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = (await res.json()) as { profile?: { preferences?: { monitor_tv_default?: boolean } } | null };
+        if (cancelled) return;
+        if (data.profile?.preferences?.monitor_tv_default) setFullscreen(true);
+      } catch { /* not signed in or prefs missing */ }
+    })();
+    return () => { cancelled = true; };
+  }, [fullscreenProp]);
   const [operatorsByJob, setOperatorsByJob] = useState<BootstrapResponse['operators']>({});
   const [trailsByJob, setTrailsByJob] = useState<Record<string, [number, number][]>>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
