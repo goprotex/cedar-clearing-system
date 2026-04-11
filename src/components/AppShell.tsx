@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 
 const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
+  { href: '/clients', label: 'CLIENTS', icon: '📇' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
   { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
   { href: '/dashboard', label: 'TEAM', icon: '👥' },
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
 ];
 
 const HEADER_NAV = [
+  { href: '/clients', label: 'CLIENTS' },
   { href: '/bids', label: 'ESTIMATOR' },
   { href: '/monitor', label: 'MONITOR' },
   { href: '/dashboard', label: 'TEAM' },
