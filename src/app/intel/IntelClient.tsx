@@ -302,7 +302,7 @@ export default function IntelClient() {
                 .sort((a, b) => (b.cedar_total_cells ?? 0) - (a.cedar_total_cells ?? 0))
                 .slice(0, 5)
                 .map((j) => {
-                  const pct = j.cedar_total_cells > 0 ? Math.round((j.cedar_cleared_cells / j.cedar_total_cells) * 100) : 0;
+                  const pct = j.cedar_total_cells > 0 ? Math.round(((j.cedar_cleared_cells ?? 0) / j.cedar_total_cells) * 100) : 0;
                   return (
                     <div key={j.id} className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">

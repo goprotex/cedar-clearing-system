@@ -193,6 +193,10 @@ export default function SettingsClient() {
   };
 
   const saveCompany = async () => {
+    if (!coName.trim()) {
+      setCoErr('Company name is required');
+      return;
+    }
     setCoSaving(true);
     setCoErr(null);
     setCoSaved(false);

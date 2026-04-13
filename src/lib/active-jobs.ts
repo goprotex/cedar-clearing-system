@@ -50,8 +50,9 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
         }
       }
 
-      // Also check the operator session storage for cleared cells count
-      // (operator saves cleared cells in ccc_operator_<bidId>)
+      // Also check the operator session storage for cleared cells count.
+      // This is safe: the outer `typeof window === 'undefined'` guard above
+      // ensures localStorage is available throughout this function.
       let clearedCells = job.cedar_cleared_cells ?? 0;
       try {
         const opRaw = localStorage.getItem(`ccc_operator_${job.bidId}`);
@@ -61,7 +62,7 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
             clearedCells = opSession.clearedCellIds.length;
           }
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore parse errors */ }
 
       results.push({
         id: job.id,

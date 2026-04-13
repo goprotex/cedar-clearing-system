@@ -75,7 +75,11 @@ export async function PATCH(req: Request) {
   }
 
   const updates: Record<string, unknown> = {};
-  if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim().slice(0, 200);
+  if (typeof body.name === 'string') {
+    const trimmedName = body.name.trim();
+    if (!trimmedName) return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
+    updates.name = trimmedName.slice(0, 200);
+  }
   if ('logo_url' in body) updates.logo_url = body.logo_url ?? null;
   if ('address' in body) updates.address = typeof body.address === 'string' ? body.address.trim().slice(0, 500) || null : null;
   if ('phone' in body) updates.phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 50) || null : null;

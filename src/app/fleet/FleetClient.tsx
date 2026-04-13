@@ -709,6 +709,9 @@ function MachineDetailPanel({
     toast.success('Hours updated');
   }
 
+  // Max size for a compressed fleet photo stored as base64 in Supabase JSONB (~225KB actual)
+  const MAX_COMPRESSED_IMAGE_BYTES = 300_000;
+
   async function onPhotoPick(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     e.target.value = '';
@@ -756,7 +759,7 @@ function MachineDetailPanel({
         toast.error('Could not read image');
         continue;
       }
-      if (dataUrl.length > 300_000) {
+      if (dataUrl.length > MAX_COMPRESSED_IMAGE_BYTES) {
         toast.error('Image still too large after compression — use a smaller photo');
         continue;
       }

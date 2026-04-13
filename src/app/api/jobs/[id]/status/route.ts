@@ -23,11 +23,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (membershipErr) return NextResponse.json({ error: membershipErr.message }, { status: 500 });
 
   const isOwnerMember = membership?.role === 'owner';
-  const isAdmin = !isOwnerMember && (await isCompanyAdmin(supabase, userId));
-  const hasAccess = !isOwnerMember && !isAdmin && (await canAccessJob(supabase, userId, jobId));
-
-  if (!isOwnerMember && !isAdmin && !hasAccess) {
-    return NextResponse.json({ error: 'Forbidden — job owners and company admins only' }, { status: 403 });
+  if (!isOwnerMember) {
+    const adminCheck = await isCompanyAdmin(supabase, userId);
+    if (!adminCheck) {
+      const hasAccess = await canAccessJob(supabase, userId, jobId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden — job owners and company admins only' }, { status: 403 });
+      }
+    }
   }
 
   let body: { status?: string };
