@@ -33,7 +33,7 @@ function LoginPageInner() {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       if (!cancelled) setSigningOut(false);
     })();
     return () => { cancelled = true; };
