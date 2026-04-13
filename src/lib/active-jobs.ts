@@ -50,6 +50,19 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
         }
       }
 
+      // Also check the operator session storage for cleared cells count
+      // (operator saves cleared cells in ccc_operator_<bidId>)
+      let clearedCells = job.cedar_cleared_cells ?? 0;
+      try {
+        const opRaw = localStorage.getItem(`ccc_operator_${job.bidId}`);
+        if (opRaw) {
+          const opSession = JSON.parse(opRaw) as { clearedCellIds?: string[] };
+          if (Array.isArray(opSession.clearedCellIds) && opSession.clearedCellIds.length > clearedCells) {
+            clearedCells = opSession.clearedCellIds.length;
+          }
+        }
+      } catch { /* ignore */ }
+
       results.push({
         id: job.id,
         title: job.title || `Job ${job.id}`,
@@ -57,7 +70,7 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
         created_at: job.createdAt || new Date().toISOString(),
         bid_snapshot: bid,
         cedar_total_cells: cedarTotal,
-        cedar_cleared_cells: job.cedar_cleared_cells ?? 0,
+        cedar_cleared_cells: clearedCells,
         work_started_at: null,
         work_completed_at: null,
         manual_machine_hours: null,

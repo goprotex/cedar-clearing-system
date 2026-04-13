@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { useBidStore } from '@/lib/store';
+import { mergeJobsById, loadLocalStorageJobs, type ActiveJobSummary } from '@/lib/active-jobs';
+import { fetchApiAuthed } from '@/lib/auth-client';
 import type { BidSummary, BidStatus } from '@/types';
 
 interface IntelMetrics {
@@ -66,13 +68,46 @@ const STATUS_COLORS: Record<BidStatus, string> = {
 
 export default function IntelClient() {
   const { savedBids, loadBidList } = useBidStore();
+  const [jobs, setJobs] = useState<ActiveJobSummary[]>([]);
 
   useEffect(() => {
     loadBidList();
   }, [loadBidList]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchApiAuthed('/api/monitor/bootstrap');
+        if (!res.ok) throw new Error('bootstrap failed');
+        const data = (await res.json()) as { jobs: ActiveJobSummary[] };
+        if (cancelled) return;
+        let remoteJobs = data.jobs ?? [];
+        const localStored = loadLocalStorageJobs();
+        if (localStored.length > 0) remoteJobs = mergeJobsById(remoteJobs, localStored);
+        else if (remoteJobs.length === 0) remoteJobs = loadLocalStorageJobs();
+        setJobs(remoteJobs);
+      } catch {
+        if (!cancelled) setJobs(loadLocalStorageJobs());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const bids = savedBids;
   const metrics = useMemo(() => computeMetrics(bids), [bids]);
+
+  // Job operational metrics
+  const jobMetrics = useMemo(() => {
+    const total = jobs.length;
+    const active = jobs.filter((j) => j.status === 'active').length;
+    const completed = jobs.filter((j) => j.status === 'completed').length;
+    const totalCells = jobs.reduce((s, j) => s + (j.cedar_total_cells ?? 0), 0);
+    const clearedCells = jobs.reduce((s, j) => s + (j.cedar_cleared_cells ?? 0), 0);
+    const overallPct = totalCells > 0 ? Math.round((clearedCells / totalCells) * 100) : 0;
+    const totalHours = jobs.reduce((s, j) => s + (j.manual_machine_hours ?? 0), 0);
+    return { total, active, completed, totalCells, clearedCells, overallPct, totalHours };
+  }, [jobs]);
 
   const maxRevenue = Math.max(...metrics.monthlyData.map((d) => d.revenue), 1);
 
@@ -218,9 +253,9 @@ export default function IntelClient() {
             {(Object.entries(metrics.statusBreakdown) as [BidStatus, number][])
               .filter(([, count]) => count > 0)
               .map(([status]) => {
-                const statusBids = JSON.parse(localStorage.getItem('ccc_bid_list') || '[]')
-                  .filter((b: BidSummary) => b.status === status);
-                const statusRevenue = statusBids.reduce((s: number, b: BidSummary) => s + b.totalAmount, 0);
+                const statusRevenue = bids
+                  .filter((b) => b.status === status)
+                  .reduce((s, b) => s + b.totalAmount, 0);
                 const pct = metrics.totalRevenue > 0 ? (statusRevenue / metrics.totalRevenue) * 100 : 0;
                 return (
                   <div key={status} className="flex items-center justify-between">
@@ -237,6 +272,55 @@ export default function IntelClient() {
               })}
           </div>
         </div>
+
+        {jobs.length > 0 && (
+          <div className="border-2 border-[#353534] p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-[#a98a7d] mb-4">FIELD_OPERATIONS</div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <div className="text-[9px] text-[#5a4136] uppercase mb-1">Total jobs</div>
+                <div className="text-2xl font-black text-[#ffb693]">{jobMetrics.total}</div>
+                <div className="text-[10px] text-[#a98a7d]">{jobMetrics.active} active · {jobMetrics.completed} completed</div>
+              </div>
+              <div>
+                <div className="text-[9px] text-[#5a4136] uppercase mb-1">Overall progress</div>
+                <div className="text-2xl font-black" style={{ color: jobMetrics.overallPct > 75 ? '#13ff43' : jobMetrics.overallPct > 40 ? '#FF6B00' : '#a98a7d' }}>
+                  {jobMetrics.overallPct}%
+                </div>
+                <div className="text-[10px] text-[#a98a7d]">{jobMetrics.clearedCells} / {jobMetrics.totalCells} cells</div>
+              </div>
+              {jobMetrics.totalHours > 0 && (
+                <div>
+                  <div className="text-[9px] text-[#5a4136] uppercase mb-1">Machine hours</div>
+                  <div className="text-2xl font-black text-[#FF6B00]">{jobMetrics.totalHours.toFixed(1)}</div>
+                  <div className="text-[10px] text-[#a98a7d]">across all jobs</div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              {[...jobs]
+                .sort((a, b) => (b.cedar_total_cells ?? 0) - (a.cedar_total_cells ?? 0))
+                .slice(0, 5)
+                .map((j) => {
+                  const pct = j.cedar_total_cells > 0 ? Math.round((j.cedar_cleared_cells / j.cedar_total_cells) * 100) : 0;
+                  return (
+                    <div key={j.id} className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-bold truncate">{j.title}</div>
+                        <div className="w-full bg-[#1a1a1a] h-1.5 mt-1">
+                          <div
+                            className="h-1.5 transition-all"
+                            style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? '#13ff43' : '#FF6B00' }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono shrink-0 text-[#a98a7d]">{pct}%</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );

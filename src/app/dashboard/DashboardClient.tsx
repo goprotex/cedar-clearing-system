@@ -19,6 +19,13 @@ type CompanyProfile = {
   email?: string | null;
 };
 
+type EmployeeHours = {
+  user_id: string;
+  full_name: string | null;
+  total_hours: number;
+  job_count: number;
+};
+
 const PROFILE_ROLES = ['owner', 'manager', 'operator', 'crew_lead', 'viewer'] as const;
 
 export default function DashboardClient() {
@@ -35,6 +42,8 @@ export default function DashboardClient() {
   const [jobs, setJobs] = useState<ActiveJobSummary[]>([]);
   const [jobsBusy, setJobsBusy] = useState(true);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+
+  const [employeeHours, setEmployeeHours] = useState<EmployeeHours[]>([]);
 
   const loadProfiles = useCallback(async () => {
     setLoading(true);
@@ -54,6 +63,13 @@ export default function DashboardClient() {
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as { profiles: CompanyProfile[] };
       setProfiles(data.profiles ?? []);
+
+      // Load employee hours summary
+      const hoursRes = await fetchApiAuthed('/api/company/hours');
+      if (hoursRes.ok) {
+        const hoursData = (await hoursRes.json()) as { hours: EmployeeHours[] };
+        setEmployeeHours(hoursData.hours ?? []);
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -186,7 +202,15 @@ export default function DashboardClient() {
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold truncate">{p.full_name || '—'}</div>
                       <div className="text-[9px] font-mono text-[#a98a7d] truncate">{p.email ?? p.id.slice(0, 8)}</div>
-                      <div className="text-[9px] text-[#13ff43]">{p.role}</div>
+                      <div className="flex gap-3 items-center">
+                        <span className="text-[9px] text-[#13ff43]">{p.role}</span>
+                        {(() => {
+                          const hrs = employeeHours.find((h) => h.user_id === p.id);
+                          return hrs && hrs.total_hours > 0 ? (
+                            <span className="text-[9px] font-mono text-[#FF6B00]">{hrs.total_hours}h</span>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                   </button>
                 </li>
@@ -287,6 +311,29 @@ export default function DashboardClient() {
                   )}
                 </div>
               </>
+            )}
+            {!selected && employeeHours.length > 0 && (
+              <div className="border-t border-[#353534] pt-4 mt-2">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] mb-3">Hours summary</h3>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[#353534]">
+                      <th className="text-left text-[9px] text-[#5a4136] uppercase pb-1 pr-4">Employee</th>
+                      <th className="text-right text-[9px] text-[#5a4136] uppercase pb-1 pr-4">Total hours</th>
+                      <th className="text-right text-[9px] text-[#5a4136] uppercase pb-1">Jobs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employeeHours.map((h) => (
+                      <tr key={h.user_id} className="border-b border-[#353534]/50">
+                        <td className="py-1.5 pr-4 font-mono truncate max-w-[200px]">{h.full_name || h.user_id.slice(0, 8)}</td>
+                        <td className="py-1.5 pr-4 text-right font-mono text-[#FF6B00]">{h.total_hours}h</td>
+                        <td className="py-1.5 text-right text-[#a98a7d]">{h.job_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </div>
