@@ -68,7 +68,7 @@ export async function GET() {
       user_id: id,
       email: null,
       full_name: profileMap.get(id) ?? null,
-      total_hours: agg ? Math.round(agg.hours * 10) / 10 : 0,
+      total_hours: agg ? Math.round(agg.hours * 10) / 10 : 0, // one decimal place
       job_count: agg ? agg.jobIds.size : 0,
     };
   }).sort((a, b) => b.total_hours - a.total_hours);

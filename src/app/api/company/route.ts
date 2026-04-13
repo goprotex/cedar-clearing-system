@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { isCompanyAdmin } from '@/lib/company-admin';
 
+const MAX_NAME_LEN = 200;
+const MAX_ADDRESS_LEN = 500;
+const MAX_PHONE_LEN = 50;
+const MAX_EMAIL_LEN = 200;
+const MAX_WEBSITE_LEN = 200;
+const MAX_LICENSE_LEN = 100;
+const MAX_INSURANCE_LEN = 500;
+
 export type CompanyPayload = {
   id: string;
   name: string;
@@ -78,15 +86,15 @@ export async function PATCH(req: Request) {
   if (typeof body.name === 'string') {
     const trimmedName = body.name.trim();
     if (!trimmedName) return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
-    updates.name = trimmedName.slice(0, 200);
+    updates.name = trimmedName.slice(0, MAX_NAME_LEN);
   }
   if ('logo_url' in body) updates.logo_url = body.logo_url ?? null;
-  if ('address' in body) updates.address = typeof body.address === 'string' ? body.address.trim().slice(0, 500) || null : null;
-  if ('phone' in body) updates.phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 50) || null : null;
-  if ('email' in body) updates.email = typeof body.email === 'string' ? body.email.trim().slice(0, 200) || null : null;
-  if ('website' in body) updates.website = typeof body.website === 'string' ? body.website.trim().slice(0, 200) || null : null;
-  if ('license_number' in body) updates.license_number = typeof body.license_number === 'string' ? body.license_number.trim().slice(0, 100) || null : null;
-  if ('insurance_info' in body) updates.insurance_info = typeof body.insurance_info === 'string' ? body.insurance_info.trim().slice(0, 500) || null : null;
+  if ('address' in body) updates.address = typeof body.address === 'string' ? body.address.trim().slice(0, MAX_ADDRESS_LEN) || null : null;
+  if ('phone' in body) updates.phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, MAX_PHONE_LEN) || null : null;
+  if ('email' in body) updates.email = typeof body.email === 'string' ? body.email.trim().slice(0, MAX_EMAIL_LEN) || null : null;
+  if ('website' in body) updates.website = typeof body.website === 'string' ? body.website.trim().slice(0, MAX_WEBSITE_LEN) || null : null;
+  if ('license_number' in body) updates.license_number = typeof body.license_number === 'string' ? body.license_number.trim().slice(0, MAX_LICENSE_LEN) || null : null;
+  if ('insurance_info' in body) updates.insurance_info = typeof body.insurance_info === 'string' ? body.insurance_info.trim().slice(0, MAX_INSURANCE_LEN) || null : null;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields' }, { status: 400 });

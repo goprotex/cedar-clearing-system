@@ -58,8 +58,8 @@ export function loadLocalStorageJobs(): ActiveJobSummary[] {
         const opRaw = localStorage.getItem(`ccc_operator_${job.bidId}`);
         if (opRaw) {
           const opSession = JSON.parse(opRaw) as { clearedCellIds?: string[] };
-          if (Array.isArray(opSession.clearedCellIds) && opSession.clearedCellIds.length > clearedCells) {
-            clearedCells = opSession.clearedCellIds.length;
+          if (Array.isArray(opSession.clearedCellIds)) {
+            clearedCells = Math.max(clearedCells, opSession.clearedCellIds.length);
           }
         }
       } catch { /* ignore parse errors */ }
