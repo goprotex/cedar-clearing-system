@@ -334,7 +334,7 @@ export default function SettingsClient() {
 
             <div className="border-t border-[#353534] pt-4 space-y-2">
               <h3 className="text-[10px] font-bold uppercase text-[#a98a7d]">Account</h3>
-              <Link href="/logout" className="text-sm font-mono text-red-400/90 hover:text-red-300">
+              <Link href="/logout" prefetch={false} className="text-sm font-mono text-red-400/90 hover:text-red-300">
                 Sign out
               </Link>
             </div>

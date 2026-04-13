@@ -91,6 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
                 <Link
                   href="/logout"
+                  prefetch={false}
                   className="text-[10px] font-mono border border-[#353534] px-2 py-1.5 text-[#a98a7d] hover:text-white hover:bg-[#353534] whitespace-nowrap"
                 >
                   Log out
@@ -148,6 +149,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
           <Link
             href={authEmail ? '/logout' : '/login'}
+            prefetch={false}
             onClick={() => setMobileMenuOpen(false)}
             className={`block text-center text-xs font-black uppercase tracking-widest py-2 border-2 ${
               authEmail ? 'border-[#353534] text-[#a98a7d]' : 'border-[#FF6B00] bg-[#FF6B00] text-black'
@@ -239,6 +241,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="text-[9px] font-mono text-[#5a4136] truncate mb-1" title={authEmail}>{authEmail}</div>
                 <Link
                   href="/logout"
+                  prefetch={false}
                   className="block text-center text-[10px] font-black uppercase tracking-widest border border-[#353534] py-2 text-[#a98a7d] hover:text-white hover:bg-[#353534]"
                 >
                   Log out

@@ -109,6 +109,7 @@ export default function Home() {
           {!authLoading && (
             <Link
               href={authEmail ? '/logout' : '/login'}
+              prefetch={false}
               className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-2 border-2 transition-all whitespace-nowrap ${
                 authEmail
                   ? 'border-[#353534] text-[#a98a7d] hover:text-white'
@@ -163,6 +164,7 @@ export default function Home() {
           {!authLoading && (
             <Link
               href={authEmail ? '/logout' : '/login'}
+              prefetch={false}
               onClick={() => setMenuOpen(false)}
               className="uppercase tracking-tight font-black text-[#FF6B00] hover:bg-[#FF6B00] hover:text-black transition-colors duration-150 px-6 py-3 text-sm"
             >
