@@ -67,8 +67,9 @@ export async function fetchApiAuthed(url: string, init?: RequestInit): Promise<R
 
   let res = await fetch(url, withBearer(init, accessToken));
   if (res.status === 401) {
-    await syncAuthSessionToCookies();
-    await supabase.auth.getUser();
+    // Retry with a refreshed token. Do NOT call getUser() here — it triggers
+    // a server-side token refresh that races with concurrent calls and can
+    // cause @supabase/ssr to call signOut() globally, destroying the session.
     const { data: r, error: refErr } = await supabase.auth.refreshSession();
     const s2 = !refErr && r.session ? r.session : (await supabase.auth.getSession()).data.session;
     accessToken = s2?.access_token;

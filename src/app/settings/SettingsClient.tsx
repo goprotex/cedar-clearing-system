@@ -153,8 +153,8 @@ export default function SettingsClient() {
     setErr(null);
     try {
       const supabase = createClient();
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id;
+      const { data: { session: s } } = await supabase.auth.getSession();
+      const uid = s?.user?.id;
       if (!uid) throw new Error('Not signed in');
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const path = `${uid}/avatar-${Date.now()}.${ext}`;

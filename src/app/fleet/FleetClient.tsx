@@ -115,8 +115,8 @@ export default function FleetClient() {
     }
     const supabase = supabaseRef.current;
     setLoadError(null);
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
       setCompanyId(null);
       setUnits([]);
       setLoading(false);
@@ -127,7 +127,7 @@ export default function FleetClient() {
     const { data: profile, error: pErr } = await supabase
       .from('profiles')
       .select('company_id')
-      .eq('id', userData.user.id)
+      .eq('id', session.user.id)
       .maybeSingle();
     if (pErr) {
       setLoadError(pErr.message);

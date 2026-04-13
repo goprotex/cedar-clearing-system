@@ -8,7 +8,6 @@ import { createClient } from '@/utils/supabase/client';
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const signupIntent = searchParams.get('signup') === '1' || searchParams.get('mode') === 'signup';
-  const forceSignout = searchParams.get('signout') === '1';
   const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>(
     () => (signupIntent ? 'password-signup' : 'magic'),
   );
@@ -17,7 +16,6 @@ function LoginPageInner() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [signingOut, setSigningOut] = useState(forceSignout);
 
   const envMissing = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
@@ -26,40 +24,20 @@ function LoginPageInner() {
   }, [signupIntent]);
 
   useEffect(() => {
-    if (envMissing || !forceSignout) {
-      setSigningOut(false);
-      return;
-    }
+    if (envMissing) return;
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      await supabase.auth.signOut({ scope: 'local' });
-      if (!cancelled) setSigningOut(false);
-    })();
-    return () => { cancelled = true; };
-  }, [envMissing, forceSignout]);
-
-  useEffect(() => {
-    if (envMissing || forceSignout) return;
-    let cancelled = false;
-    (async () => {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
+      // Use getSession() only — getUser() triggers server-side token refresh
+      // which races with concurrent calls and destroys the session.
+      const { data: { session } } = await supabase.auth.getSession();
       if (cancelled) return;
-      if (data.user) {
+      if (session?.user) {
         window.location.href = '/bids';
       }
     })();
     return () => { cancelled = true; };
-  }, [envMissing, forceSignout]);
-
-  if (signingOut) {
-    return (
-      <div className="min-h-screen bg-[#131313] flex items-center justify-center text-[#a98a7d] font-mono text-sm">
-        Signing out stale session…
-      </div>
-    );
-  }
+  }, [envMissing]);
 
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] flex items-center justify-center p-6">

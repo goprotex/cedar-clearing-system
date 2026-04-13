@@ -322,8 +322,8 @@ export async function getAuthUserId(
   supabase: SupabaseClient,
 ): Promise<string | null> {
   try {
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id ?? null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id ?? null;
   } catch {
     return null;
   }
