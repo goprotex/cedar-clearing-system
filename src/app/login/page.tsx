@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const signupIntent = searchParams.get('signup') === '1' || searchParams.get('mode') === 'signup';
+  const forceSignout = searchParams.get('signout') === '1';
   const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>(
     () => (signupIntent ? 'password-signup' : 'magic'),
   );
@@ -16,6 +17,7 @@ function LoginPageInner() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(forceSignout);
 
   const envMissing = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
@@ -24,7 +26,21 @@ function LoginPageInner() {
   }, [signupIntent]);
 
   useEffect(() => {
-    if (envMissing) return;
+    if (envMissing || !forceSignout) {
+      setSigningOut(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      if (!cancelled) setSigningOut(false);
+    })();
+    return () => { cancelled = true; };
+  }, [envMissing, forceSignout]);
+
+  useEffect(() => {
+    if (envMissing || forceSignout) return;
     let cancelled = false;
     (async () => {
       const supabase = createClient();
@@ -35,7 +51,15 @@ function LoginPageInner() {
       }
     })();
     return () => { cancelled = true; };
-  }, [envMissing]);
+  }, [envMissing, forceSignout]);
+
+  if (signingOut) {
+    return (
+      <div className="min-h-screen bg-[#131313] flex items-center justify-center text-[#a98a7d] font-mono text-sm">
+        Signing out stale session…
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] flex items-center justify-center p-6">
