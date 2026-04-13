@@ -1,30 +1,5 @@
 import { createClient } from '@/utils/supabase/client';
 
-export async function syncAuthSessionToCookies(): Promise<void> {
-  const supabase = createClient();
-  await supabase.auth.getSession();
-}
-
-function decodeJwtPayload(token: string): { exp?: number } | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    return JSON.parse(atob(padded)) as { exp?: number };
-  } catch {
-    return null;
-  }
-}
-
-/** True if missing, malformed, expired, or within skewMs of expiry (refresh early). */
-function accessTokenNeedsRefresh(token: string | undefined, skewMs = 120_000): boolean {
-  if (!token) return true;
-  const payload = decodeJwtPayload(token);
-  if (typeof payload?.exp !== 'number') return true;
-  return Date.now() >= payload.exp * 1000 - skewMs;
-}
-
 function withBearer(init: RequestInit | undefined, accessToken: string | undefined): RequestInit {
   const headers = new Headers(init?.headers);
   if (accessToken) {
@@ -38,42 +13,18 @@ function withBearer(init: RequestInit | undefined, accessToken: string | undefin
   };
 }
 
-async function ensureFreshAccessToken(supabase: ReturnType<typeof createClient>) {
-  let {
-    data: { session },
-  } = await supabase.auth.getSession();
-  let token = session?.access_token;
-  if (!token || accessTokenNeedsRefresh(token)) {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (!error && data.session) {
-      session = data.session;
-      token = data.session.access_token;
-    }
-  }
-  return { session, accessToken: session?.access_token };
-}
-
 /**
- * Authenticated fetch: sends Authorization Bearer from the Supabase session so API routes
- * see the user even when auth cookies are missing or blocked.
+ * Authenticated fetch: sends Authorization Bearer from the Supabase session.
  *
- * Refreshes the access token when it is missing or near expiry so the server always receives
- * a valid JWT. (Middleware may refresh cookies on the *response*, while Route Handlers still
- * read the *incoming* request cookies in the same round-trip — a stale JWT there causes 401.)
+ * Uses getSession() exclusively — never getUser() or refreshSession() — to
+ * avoid consuming the single-use refresh token. The Supabase browser client
+ * manages token refresh internally via its auto-refresh timer; we just read
+ * whatever session is currently available.
  */
 export async function fetchApiAuthed(url: string, init?: RequestInit): Promise<Response> {
   const supabase = createClient();
-  let { accessToken } = await ensureFreshAccessToken(supabase);
+  const { data: { session } } = await supabase.auth.getSession();
+  const accessToken = session?.access_token;
 
-  let res = await fetch(url, withBearer(init, accessToken));
-  if (res.status === 401) {
-    // Retry with a refreshed token. Do NOT call getUser() here — it triggers
-    // a server-side token refresh that races with concurrent calls and can
-    // cause @supabase/ssr to call signOut() globally, destroying the session.
-    const { data: r, error: refErr } = await supabase.auth.refreshSession();
-    const s2 = !refErr && r.session ? r.session : (await supabase.auth.getSession()).data.session;
-    accessToken = s2?.access_token;
-    res = await fetch(url, withBearer(init, accessToken));
-  }
-  return res;
+  return fetch(url, withBearer(init, accessToken));
 }
