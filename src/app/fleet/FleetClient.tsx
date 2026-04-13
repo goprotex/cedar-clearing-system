@@ -709,6 +709,9 @@ function MachineDetailPanel({
     toast.success('Hours updated');
   }
 
+  // Max size for a compressed fleet photo stored as base64 in Supabase JSONB (~225KB actual)
+  const MAX_COMPRESSED_IMAGE_BYTES = 300_000;
+
   async function onPhotoPick(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     e.target.value = '';
@@ -724,23 +727,43 @@ function MachineDetailPanel({
       .slice(0, cap);
     const newUrls: string[] = [];
     for (const file of toRead) {
-      let data: string;
+      let dataUrl: string;
       try {
-        data = await new Promise<string>((resolve, reject) => {
+        // Load original into an Image element
+        const originalDataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = () => reject(new Error('read'));
           reader.readAsDataURL(file);
         });
+        // Compress/resize to max 800px using canvas
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX = 800;
+            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { reject(new Error('canvas')); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.75));
+          };
+          img.onerror = () => reject(new Error('decode'));
+          img.src = originalDataUrl;
+        });
       } catch {
         toast.error('Could not read image');
         continue;
       }
-      if (data.length > 900_000) {
-        toast.error('Image too large — try a smaller photo');
+      if (dataUrl.length > MAX_COMPRESSED_IMAGE_BYTES) {
+        toast.error('Image still too large after compression — use a smaller photo');
         continue;
       }
-      newUrls.push(data);
+      newUrls.push(dataUrl);
     }
     if (newUrls.length > 0) {
       onUpdate({ photoUrls: [...m.photoUrls, ...newUrls] });

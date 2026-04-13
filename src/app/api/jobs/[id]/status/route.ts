@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { canAccessJob } from '@/lib/job-access';
+import { isCompanyAdmin } from '@/lib/company-admin';
 
 const ALLOWED = new Set(['active', 'paused', 'completed', 'cancelled']);
 
@@ -11,6 +13,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Allow job owners, company admins (owner/manager), or users with canAccessJob
   const { data: membership, error: membershipErr } = await supabase
     .from('job_members')
     .select('role')
@@ -18,8 +21,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .eq('user_id', userId)
     .maybeSingle();
   if (membershipErr) return NextResponse.json({ error: membershipErr.message }, { status: 500 });
-  if (!membership || membership.role !== 'owner') {
-    return NextResponse.json({ error: 'Forbidden — job owners only' }, { status: 403 });
+
+  const isOwnerMember = membership?.role === 'owner';
+  if (!isOwnerMember) {
+    const [adminCheck, accessCheck] = await Promise.all([
+      isCompanyAdmin(supabase, userId),
+      canAccessJob(supabase, userId, jobId),
+    ]);
+    if (!adminCheck && !accessCheck) {
+      return NextResponse.json({ error: 'Forbidden — job owners and company admins only' }, { status: 403 });
+    }
   }
 
   let body: { status?: string };

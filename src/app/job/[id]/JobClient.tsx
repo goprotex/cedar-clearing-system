@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import JobExecutionPanel from '@/components/job/JobExecutionPanel';
+import JobNotesAndProgressPanel from '@/components/operations/JobNotesAndProgressPanel';
 import type { Job, JobEvent } from '@/types';
+import type { ActiveJobSummary } from '@/lib/active-jobs';
 import { loadLocalJobBundle } from '@/lib/jobs';
 import { fetchApiAuthed } from '@/lib/auth-client';
 
@@ -210,6 +212,13 @@ export default function JobClient({ jobId }: { jobId: string }) {
             jobId={job.id}
             isRemote={isRemote}
             bidSnapshot={job.bid_snapshot}
+          />
+
+          <JobNotesAndProgressPanel
+            job={job as ActiveJobSummary}
+            onJobPatch={(patch) => {
+              setJob((prev) => prev ? { ...prev, ...patch } as Job : prev);
+            }}
           />
         </>
       )}

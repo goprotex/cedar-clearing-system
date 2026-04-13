@@ -22,6 +22,18 @@ type SettingsPayload = {
   } | null;
 };
 
+type CompanyData = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  license_number: string | null;
+  insurance_info: string | null;
+};
+
 export default function SettingsClient() {
   const { email: authEmail, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -41,6 +53,20 @@ export default function SettingsClient() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [monitorTv, setMonitorTv] = useState(false);
+
+  // Company info
+  const [company, setCompany] = useState<CompanyData | null>(null);
+  const [canEditCompany, setCanEditCompany] = useState(false);
+  const [coName, setCoName] = useState('');
+  const [coAddress, setCoAddress] = useState('');
+  const [coPhone, setCoPhone] = useState('');
+  const [coEmail, setCoEmail] = useState('');
+  const [coWebsite, setCoWebsite] = useState('');
+  const [coLicense, setCoLicense] = useState('');
+  const [coInsurance, setCoInsurance] = useState('');
+  const [coSaving, setCoSaving] = useState(false);
+  const [coSaved, setCoSaved] = useState(false);
+  const [coErr, setCoErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,6 +103,24 @@ export default function SettingsClient() {
         setCompanyName(null);
         setAvatarUrl(null);
         setMonitorTv(false);
+      }
+
+      // Load company info
+      const coRes = await fetchApiAuthed('/api/company');
+      if (coRes.ok) {
+        const coData = (await coRes.json()) as { company: CompanyData | null };
+        const co = coData.company;
+        setCompany(co);
+        setCanEditCompany(Boolean(data.can_edit_own_role));
+        if (co) {
+          setCoName(co.name ?? '');
+          setCoAddress(co.address ?? '');
+          setCoPhone(co.phone ?? '');
+          setCoEmail(co.email ?? '');
+          setCoWebsite(co.website ?? '');
+          setCoLicense(co.license_number ?? '');
+          setCoInsurance(co.insurance_info ?? '');
+        }
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -145,6 +189,39 @@ export default function SettingsClient() {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveCompany = async () => {
+    if (!coName.trim()) {
+      setCoErr('Company name is required');
+      return;
+    }
+    setCoSaving(true);
+    setCoErr(null);
+    setCoSaved(false);
+    try {
+      const res = await fetchApiAuthed('/api/company', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: coName,
+          address: coAddress.trim() || null,
+          phone: coPhone.trim() || null,
+          email: coEmail.trim() || null,
+          website: coWebsite.trim() || null,
+          license_number: coLicense.trim() || null,
+          insurance_info: coInsurance.trim() || null,
+        }),
+      });
+      const d = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(d.error ?? res.statusText);
+      setCoSaved(true);
+      void load();
+    } catch (e) {
+      setCoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCoSaving(false);
     }
   };
 
@@ -359,6 +436,112 @@ export default function SettingsClient() {
               {saving ? 'Saving…' : 'Save settings'}
             </button>
           </div>
+
+          {company !== undefined && (
+            <section className="lg:col-span-2 border-2 border-[#353534] p-5 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">Company info</h2>
+                {!canEditCompany && (
+                  <span className="text-[9px] text-[#5a4136] font-mono">Owners and managers can edit</span>
+                )}
+              </div>
+              {!company && (
+                <p className="text-sm text-[#a98a7d]">No company linked to your profile. Ask an admin to add you.</p>
+              )}
+              {company && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Company name *</label>
+                      <input
+                        value={coName}
+                        onChange={(e) => setCoName(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Phone</label>
+                      <input
+                        value={coPhone}
+                        onChange={(e) => setCoPhone(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Business email</label>
+                      <input
+                        type="email"
+                        value={coEmail}
+                        onChange={(e) => setCoEmail(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Website</label>
+                      <input
+                        value={coWebsite}
+                        onChange={(e) => setCoWebsite(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Address</label>
+                      <input
+                        value={coAddress}
+                        onChange={(e) => setCoAddress(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">License number</label>
+                      <input
+                        value={coLicense}
+                        onChange={(e) => setCoLicense(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Insurance info</label>
+                      <input
+                        value={coInsurance}
+                        onChange={(e) => setCoInsurance(e.target.value)}
+                        disabled={!canEditCompany}
+                        className="w-full bg-transparent border border-[#353534] px-3 py-2 text-sm font-mono disabled:opacity-50"
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+                  {coErr && (
+                    <div className="border border-red-500/40 bg-red-950/30 p-3 text-sm text-red-200">{coErr}</div>
+                  )}
+                  {coSaved && !coErr && (
+                    <div className="text-sm text-[#13ff43] font-mono">Company info saved.</div>
+                  )}
+                  {canEditCompany && (
+                    <button
+                      type="button"
+                      disabled={coSaving}
+                      onClick={() => void saveCompany()}
+                      className="bg-[#FF6B00] text-black font-black px-6 py-3 text-xs uppercase tracking-widest hover:bg-white disabled:opacity-40"
+                    >
+                      {coSaving ? 'Saving…' : 'Save company info'}
+                    </button>
+                  )}
+                </>
+              )}
+            </section>
+          )}
         </div>
       )}
     </AppShell>
