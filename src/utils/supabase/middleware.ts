@@ -1,43 +1,16 @@
-import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-
 export async function updateSession(request: NextRequest) {
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.next({ request });
-  }
-
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    },
-  );
-
-  // Refreshing the auth token is critical for keeping sessions alive.
-  // getUser() sends a request to the Supabase Auth server to validate
-  // the JWT and triggers cookie updates via setAll when tokens are refreshed.
-  await supabase.auth.getUser();
-
-  return supabaseResponse;
+  // Pass all requests through without server-side session refresh.
+  //
+  // The Supabase docs recommend calling getUser() here to refresh expired
+  // tokens, but on Vercel's serverless/edge architecture, concurrent
+  // middleware invocations race to consume the single-use refresh token.
+  // The loser gets "invalid refresh token" and @supabase/ssr internally
+  // calls signOut(), destroying the session — causing users to be logged
+  // out immediately after signing in.
+  //
+  // Session refresh is instead handled by the browser client (AuthProvider)
+  // and by fetchApiAuthed() which refreshes tokens before API calls.
+  return NextResponse.next({ request });
 }
