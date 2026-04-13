@@ -465,7 +465,13 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
       )}
 
       <div className={fullscreen ? 'absolute inset-0' : 'flex flex-col lg:flex-row gap-6'}>
-        <div className={fullscreen ? 'absolute inset-0' : 'flex-1 border-2 border-[#353534] relative min-h-0'} style={fullscreen ? undefined : { minHeight: 'min(70vh, 720px)' }}>
+        <div
+          className={
+            fullscreen
+              ? 'absolute inset-0'
+              : 'flex-1 border-2 border-[#353534] relative min-h-0 h-[min(70vh,720px)]'
+          }
+        >
           {mapboxToken ? (
             <MapboxMap
               accessToken={mapboxToken}
