@@ -150,6 +150,19 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
+  // Mapbox measures the container at init; if height was 0 or wrong (e.g. % inside min-height-only parent), resize when layout is known.
+  useEffect(() => {
+    const map = mapRef.current;
+    const el = containerRef.current;
+    if (!map || !el || !mapLoaded) return;
+    const ro = new ResizeObserver(() => {
+      map.resize();
+    });
+    ro.observe(el);
+    queueMicrotask(() => map.resize());
+    return () => ro.disconnect();
+  }, [mapLoaded]);
+
   // ── Push data to map whenever jobs/cleared change AND map is loaded ──
   useEffect(() => {
     const map = mapRef.current;
