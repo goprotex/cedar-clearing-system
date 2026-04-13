@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import type { MonitorBootstrapResponse, MonitorTelemetryRow } from '@/types/monitor-bootstrap';
 
 type MonitorJob = {
@@ -24,7 +24,7 @@ function isCompanySupervisorRole(role: string | null | undefined): boolean {
 export async function GET() {
   const supabase = await createClient();
 
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase);
   if (authErr || !auth.user?.id) {
     return NextResponse.json({
       jobs: [],

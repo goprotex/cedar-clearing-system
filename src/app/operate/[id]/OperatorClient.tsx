@@ -11,6 +11,7 @@ import { treeFeaturesForMapboxExtrusion } from '@/lib/operate-mapbox-trees';
 import { jobIdFromBidId, mergeClearedCellIds } from '@/lib/jobs';
 import type { Session } from '@supabase/supabase-js';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
+import { fetchApiAuthed } from '@/lib/auth-client';
 import { loadBidFromSupabase, getAuthUserId } from '@/lib/db';
 
 const CLEAR_RADIUS_M = 8;
@@ -1028,11 +1029,13 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     if (now - lastPublishRef.current >= OPERATOR_PUBLISH_MS) {
       lastPublishRef.current = now;
       const jobId = jobIdFromBidId(bidId);
+      const headingVal = stateRef.current.heading;
       const posData = {
         lng,
         lat,
         accuracy_m: stateRef.current.accuracy,
-        heading: stateRef.current.heading,
+        heading: headingVal,
+        heading_deg: headingVal,
         speed_mps: stateRef.current.speed,
         timestamp: now,
       };
@@ -1051,10 +1054,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       // Push to Supabase when signed in so scout monitor realtime works (shared progress is separate).
       if (supabaseSessionRef.current) {
-        void fetch(`/api/jobs/${jobId}/operator-positions`, {
+        void fetchApiAuthed(`/api/jobs/${jobId}/operator-positions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
           body: JSON.stringify(posData),
         }).catch(() => { /* best-effort */ });
       }

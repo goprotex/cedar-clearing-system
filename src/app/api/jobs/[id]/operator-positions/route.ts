@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
