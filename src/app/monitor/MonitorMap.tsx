@@ -195,9 +195,9 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
           operatorListHtml = '<div style="opacity:0.5;margin-top:2px;">No operators assigned</div>';
         }
 
-        // Equipment info from telemetry (if available)
+        // Equipment info from bid snapshot (if available via custom data)
         let equipmentHtml = '';
-        const bid = job?.bid_snapshot;
+        const bid = job?.bid_snapshot as any;
         if (bid?.equipment?.length) {
           equipmentHtml = `<div style="margin-top:6px;border-top:1px solid #353534;padding-top:4px;">
             <div style="font-weight:700;color:#a98a7d;font-size:10px;letter-spacing:0.08em;">EQUIPMENT</div>

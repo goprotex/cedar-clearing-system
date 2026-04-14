@@ -31,6 +31,9 @@ export async function GET() {
       clearedByJob: {} as Record<string, string[]>,
       operatorsByJob: {} as Record<string, unknown[]>,
       telemetryByJob: {} as Record<string, MonitorTelemetryRow[]>,
+      operatorProfiles: {},
+      activeTimeEntries: {},
+      membersByJob: {},
       scope: 'membership',
     } satisfies MonitorBootstrapResponse);
   }
@@ -94,6 +97,9 @@ export async function GET() {
       clearedByJob: {} as Record<string, string[]>,
       operatorsByJob: {} as Record<string, unknown[]>,
       telemetryByJob: {} as Record<string, MonitorTelemetryRow[]>,
+      operatorProfiles: {},
+      activeTimeEntries: {},
+      membersByJob: {},
       scope,
     } satisfies MonitorBootstrapResponse);
   }
