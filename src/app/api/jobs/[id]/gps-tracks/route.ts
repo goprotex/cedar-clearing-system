@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { requireJobWorker } from '@/lib/job-api-auth';
+import { canAccessJob } from '@/lib/job-access';
 
 function haversineM(a: [number, number], b: [number, number]): number {
   const R = 6371000;
@@ -76,4 +77,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ gpsTrack: data });
+}
+
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: jobId } = await params;
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (!(await canAccessJob(supabase, userId, jobId))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const { data, error } = await supabase
+    .from('job_gps_tracks')
+    .select(
+      'id, job_id, operator_id, source, label, started_at, ended_at, points, distance_m, area_acres_estimate, created_at'
+    )
+    .eq('job_id', jobId)
+    .order('started_at', { ascending: false })
+    .limit(500);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ tracks: data ?? [] });
 }

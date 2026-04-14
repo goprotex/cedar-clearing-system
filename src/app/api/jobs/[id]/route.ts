@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { canAccessJob } from '@/lib/job-access';
+import { isCompanyAdmin } from '@/lib/company-admin';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,3 +35,34 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   return NextResponse.json({ job, events: events ?? [] });
 }
 
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Require job owner role OR company admin
+  const { data: membership } = await supabase
+    .from('job_members')
+    .select('role')
+    .eq('job_id', id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const isJobOwner = membership?.role === 'owner';
+  const isAdmin = !isJobOwner && (await isCompanyAdmin(supabase, userId));
+
+  if (!isJobOwner && !isAdmin) {
+    return NextResponse.json(
+      { error: 'Only the job owner or a company admin can delete a job' },
+      { status: 403 }
+    );
+  }
+
+  const { error } = await supabase.from('jobs').delete().eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}

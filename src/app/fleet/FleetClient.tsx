@@ -542,6 +542,14 @@ export default function FleetClient() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
+                          {m.photoUrls.length > 0 && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={m.photoUrls[0]}
+                              alt=""
+                              className="w-9 h-9 object-cover shrink-0 border border-[#353534]"
+                            />
+                          )}
                           <span className="font-mono font-black text-sm text-[#ffb693] shrink-0">{m.id}</span>
                           <span className="font-black text-sm uppercase truncate">{m.name}</span>
                         </div>
