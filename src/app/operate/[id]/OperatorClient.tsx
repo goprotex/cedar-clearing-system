@@ -1274,16 +1274,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       setState(prev => {
         const nextIds = new Set(prev.clearedCellIds);
         nextIds.add(cellId);
-        const parts = cellId.split(':');
+        const colonIdx = cellId.indexOf(':');
+        if (colonIdx < 0) return prev; // malformed cellId, skip
+        const pastureId = cellId.slice(0, colonIdx);
+        const cellIndex = parseInt(cellId.slice(colonIdx + 1), 10);
+        if (!pastureId || Number.isNaN(cellIndex)) return prev; // guard against bad data
         const nextCells = [
           ...prev.clearedCells,
-          { cellIndex: parseInt(parts[1], 10), pastureId: parts[0], timestamp: ts },
+          { cellIndex, pastureId, timestamp: ts },
         ];
         saveOperatorSession(bidId, Array.from(nextIds), nextCells);
         return { ...prev, clearedCellIds: nextIds, clearedCells: nextCells };
       });
 
       // Best-effort: push clearing event so live monitor / other devices see progress.
+      // Failures are intentionally ignored — field connections are unreliable.
       if (sharedEnabledRef.current) {
         const jobId = jobIdFromBidId(bidId);
         void fetch(`/api/jobs/${jobId}/events`, {
@@ -1295,7 +1300,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             setSharedEnabled(false);
             setSharedStatus('unauth');
           }
-        }).catch(() => { /* ignore */ });
+        }).catch(() => { /* best-effort — ignore network failures */ });
       }
     };
 
