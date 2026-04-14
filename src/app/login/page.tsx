@@ -8,6 +8,9 @@ import { createClient } from '@/utils/supabase/client';
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const signupIntent = searchParams.get('signup') === '1' || searchParams.get('mode') === 'signup';
+  // ?signout=1 is sent by AuthRequiredGate when the user is blocked — we sign
+  // out any stale session first so they don't get bounced back in a loop.
+  const forceSignout = searchParams.get('signout') === '1';
   const [mode, setMode] = useState<'magic' | 'password-signin' | 'password-signup'>(
     () => (signupIntent ? 'password-signup' : 'magic'),
   );
@@ -28,6 +31,12 @@ function LoginPageInner() {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
+      // If the gate sent us here with ?signout=1, clear any stale session first
+      // so the user can log in fresh without getting bounced in a loop.
+      if (forceSignout) {
+        await supabase.auth.signOut();
+        return;
+      }
       // Use getSession() only — getUser() triggers server-side token refresh
       // which races with concurrent calls and destroys the session.
       const { data: { session } } = await supabase.auth.getSession();
@@ -37,7 +46,7 @@ function LoginPageInner() {
       }
     })();
     return () => { cancelled = true; };
-  }, [envMissing]);
+  }, [envMissing, forceSignout]);
 
   return (
     <div className="min-h-screen bg-[#131313] text-[#e5e2e1] flex items-center justify-center p-6">

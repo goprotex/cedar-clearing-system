@@ -68,7 +68,7 @@ export default function AuthRequiredGate({ children }: { children: React.ReactNo
               </p>
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <Link
-                  href="/login"
+                  href="/login?signout=1"
                   className="flex-1 text-center bg-[#FF6B00] text-black font-black uppercase tracking-widest py-3 px-4 text-sm hover:bg-white transition-colors"
                 >
                   Sign in
