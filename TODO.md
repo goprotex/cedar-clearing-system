@@ -75,6 +75,7 @@ which means no multi-device sync, no data backup, and single-browser-only access
 - [ ] **Pasture polygon storage** — Pasture GeoJSON polygons need to save to the `pastures.polygon` column (already in schema) rather than only being in the Zustand store
 - [ ] **Rate card snapshot** — When saving a bid, snapshot the current rate card into `bids.rate_card_snapshot` so historical bids retain their pricing even if the rate card changes
 - [ ] **Bid status workflow** — Wire up bid status transitions (draft → sent → accepted → declined → expired) in the UI and enforce via Supabase RLS/triggers
+  - `PATCH /api/bids/[id]` now accepts `{ status }` to update bid status
 - [ ] **Bid versioning** — Track bid revisions; store previous versions so you can see "Revision 3 of 5"
 
 ### 2.2 Migrate Fleet from localStorage to Supabase
@@ -106,9 +107,10 @@ The master plan defines 24 tables. Currently ~15 exist. These are still needed:
 
 ### 2.4 Missing API Routes (From Master Plan)
 
-- [ ] **`DELETE /api/jobs/[id]`** — Job deletion (currently not exposed)
-- [ ] **`PATCH /api/jobs/[id]/work-orders/[workOrderId]`** — Work order update (currently not exposed)
-- [ ] **`GET/POST /api/fleet`** — Fleet CRUD API routes
+- [x] **`DELETE /api/jobs/[id]`** — Job deletion (owners and company admins only)
+- [x] **`PATCH /api/jobs/[id]/work-orders/[workOrderId]`** — Work order update (already existed)
+- [x] **`GET/POST /api/fleet`** — Fleet CRUD API routes
+- [x] **`GET/PATCH/DELETE /api/fleet/[id]`** — Single fleet machine CRUD
 - [ ] **`POST /api/fleet/[id]/maintenance`** — Record maintenance event
 - [ ] **`POST /api/fleet/[id]/teeth-change`** — Log teeth change
 - [ ] **`GET /api/fleet/[id]/telematics`** — Fetch latest telematics reading
@@ -117,14 +119,14 @@ The master plan defines 24 tables. Currently ~15 exist. These are still needed:
 - [ ] **`GET /api/drone/task/[taskId]`** — Poll ODM processing status
 - [ ] **`POST /api/invoices`** — Generate invoice from completed job
 - [ ] **`POST /api/invoices/[id]/email`** — Email invoice to customer
-- [ ] **`GET /api/analytics/dashboard`** — Owner dashboard metrics
+- [x] **`GET /api/analytics/dashboard`** — Owner dashboard metrics (job/bid/fleet/approval counts)
 - [ ] **`GET /api/analytics/profitability`** — Job profitability by method/soil
 - [ ] **`POST /api/progress/snapshot`** — Calculate completion % from drone/telematics
 - [ ] **`POST /api/progress/report`** — Generate and email progress report PDF
 - [ ] **`GET/POST /api/customers/[id]/contact-log`** — CRM communication history
 - [ ] **`POST /api/schedule/weather`** — Fetch 7-day forecast for job site
 - [ ] **`GET /api/telematics/sync`** — Scheduled job to poll equipment OEM APIs
-- [ ] **`POST /api/time-entries/[id]/approve`** — Crew lead time entry approval
+- [x] **`POST /api/jobs/[id]/time-entries/[entryId]/approve`** — Crew lead time entry approval
 
 ### 2.5 RLS & Security Gaps
 
