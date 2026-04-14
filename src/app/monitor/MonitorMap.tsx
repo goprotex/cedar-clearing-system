@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
+import type { OperatorProfile, ActiveTimeEntry, JobMember } from './MonitorClient';
 
 type JobLike = {
   id: string;
@@ -28,19 +29,56 @@ type Props = {
   layers: Record<LayerKey, boolean>;
   flyToJobId?: string | null;
   onMapReady?: () => void;
+  operatorProfiles: Record<string, OperatorProfile>;
+  activeTimeEntries: Record<string, ActiveTimeEntry[]>;
+  membersByJob: Record<string, JobMember[]>;
+  operateMode?: boolean;
+  operateModeUserId?: string | null;
 };
 
 function fc(features: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features };
 }
 
-export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, flyToJobId, onMapReady }: Props) {
+function pctVal(cleared: number, total: number) {
+  if (!total) return 0;
+  return Math.max(0, Math.min(100, Math.round((cleared / total) * 100)));
+}
+
+function hoursElapsed(clockInIso: string): string {
+  const ms = Date.now() - Date.parse(clockInIso);
+  if (ms < 0) return '0.0';
+  return (ms / 3600000).toFixed(1);
+}
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch { return iso; }
+}
+
+export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, flyToJobId, onMapReady, operatorProfiles, activeTimeEntries, membersByJob, operateMode, operateModeUserId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const operatorMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const jobProgressMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const popupRef = useRef<mapboxgl.Popup | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const rotationRef = useRef<number | null>(null);
+
+  // Refs for latest data so click handlers can access current state
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
+  const operatorProfilesRef = useRef(operatorProfiles);
+  operatorProfilesRef.current = operatorProfiles;
+  const activeTimeEntriesRef = useRef(activeTimeEntries);
+  activeTimeEntriesRef.current = activeTimeEntries;
+  const membersByJobRef = useRef(membersByJob);
+  membersByJobRef.current = membersByJob;
+  const operatorsByJobRef = useRef(operatorsByJob);
+  operatorsByJobRef.current = operatorsByJob;
+  const clearedByJobRef = useRef(clearedByJob);
+  clearedByJobRef.current = clearedByJob;
 
   // ── Create map once ──
   useEffect(() => {
@@ -116,17 +154,84 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.addSource('operator-trails', { type: 'geojson', data: fc([]) });
       map.addLayer({ id: 'operator-trails-line', type: 'line', source: 'operator-trails', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.7 } });
 
-      // Click handlers
+      // Click handlers — property/pasture popup with full job details
       map.on('click', 'monitor-pastures-fill', (e) => {
         const f = e.features?.[0];
         if (!f) return;
         const props = f.properties as any;
-        if (!popupRef.current) popupRef.current = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '360px' });
+        const jobId = props?.jobId;
+
+        // Find the job
+        const job = jobsRef.current.find(j => j.id === jobId);
+        const cleared = props?.cedarCleared ?? 0;
+        const total = props?.cedarTotal ?? 0;
+        const progress = total > 0 ? pctVal(cleared, total) : 0;
+
+        // Assigned operators for this job
+        const members = membersByJobRef.current[jobId] ?? [];
+        const operators = operatorsByJobRef.current[jobId] ?? [];
+        const timeEntries = activeTimeEntriesRef.current[jobId] ?? [];
+
+        // Build operator list HTML
+        let operatorListHtml = '';
+        if (operators.length > 0) {
+          for (const op of operators) {
+            const profile = operatorProfilesRef.current[op.user_id];
+            const name = profile?.display_name || op.user_id;
+            const te = timeEntries.find(t => t.user_id === op.user_id);
+            const clockInfo = te ? `Clocked in ${formatTime(te.clock_in)} (${hoursElapsed(te.clock_in)}h)` : 'Not clocked in';
+            operatorListHtml += `<div style="margin-top:4px;padding:4px 0;border-top:1px solid #353534;">
+              <span style="color:#FF6B00;font-weight:700;">● ${name}</span>
+              <div style="opacity:0.7;font-size:10px;">${clockInfo}</div>
+            </div>`;
+          }
+        } else if (members.length > 0) {
+          for (const m of members) {
+            const profile = operatorProfilesRef.current[m.user_id];
+            const name = profile?.display_name || m.user_id;
+            operatorListHtml += `<div style="margin-top:2px;opacity:0.7;">👤 ${name} (${m.role})</div>`;
+          }
+        } else {
+          operatorListHtml = '<div style="opacity:0.5;margin-top:2px;">No operators assigned</div>';
+        }
+
+        // Equipment info from bid snapshot (if available via custom data)
+        let equipmentHtml = '';
+        const bid = job?.bid_snapshot as any;
+        if (bid?.equipment?.length) {
+          equipmentHtml = `<div style="margin-top:6px;border-top:1px solid #353534;padding-top:4px;">
+            <div style="font-weight:700;color:#a98a7d;font-size:10px;letter-spacing:0.08em;">EQUIPMENT</div>
+            ${bid.equipment.map((eq: any) => `<div style="opacity:0.8;">🔧 ${eq.name || eq.type || 'Equipment'}</div>`).join('')}
+          </div>`;
+        }
+
+        if (!popupRef.current) popupRef.current = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '400px' });
         popupRef.current.setLngLat(e.lngLat).setHTML(`
-          <div style="font-family:ui-monospace,monospace;font-size:12px;color:#e5e2e1;">
-            <div style="font-weight:900;letter-spacing:0.08em;color:#13ff43;">${props?.name ?? 'Pasture'}</div>
-            <div style="margin-top:4px;opacity:0.85;">${props?.acreLabel ?? ''}</div>
-            <div style="margin-top:6px;opacity:0.85;">Cedar: ${props?.cedarCleared ?? 0}/${props?.cedarTotal ?? 0} cleared</div>
+          <div style="font-family:ui-monospace,monospace;font-size:12px;color:#e5e2e1;min-width:200px;">
+            <div style="font-weight:900;letter-spacing:0.08em;color:#13ff43;font-size:14px;">${props?.name ?? 'Pasture'}</div>
+            <div style="margin-top:2px;opacity:0.85;font-size:11px;">${job?.title ?? ''}</div>
+            <div style="margin-top:2px;opacity:0.7;">${props?.acreLabel ?? ''} · ${job?.status ?? ''}</div>
+
+            <div style="margin-top:8px;">
+              <div style="font-weight:700;color:#a98a7d;font-size:10px;letter-spacing:0.08em;">PROGRESS</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                <div style="flex:1;height:8px;background:#353534;border-radius:4px;overflow:hidden;">
+                  <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,#13ff43,#00cc33);border-radius:4px;"></div>
+                </div>
+                <span style="font-weight:900;color:#13ff43;">${progress}%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;opacity:0.7;margin-top:2px;">
+                <span>${cleared} cleared</span>
+                <span>${total} total</span>
+              </div>
+            </div>
+
+            <div style="margin-top:8px;">
+              <div style="font-weight:700;color:#a98a7d;font-size:10px;letter-spacing:0.08em;">OPERATORS ON SITE</div>
+              ${operatorListHtml}
+            </div>
+
+            ${equipmentHtml}
           </div>
         `).addTo(map);
       });
@@ -573,15 +678,67 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
         if (existing) { existing.setLngLat([op.lng, op.lat]); continue; }
 
         const el = document.createElement('div');
-        el.style.cssText = 'width:16px;height:16px;border-radius:999px;border:2px solid #fff;background:#FF6B00;box-shadow:0 0 12px rgba(255,107,0,0.6);cursor:pointer;';
+        el.style.cssText = 'width:18px;height:18px;border-radius:999px;border:2px solid #fff;background:#FF6B00;box-shadow:0 0 16px rgba(255,107,0,0.7);cursor:pointer;';
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat([op.lng, op.lat]).addTo(map);
-        el.addEventListener('click', () => {
-          new mapboxgl.Popup({ closeButton: true, closeOnClick: true }).setLngLat([op.lng, op.lat]).setHTML(`
-            <div style="font-family:ui-monospace,monospace;font-size:12px;color:#e5e2e1;">
-              <div style="font-weight:800;color:#FF6B00;">OPERATOR</div>
-              <div style="opacity:0.8;margin-top:4px;">${op.user_id}</div>
-              <div style="opacity:0.7;margin-top:4px;">Speed: ${op.speed_mps != null ? (op.speed_mps * 2.237).toFixed(1) + ' mph' : '—'}</div>
-              <div style="opacity:0.7;">Accuracy: ${op.accuracy_m != null ? Math.round(op.accuracy_m) + 'm' : '—'}</div>
+
+        // Capture jobId and user_id for the click handler closure
+        const capturedJobId = jobId;
+        const capturedUserId = op.user_id;
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const profile = operatorProfilesRef.current[capturedUserId];
+          const name = profile?.display_name || capturedUserId;
+          const email = profile?.email || '';
+
+          // Find active time entry for this operator
+          const allEntries = activeTimeEntriesRef.current;
+          let clockInStr = '';
+          let hoursStr = '';
+          for (const [, entries] of Object.entries(allEntries)) {
+            const te = entries.find(t => t.user_id === capturedUserId);
+            if (te) {
+              clockInStr = formatTime(te.clock_in);
+              hoursStr = hoursElapsed(te.clock_in);
+              break;
+            }
+          }
+
+          // Find job title
+          const job = jobsRef.current.find(j => j.id === capturedJobId);
+          const jobTitle = job?.title ?? capturedJobId;
+
+          // Get current position from ref for latest data
+          const latestOps = operatorsByJobRef.current[capturedJobId] ?? [];
+          const latestOp = latestOps.find(o => o.user_id === capturedUserId);
+          const speed = latestOp?.speed_mps ?? op.speed_mps;
+          const accuracy = latestOp?.accuracy_m ?? op.accuracy_m;
+          const lngLat: [number, number] = latestOp ? [latestOp.lng, latestOp.lat] : [op.lng, op.lat];
+
+          new mapboxgl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '320px' }).setLngLat(lngLat).setHTML(`
+            <div style="font-family:ui-monospace,monospace;font-size:12px;color:#e5e2e1;min-width:180px;">
+              <div style="font-weight:900;color:#FF6B00;font-size:14px;">🔶 ${name}</div>
+              ${email ? `<div style="opacity:0.6;font-size:10px;">${email}</div>` : ''}
+              <div style="margin-top:6px;opacity:0.85;">📍 Job: ${jobTitle}</div>
+              ${clockInStr ? `
+                <div style="margin-top:6px;border-top:1px solid #353534;padding-top:6px;">
+                  <div style="font-weight:700;color:#a98a7d;font-size:10px;letter-spacing:0.08em;">TIME ON MACHINE</div>
+                  <div style="font-size:20px;font-weight:900;color:#13ff43;">${hoursStr}h</div>
+                  <div style="opacity:0.7;font-size:10px;">Clocked in at ${clockInStr}</div>
+                </div>
+              ` : `
+                <div style="margin-top:6px;opacity:0.5;font-size:10px;">Not clocked in</div>
+              `}
+              <div style="margin-top:6px;border-top:1px solid #353534;padding-top:4px;display:flex;gap:12px;">
+                <div>
+                  <div style="opacity:0.5;font-size:9px;">SPEED</div>
+                  <div style="font-weight:700;">${speed != null ? (speed * 2.237).toFixed(1) + ' mph' : '—'}</div>
+                </div>
+                <div>
+                  <div style="opacity:0.5;font-size:9px;">ACCURACY</div>
+                  <div style="font-weight:700;">${accuracy != null ? Math.round(accuracy) + 'm' : '—'}</div>
+                </div>
+              </div>
             </div>
           `).addTo(map);
         });
@@ -616,6 +773,151 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.fitBounds(bounds, { padding: 80, maxZoom: 17, duration: 1400 });
     }
   }, [flyToJobId, mapLoaded, jobs]);
+
+  // ── Per-job progress bar markers on the map ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const markers = jobProgressMarkersRef.current;
+    const nextKeys = new Set<string>();
+
+    for (const job of jobs) {
+      const bid = job.bid_snapshot;
+      if (!bid?.pastures) continue;
+
+      // Compute centroid of the first pasture
+      let sumLng = 0, sumLat = 0, count = 0;
+      for (const p of bid.pastures) {
+        const ring = p.polygon?.geometry?.coordinates?.[0];
+        if (!ring || ring.length < 3) continue;
+        for (const c of ring) {
+          if (Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+            sumLng += c[0]; sumLat += c[1]; count++;
+          }
+        }
+      }
+      if (count === 0) continue;
+      const centroid: [number, number] = [sumLng / count, sumLat / count];
+
+      const total = job.cedar_total_cells ?? 0;
+      const cleared = job.cedar_cleared_cells ?? 0;
+      const p = pctVal(cleared, total);
+
+      nextKeys.add(job.id);
+      const existing = markers.get(job.id);
+      if (existing) {
+        // Update position and content
+        existing.setLngLat(centroid);
+        const el = existing.getElement();
+        const bar = el.querySelector('.prog-fill') as HTMLElement | null;
+        const pctLabel = el.querySelector('.prog-pct') as HTMLElement | null;
+        const countLabel = el.querySelector('.prog-count') as HTMLElement | null;
+        if (bar) bar.style.width = `${p}%`;
+        if (pctLabel) pctLabel.textContent = `${p}%`;
+        if (countLabel) countLabel.textContent = `${cleared}/${total}`;
+        continue;
+      }
+
+      // Create new progress bar marker
+      const el = document.createElement('div');
+      el.style.cssText = 'pointer-events:none;display:flex;flex-direction:column;align-items:center;width:140px;transform:translateY(-32px);';
+      el.innerHTML = `
+        <div style="font-family:ui-monospace,monospace;font-size:10px;font-weight:900;color:#13ff43;text-shadow:0 0 4px rgba(0,0,0,0.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${job.title ?? ''}</div>
+        <div style="width:100%;height:6px;background:#353534;border-radius:3px;overflow:hidden;margin-top:2px;border:1px solid rgba(255,255,255,0.15);">
+          <div class="prog-fill" style="height:100%;width:${p}%;background:linear-gradient(90deg,#13ff43,#00cc33);border-radius:3px;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;width:100%;margin-top:1px;">
+          <span class="prog-pct" style="font-family:ui-monospace,monospace;font-size:9px;font-weight:900;color:#13ff43;text-shadow:0 0 4px rgba(0,0,0,0.8);">${p}%</span>
+          <span class="prog-count" style="font-family:ui-monospace,monospace;font-size:9px;color:#a98a7d;text-shadow:0 0 4px rgba(0,0,0,0.8);">${cleared}/${total}</span>
+        </div>
+      `;
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat(centroid).addTo(map);
+      markers.set(job.id, marker);
+    }
+
+    // Remove old markers
+    for (const [key, marker] of markers.entries()) {
+      if (!nextKeys.has(key)) { marker.remove(); markers.delete(key); }
+    }
+  }, [jobs, mapLoaded]);
+
+  // ── Operate Mode: 3D terrain, 45° pitch, slow rotation, center on operator ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !operateMode) return;
+
+    // Enable 3D terrain
+    try {
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: 2.0 });
+      if (!map.getLayer('sky')) {
+        map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
+      }
+    } catch { /* terrain may already be set */ }
+
+    // Set initial 45° pitch
+    map.easeTo({ pitch: 45, duration: 1000 });
+
+    // Disable drag rotate and keyboard (only allow zoom and layer switching)
+    map.dragRotate.disable();
+    map.keyboard.disable();
+    map.touchPitch.disable();
+
+    // Start slow rotation
+    let alive = true;
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+    let frameId: number | null = null;
+
+    const startRotation = () => {
+      if (!alive || frameId) return;
+      const spin = () => {
+        if (!alive || !mapRef.current) return;
+        mapRef.current.setBearing(mapRef.current.getBearing() + 0.03);
+        frameId = requestAnimationFrame(spin);
+      };
+      frameId = requestAnimationFrame(spin);
+    };
+
+    const pause = () => {
+      if (frameId) { cancelAnimationFrame(frameId); frameId = null; }
+      if (resumeTimer) clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(startRotation, 3000);
+    };
+
+    // Start rotation after initial animation
+    const startDelay = setTimeout(startRotation, 1200);
+
+    map.on('wheel', pause);
+    map.on('touchstart', pause);
+
+    return () => {
+      alive = false;
+      clearTimeout(startDelay);
+      if (frameId) cancelAnimationFrame(frameId);
+      if (resumeTimer) clearTimeout(resumeTimer);
+      map.off('wheel', pause);
+      map.off('touchstart', pause);
+      // Restore controls
+      map.dragRotate.enable();
+      map.keyboard.enable();
+      map.touchPitch.enable();
+    };
+  }, [operateMode, mapLoaded]);
+
+  // ── Operate Mode: center map on the operator ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !operateMode || !operateModeUserId) return;
+
+    // Find the operator position
+    for (const [, ops] of Object.entries(operatorsByJob ?? {})) {
+      for (const op of ops ?? []) {
+        if (op.user_id === operateModeUserId && typeof op.lng === 'number' && typeof op.lat === 'number') {
+          map.easeTo({ center: [op.lng, op.lat], zoom: Math.max(map.getZoom(), 15), duration: 800 });
+          return;
+        }
+      }
+    }
+  }, [operateMode, operateModeUserId, operatorsByJob, mapLoaded]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

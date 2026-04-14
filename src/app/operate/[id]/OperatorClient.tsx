@@ -23,6 +23,11 @@ const OPERATOR_PUBLISH_MS = 2500;
 const TRAIL_MAP_MIN_INTERVAL_MS = 200;
 /** Avoid re-rendering the whole tree on every GPS tick (janks pinch/rotate). */
 const HUD_GPS_STATE_MIN_INTERVAL_MS = 350;
+/** Throttle auto-center easeTo so rapid GPS ticks don't interrupt in-progress animations. */
+const CENTER_MAP_MIN_INTERVAL_MS = 800;
+const CENTER_MAP_DURATION_MS = 600;
+/** Top bar height used for positioning elements below it (must match the bar's rendered height). */
+const TOP_BAR_HEIGHT = '3.5rem';
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
 
 const VEGETATION_COLORS: Record<string, string> = {
@@ -179,6 +184,39 @@ function formatDuration(ms: number): string {
   return `${sec}s`;
 }
 
+/** Build a GeoJSON FeatureCollection from all vegetation cells in the bid pastures,
+ *  tagging each cell with whether it has been cleared. */
+function buildClearedCellsGeoJSON(
+  pastures: Bid['pastures'],
+  clearedCellIds: Set<string>,
+): GeoJSON.FeatureCollection {
+  const classColor: Record<string, string> = {
+    cedar: '#ef4444',
+    oak: '#92400e',
+    mixed_brush: '#f97316',
+  };
+  const features: GeoJSON.Feature[] = [];
+  for (const p of pastures) {
+    if (!p.cedarAnalysis?.gridCells?.features) continue;
+    p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
+      const cls = f.properties?.classification as string | undefined;
+      if (!cls || !(cls in classColor)) return;
+      const cellId = `${p.id}:${idx}`;
+      features.push({
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: {
+          ...f.properties,
+          cellId,
+          cleared: clearedCellIds.has(cellId),
+          color: classColor[cls],
+        },
+      });
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
+
 export default function OperatorClient({ bidId }: { bidId: string }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -200,9 +238,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
+  const sharedEnabledRef = useRef(sharedEnabled);
+  sharedEnabledRef.current = sharedEnabled;
   const lastPublishRef = useRef<number>(0);
   const lastTrailMapDrawRef = useRef<number>(0);
   const lastHudGpsEmitRef = useRef<number>(0);
+  const lastCenterMapRef = useRef<number>(0);
   const supabaseSessionRef = useRef(false);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
@@ -432,7 +473,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
           center,
           zoom,
-          pitch: coarsePointer ? 0 : 45,
+          pitch: 45,
           antialias: true,
           preserveDrawingBuffer: true,
           failIfMajorPerformanceCaveat: false,
@@ -608,6 +649,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           map.addLayer({ id: 'pastures-fill', type: 'fill', source: 'pastures', paint: { 'fill-color': '#00ff41', 'fill-opacity': 0.05 } });
           map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
           map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
+
+          // Cedar analysis grid cells — uncleared shown as semi-transparent fill, cleared shown green.
+          try {
+            const initialCedarData = buildClearedCellsGeoJSON(bid.pastures, stateRef.current.clearedCellIds);
+            map.addSource('cedar-cells', { type: 'geojson', data: initialCedarData });
+            map.addLayer({
+              id: 'cedar-cells-uncleared',
+              type: 'fill',
+              source: 'cedar-cells',
+              filter: ['==', ['get', 'cleared'], false],
+              paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.3 },
+            });
+            map.addLayer({
+              id: 'cedar-cells-cleared',
+              type: 'fill',
+              source: 'cedar-cells',
+              filter: ['==', ['get', 'cleared'], true],
+              paint: { 'fill-color': '#13ff43', 'fill-opacity': 0.5 },
+            });
+          } catch {
+            /* optional — only present if cedar analysis has been run */
+          }
 
           // Mapbox-native 3D trees only (no grid cell blocks — clearing still uses analysis grid in memory).
           try {
@@ -896,7 +959,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
   // Slow bearing drift only in HOLO mode — constant spin in “normal” operate fights pinch/rotate.
   useEffect(() => {
-    if (!mapReady || !layers.hologram) {
+    if (!mapReady) {
       if (holoRotationRef.current) {
         cancelAnimationFrame(holoRotationRef.current);
         holoRotationRef.current = null;
@@ -904,7 +967,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
     const spin = () => {
-      if (!mapRef.current || !layersRef.current.hologram) return;
+      if (!mapRef.current) return;
       mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
       holoRotationRef.current = requestAnimationFrame(spin);
     };
@@ -915,12 +978,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         holoRotationRef.current = null;
       }
     };
-  }, [mapReady, layers.hologram]);
+  }, [mapReady]);
 
-  // Pause HOLO spin on gesture; resume after idle
+  // Pause spin on gesture; resume after idle
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !mapReady || !layers.hologram) return;
+    if (!map || !map.isStyleLoaded() || !mapReady) return;
 
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -931,9 +994,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
       if (resumeTimer) clearTimeout(resumeTimer);
       resumeTimer = setTimeout(() => {
-        if (!mapRef.current || !layersRef.current.hologram) return;
+        if (!mapRef.current) return;
         const spin = () => {
-          if (!mapRef.current || !layersRef.current.hologram) return;
+          if (!mapRef.current) return;
           mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
           holoRotationRef.current = requestAnimationFrame(spin);
         };
@@ -951,7 +1014,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.off('wheel', pause);
       if (resumeTimer) clearTimeout(resumeTimer);
     };
-  }, [mapReady, layers.hologram]);
+  }, [mapReady]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -968,9 +1031,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     };
   }, [state.bid]);
 
-  // Process GPS position — check cedar cells for clearing
-  /** Grid cell map layers removed; GPS clearing still uses cedar analysis in memory. */
-  const updateCedarSource = useCallback(() => {}, []);
+  // Process GPS position — check cedar cells for clearing and update map overlay.
+  /** Cedar cells are tracked in memory and visualized via the 'cedar-cells' Mapbox source. */
+  const updateCedarSource = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const bid = stateRef.current.bid;
+    if (!bid) return;
+    const source = map.getSource('cedar-cells') as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData(buildClearedCellsGeoJSON(bid.pastures, stateRef.current.clearedCellIds));
+  }, []);
 
   const processPosition = useCallback((lng: number, lat: number) => {
     const cells = cedarCellsRef.current;
@@ -1052,7 +1123,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         body: JSON.stringify({ ...posData, jobId, trailPoint: [lng, lat] }),
       }).catch(() => { /* best-effort */ });
 
-      // Push to Supabase when signed in so scout monitor realtime works (shared progress is separate).
+      // Push to Supabase when signed in so live monitor realtime works (shared progress is separate).
       if (supabaseSessionRef.current) {
         void fetchApiAuthed(`/api/jobs/${jobId}/operator-positions`, {
           method: 'POST',
@@ -1140,6 +1211,20 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(mapRef.current);
         }
 
+        // Auto-center map on operator position (throttled to avoid interrupting in-progress animations)
+        const centerNow = Date.now();
+        if (
+          mapRef.current &&
+          mapRef.current.isStyleLoaded() &&
+          centerNow - lastCenterMapRef.current >= CENTER_MAP_MIN_INTERVAL_MS
+        ) {
+          lastCenterMapRef.current = centerNow;
+          mapRef.current.easeTo({
+            center: [lng, lat],
+            duration: CENTER_MAP_DURATION_MS,
+          });
+        }
+
         processPosition(lng, lat);
       },
       (err) => {
@@ -1190,6 +1275,73 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     };
   }, []);
 
+  // Keep the cedar-cells map source in sync whenever cleared cells change.
+  useEffect(() => {
+    updateCedarSource();
+  }, [state.clearedCellIds, updateCedarSource]);
+
+  // Tap-to-clear: operator can tap an uncleared cedar cell on the map to mark it cleared.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const handleCellClick = (e: mapboxgl.MapLayerMouseEvent) => {
+      const props = e.features?.[0]?.properties;
+      if (!props?.cellId) return;
+      const cellId = props.cellId as string;
+      if (stateRef.current.clearedCellIds.has(cellId)) return;
+      const ts = Date.now();
+      setState(prev => {
+        const nextIds = new Set(prev.clearedCellIds);
+        nextIds.add(cellId);
+        const colonIdx = cellId.indexOf(':');
+        if (colonIdx < 0) return prev; // malformed cellId, skip
+        const pastureId = cellId.slice(0, colonIdx);
+        const cellIndex = parseInt(cellId.slice(colonIdx + 1), 10);
+        if (!pastureId || Number.isNaN(cellIndex)) return prev; // guard against bad data
+        const nextCells = [
+          ...prev.clearedCells,
+          { cellIndex, pastureId, timestamp: ts },
+        ];
+        saveOperatorSession(bidId, Array.from(nextIds), nextCells);
+        return { ...prev, clearedCellIds: nextIds, clearedCells: nextCells };
+      });
+
+      // Best-effort: push clearing event so live monitor / other devices see progress.
+      // Failures are intentionally ignored — field connections are unreliable.
+      if (sharedEnabledRef.current) {
+        const jobId = jobIdFromBidId(bidId);
+        void fetch(`/api/jobs/${jobId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'operator_cell_cleared', data: { cellId, timestamp: ts } }),
+        }).then((res) => {
+          if (res.status === 401) {
+            setSharedEnabled(false);
+            setSharedStatus('unauth');
+          }
+        }).catch(() => { /* best-effort — ignore network failures */ });
+      }
+    };
+
+    const handleMouseEnter = () => { map.getCanvas().style.cursor = 'pointer'; };
+    const handleMouseLeave = () => { map.getCanvas().style.cursor = ''; };
+
+    try {
+      map.on('click', 'cedar-cells-uncleared', handleCellClick);
+      map.on('mouseenter', 'cedar-cells-uncleared', handleMouseEnter);
+      map.on('mouseleave', 'cedar-cells-uncleared', handleMouseLeave);
+    } catch { /* ignore */ }
+
+    return () => {
+      try {
+        map.off('click', 'cedar-cells-uncleared', handleCellClick);
+        map.off('mouseenter', 'cedar-cells-uncleared', handleMouseEnter);
+        map.off('mouseleave', 'cedar-cells-uncleared', handleMouseLeave);
+      } catch { /* ignore */ }
+    };
+  }, [mapReady, bidId]);
+
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const elapsedMs = Date.now() - state.sessionStart;
   const bid = state.bid;
@@ -1238,7 +1390,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* Map error banner — does not cover the header or block the whole map */}
       {bid && mapError && (
-        <div className="absolute top-14 left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]">
+        <div className="absolute left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]" style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}>
           <div className="text-[#FF6B00] text-sm font-black uppercase tracking-widest">MAP_ISSUE</div>
           <div className="text-[10px] font-mono text-[#a98a7d] break-words mt-1">{mapError}</div>
           <div className="text-[10px] text-[#a98a7d] mt-2">
@@ -1265,7 +1417,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       )}
 
       {/* Top bar — pointer-events-none on strip so the map receives pan/pinch in the gaps; controls opt in */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 py-2 pointer-events-none bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40">
+      <div
+        className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 pb-2 pointer-events-none bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingLeft: 'max(0.5rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.5rem, env(safe-area-inset-right, 0px))' }}
+      >
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 pointer-events-auto">
           <Link href={bid ? `/bid/${bidId}` : '/bids'} className="text-[#00ff41] font-black text-xs sm:text-sm tracking-widest hover:text-white transition-colors shrink-0">
             ← CEDAR_HACK
@@ -1308,7 +1463,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* HUD panel — pass-through outside the card so the map isn’t blocked on phones */}
       {bid && hudOpen && (
-        <div className="absolute top-14 left-3 z-10 pointer-events-none">
+        <div className="absolute left-3 z-10 pointer-events-none" style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}>
           <div className="holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3 pointer-events-auto">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Field HUD</span>
@@ -1389,7 +1544,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       {bid && !hudOpen && (
         <button
           onClick={() => setHudOpen(true)}
-          className="absolute top-14 left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+          className="absolute left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+          style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}
         >
           HUD ({stats.pct}%)
         </button>
@@ -1397,7 +1553,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* Bottom controls */}
       {bid && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
+        <div className="absolute left-1/2 -translate-x-1/2 z-10 flex items-center gap-2" style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
           <button
             onClick={toggleGPS}
             className={`px-5 py-3 rounded-lg font-bold text-sm uppercase tracking-widest transition-all ${

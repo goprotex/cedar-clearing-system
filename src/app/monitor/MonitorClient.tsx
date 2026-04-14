@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { mergeJobsById, loadLocalStorageJobs, loadJobsFromOperatorStorage, type ActiveJobSummary } from '@/lib/active-jobs';
 import { fetchApiAuthed } from '@/lib/auth-client';
@@ -9,6 +9,10 @@ import type { MonitorTelemetryRow } from '@/types/monitor-bootstrap';
 import type { LayerKey } from './MonitorMap';
 
 type BootstrapJob = ActiveJobSummary;
+
+export type OperatorProfile = { display_name: string; email: string };
+export type ActiveTimeEntry = { user_id: string; clock_in: string; job_id: string };
+export type JobMember = { user_id: string; role: string };
 
 type OperatorPosition = {
   user_id: string;
@@ -100,6 +104,11 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   const [trailsByJob, setTrailsByJob] = useState<Record<string, [number, number][]>>({});
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const [flyToJobId, setFlyToJobId] = useState<string | null>(null);
+  const [operatorProfiles, setOperatorProfiles] = useState<Record<string, OperatorProfile>>({});
+  const [activeTimeEntries, setActiveTimeEntries] = useState<Record<string, ActiveTimeEntry[]>>({});
+  const [membersByJob, setMembersByJob] = useState<Record<string, JobMember[]>>({});
+  const [operateMode, setOperateMode] = useState(false);
+  const [operateModeUserId, setOperateModeUserId] = useState<string | null>(null);
 
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -153,6 +162,9 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           clearedByJob: Record<string, string[]>;
           operatorsByJob: Record<string, OperatorPosition[]>;
           telemetryByJob?: Record<string, MonitorTelemetryRow[]>;
+          operatorProfiles?: Record<string, OperatorProfile>;
+          activeTimeEntries?: Record<string, ActiveTimeEntry[]>;
+          membersByJob?: Record<string, JobMember[]>;
           scope?: 'membership' | 'company';
         };
         if (cancelled) return;
@@ -171,6 +183,9 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
         setOperatorsByJob(data.operatorsByJob ?? {});
         setTelemetryByJob(data.telemetryByJob ?? {});
         setBootstrapScope(data.scope ?? 'membership');
+        setOperatorProfiles(data.operatorProfiles ?? {});
+        setActiveTimeEntries(data.activeTimeEntries ?? {});
+        setMembersByJob(data.membersByJob ?? {});
 
         const mergedIds = new Set(remoteJobs.map((j) => j.id));
         remoteJobs = [...remoteJobs, ...loadJobsFromOperatorStorage(mergedIds)];
@@ -442,12 +457,72 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     { key: 'hologram', label: '🔮 Hologram' },
   ];
 
+  // Clock-in handler: triggers operate mode
+  const [clockingIn, setClockingIn] = useState(false);
+  const handleClockIn = useCallback(async (jobId: string) => {
+    try {
+      setClockingIn(true);
+      // Try to clock in via API
+      const res = await fetchApiAuthed(`/api/jobs/${jobId}/time-entries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { timeEntry?: { operator_id?: string; clock_in?: string } };
+        const userId = data.timeEntry?.operator_id;
+        if (userId) {
+          setOperateModeUserId(userId);
+          setOperateMode(true);
+          setFullscreen(true);
+          setFlyToJobId(jobId);
+          // Update activeTimeEntries locally
+          if (data.timeEntry?.clock_in) {
+            setActiveTimeEntries(prev => ({
+              ...prev,
+              [jobId]: [...(prev[jobId] ?? []), { user_id: userId, clock_in: data.timeEntry!.clock_in!, job_id: jobId }],
+            }));
+          }
+        }
+      } else {
+        const errData = await res.json().catch(() => ({ error: `Clock-in failed (status: ${res.status})` })) as { error?: string };
+        // If already clocked in (409), still enter operate mode
+        if (res.status === 409) {
+          // Find existing time entry for this user
+          const entries = activeTimeEntries[jobId] ?? [];
+          const existingUserId = entries[0]?.user_id;
+          if (existingUserId) {
+            setOperateModeUserId(existingUserId);
+          }
+          setOperateMode(true);
+          setFullscreen(true);
+          setFlyToJobId(jobId);
+        } else {
+          alert(errData.error || 'Failed to clock in');
+        }
+      }
+    } catch (e) {
+      // Fallback: enter operate mode locally without API
+      setOperateMode(true);
+      setFullscreen(true);
+      setFlyToJobId(jobId);
+    } finally {
+      setClockingIn(false);
+    }
+  }, [activeTimeEntries]);
+
+  const handleExitOperateMode = useCallback(() => {
+    setOperateMode(false);
+    setOperateModeUserId(null);
+    setFullscreen(false);
+  }, []);
+
   return (
     <div className={`bg-[#131313] text-[#e5e2e1] ${fullscreen ? 'fixed inset-0 z-[60] overflow-hidden' : 'min-h-screen'}`}>
       {!fullscreen && (
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-6 min-w-0">
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">SCOUT_MONITOR</h1>
+            <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">LIVE_MONITOR</h1>
             <p className="text-[#ffb693] text-[10px] sm:text-xs font-mono break-words">GLOBAL OPS // LIVE JOBS // WEATHER + HOLOGRAM</p>
             {bootstrapScope === 'company' && (
               <p className="text-[9px] font-mono text-[#13ff43]/80 mt-1">COMPANY_SCOPE — ALL COMPANY JOBS</p>
@@ -483,6 +558,11 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               cedarOn={layers.cedarAI}
               layers={layers}
               flyToJobId={flyToJobId}
+              operatorProfiles={operatorProfiles}
+              activeTimeEntries={activeTimeEntries}
+              membersByJob={membersByJob}
+              operateMode={operateMode}
+              operateModeUserId={operateModeUserId}
             />
           ) : (
             <div className="w-full h-full min-h-[min(70vh,720px)] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d] px-4">
@@ -537,19 +617,32 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
             )}
           </div>
 
-          {/* Fullscreen TV overlay */}
+          {/* Fullscreen TV / Operate Mode overlay */}
           {fullscreen && (
             <div className="absolute top-[max(0.75rem,env(safe-area-inset-top,0px))] left-[max(0.75rem,env(safe-area-inset-left,0px))] z-20 holo-panel backdrop-blur-sm rounded-lg px-3 sm:px-4 py-2 sm:py-3 space-y-2 max-w-[calc(100vw-2rem)]">
-              <div className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Office Monitor</div>
+              <div className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">
+                {operateMode ? 'OPERATE MODE' : 'Live Monitor'}
+              </div>
+              {operateMode && operateModeUserId && (
+                <div className="text-[10px] font-mono text-[#FF6B00]">
+                  🔶 {operatorProfiles[operateModeUserId]?.display_name || operateModeUserId}
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <div className="text-xs font-mono text-[#a98a7d]">ALL_JOBS</div>
                 <div className="text-xl font-black text-[#13ff43] tabular-nums">{totals.pct}%</div>
                 <div className="text-[10px] font-mono text-[#a98a7d] tabular-nums">{totals.cleared}/{totals.total}</div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setFullscreen(false)} className="px-3 py-2 rounded bg-[#FF6B00] text-black text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
-                  EXIT_FULL
-                </button>
+                {operateMode ? (
+                  <button onClick={handleExitOperateMode} className="px-3 py-2 rounded bg-red-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-500 transition-all">
+                    EXIT_OPERATE
+                  </button>
+                ) : (
+                  <button onClick={() => setFullscreen(false)} className="px-3 py-2 rounded bg-[#FF6B00] text-black text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
+                    EXIT_FULL
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -566,6 +659,28 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               </button>
             </div>
           </div>
+
+          {/* Clock-in / Operate Mode section */}
+          {jobs.length > 0 && (
+            <div className="border-2 border-[#FF6B00]/50 p-4 space-y-3">
+              <div className="text-[10px] text-[#FF6B00] font-bold uppercase tracking-widest">OPERATE MODE</div>
+              <p className="text-[10px] font-mono text-[#a98a7d]">Clock in to enter operate mode — map will center on you in 3D terrain with slow rotation.</p>
+              <div className="space-y-2">
+                {jobs.map((j) => (
+                  <div key={`op-${j.id}`} className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono text-[#e5e2e1] truncate flex-1">{j.title}</span>
+                    <button
+                      disabled={clockingIn}
+                      onClick={() => handleClockIn(j.id)}
+                      className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-black transition-all disabled:opacity-50"
+                    >
+                      {clockingIn ? '…' : 'CLOCK IN'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="border-2 border-[#353534] p-4">
             <div className="flex items-center justify-between mb-2">

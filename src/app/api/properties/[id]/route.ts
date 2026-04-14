@@ -4,7 +4,7 @@ import { getUserCompanyId } from '@/lib/user-company';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const ctx = await getUserCompanyId(supabase, req);
   if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const ctx = await getUserCompanyId(supabase, req);
   if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -119,7 +119,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
   const ctx = await getUserCompanyId(supabase, req);
   if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

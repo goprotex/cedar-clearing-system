@@ -4,11 +4,11 @@ import { canAccessJob } from '@/lib/job-access';
 import { getProfileCompanyContext, isCompanyAdminRole } from '@/lib/company-admin';
 import { jobBidCompanyMatches } from '@/lib/job-company-access';
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
-  const { data: auth } = await getUserFromRequest(supabase);
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -36,11 +36,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   return NextResponse.json({ job, events: events ?? [] });
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
-  const { data: auth } = await getUserFromRequest(supabase);
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -58,7 +58,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const isJobOwner = membership?.role === 'owner';
 
   if (!isJobOwner) {
-    // Company admin check scoped to this job's company (mirrors canAccessJob logic)
+    // Company admin check scoped to this job's company (mirrors RLS policy / canAccessJob)
     const ctx = await getProfileCompanyContext(supabase, userId);
     if (!ctx?.companyId || !isCompanyAdminRole(ctx.role)) {
       return NextResponse.json(

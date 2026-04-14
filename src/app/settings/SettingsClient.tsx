@@ -432,7 +432,7 @@ export default function SettingsClient() {
                 className="mt-1 accent-[#FF6B00]"
               />
               <span>
-                <span className="text-sm text-[#e5e2e1] block">Open scout monitor in fullscreen TV layout</span>
+                <span className="text-sm text-[#e5e2e1] block">Open live monitor in fullscreen TV layout</span>
                 <span className="text-[10px] text-[#5a4136] font-mono">Applies on next visit to /monitor</span>
               </span>
             </label>
