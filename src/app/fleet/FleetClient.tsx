@@ -735,11 +735,21 @@ export default function FleetClient() {
                         </div>
                         {/* Thumbnail to the right */}
                         <div
+                          role="button"
+                          tabIndex={0}
                           className="w-20 h-20 shrink-0 border border-[#353534] bg-[#1c1b1b] flex items-center justify-center overflow-hidden cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedRowId(u.rowId);
                             setDetailTab('notes');
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedRowId(u.rowId);
+                              setDetailTab('notes');
+                            }
                           }}
                           title={thumbUrl ? 'Click to manage photos' : 'Click to add photo'}
                         >
@@ -759,6 +769,7 @@ export default function FleetClient() {
             {selected && (
               <MachineDetailPanel
                 rowId={selected.rowId}
+                companyId={companyId}
                 machine={selected.machine}
                 jobOptions={jobOptions}
                 selectedJobSelectValue={selectedJobSelectValue}
@@ -780,6 +791,7 @@ export default function FleetClient() {
 
 function MachineDetailPanel({
   rowId,
+  companyId,
   machine: m,
   jobOptions,
   selectedJobSelectValue,
@@ -791,6 +803,7 @@ function MachineDetailPanel({
   onRemove,
 }: {
   rowId: string;
+  companyId: string | null;
   machine: Machine;
   jobOptions: ActiveJobSummary[];
   selectedJobSelectValue: string;
@@ -911,7 +924,8 @@ function MachineDetailPanel({
         const { data: { session: s } } = await supabase.auth.getSession();
         if (s?.user) {
           const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-          const path = `${m.id}/${Date.now()}-${uuidv4().slice(0, 8)}.${ext}`;
+          const pathPrefix = companyId || 'unknown';
+          const path = `${pathPrefix}/${m.id}/${Date.now()}-${uuidv4().slice(0, 8)}.${ext}`;
           const { error: upErr } = await supabase.storage.from('equipment-photos').upload(path, file, {
             upsert: false,
             contentType: file.type || 'image/jpeg',
@@ -983,7 +997,7 @@ function MachineDetailPanel({
     const fuel = parseFloat(checkoutForm.fuelLevel);
     const record: CheckoutRecord = {
       id: uuidv4(),
-      checkedOutBy: '', // Will be set server-side in future; for now display name
+      checkedOutBy: '', // Populated by authenticated user ID when telematics API is wired
       checkedOutByName: checkoutForm.operatorName || 'Unknown',
       jobId: checkoutForm.jobId,
       checkoutAt: new Date().toISOString(),
@@ -1190,7 +1204,12 @@ function MachineDetailPanel({
                 placeholder="e.g. 4500"
               />
               {m.nextServiceHours > 0 && m.hours >= m.nextServiceHours - 50 && (
-                <div className="text-red-400 text-[10px] font-bold mt-1">⚠ SERVICE DUE — {m.nextServiceHours - m.hours} hrs remaining</div>
+                <div className="text-red-400 text-[10px] font-bold mt-1">
+                  {m.hours >= m.nextServiceHours
+                    ? `⚠ SERVICE OVERDUE — ${Math.round(m.hours - m.nextServiceHours)} hrs past due`
+                    : `⚠ SERVICE DUE SOON — ${Math.round(m.nextServiceHours - m.hours)} hrs remaining`
+                  }
+                </div>
               )}
             </div>
 

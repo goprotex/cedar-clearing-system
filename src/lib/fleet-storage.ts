@@ -145,7 +145,7 @@ function migrateLegacyMachine(m: LegacyMachine): Machine {
 function inferCategory(type: string): EquipmentCategory {
   const t = (type || '').toLowerCase();
   if (t.includes('barko') || t.includes('mulcher')) return 'barko';
-  if (t.includes('skid') && t.includes('attach')) return 'skid_steer_attachment';
+  if (t.includes('skid') && (t.includes('attachment') || t.includes('head') || t.includes('grapple bucket'))) return 'skid_steer_attachment';
   if (t.includes('skid')) return 'skid_steer';
   if (t.includes('truck') || t.includes('grapple')) return 'truck';
   if (t.includes('trailer')) return 'trailer';

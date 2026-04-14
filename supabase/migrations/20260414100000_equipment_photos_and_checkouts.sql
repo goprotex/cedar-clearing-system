@@ -22,7 +22,7 @@ create policy "equip_photos_select_public"
   to public
   using (bucket_id = 'equipment-photos');
 
--- Authenticated users in a company can upload to their company folder
+-- Authenticated users in a company can upload to their company folder (path prefix = company_id)
 drop policy if exists "equip_photos_insert_company" on storage.objects;
 create policy "equip_photos_insert_company"
   on storage.objects for insert
@@ -30,9 +30,10 @@ create policy "equip_photos_insert_company"
   with check (
     bucket_id = 'equipment-photos'
     and public.user_company_id() is not null
+    and (storage.foldername(name))[1] = public.user_company_id()::text
   );
 
--- Authenticated users in a company can update photos
+-- Authenticated users in a company can update their company's photos
 drop policy if exists "equip_photos_update_company" on storage.objects;
 create policy "equip_photos_update_company"
   on storage.objects for update
@@ -40,10 +41,12 @@ create policy "equip_photos_update_company"
   using (
     bucket_id = 'equipment-photos'
     and public.user_company_id() is not null
+    and (storage.foldername(name))[1] = public.user_company_id()::text
   )
   with check (
     bucket_id = 'equipment-photos'
     and public.user_company_id() is not null
+    and (storage.foldername(name))[1] = public.user_company_id()::text
   );
 
 -- Authenticated users can delete their company's photos
@@ -54,6 +57,7 @@ create policy "equip_photos_delete_company"
   using (
     bucket_id = 'equipment-photos'
     and public.user_company_id() is not null
+    and (storage.foldername(name))[1] = public.user_company_id()::text
   );
 
 -- ─── Equipment Checkouts ───────────────────────────────────────────────────
