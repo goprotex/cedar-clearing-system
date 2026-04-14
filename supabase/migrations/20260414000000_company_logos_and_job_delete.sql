@@ -7,7 +7,7 @@ values (
   'company-logos',
   true,
   5242880,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']::text[]
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']::text[]
 )
 on conflict (id) do update set
   public = excluded.public,
