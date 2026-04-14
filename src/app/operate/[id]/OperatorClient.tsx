@@ -165,6 +165,19 @@ function saveOperatorTrailToStorage(jobId: string, coords: [number, number][]) {
   }
 }
 
+/** Ray-casting point-in-polygon: returns true if (lng, lat) is inside the ring. */
+function pointInPolygon(lng: number, lat: number, ring: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 function haversineDistM(lng1: number, lat1: number, lng2: number, lat2: number): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -235,6 +248,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const preHoloLayersRef = useRef<Pick<Record<OperateLayerKey, boolean>, 'naip' | 'naipCIR' | 'naipNDVI'> | null>(null);
   const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
   const holoRotationRef = useRef<number | null>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const autoRotateRef = useRef(autoRotate);
+  autoRotateRef.current = autoRotate;
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
@@ -697,7 +713,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             ? trailCoordsRef.current
             : [];
           map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: trailData }, properties: {} } });
-          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.8 } });
+          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 14, 2, 17, 4, 18, 7, 19, 14, 22, 80], 'line-opacity': 0.8 } });
         } catch (err) {
           setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
           return;
@@ -957,64 +973,47 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     }
   }, [layers, mapReady, state.bid]);
 
-  // Slow bearing drift only in HOLO mode — constant spin in “normal” operate fights pinch/rotate.
-  useEffect(() => {
-    if (!mapReady) {
-      if (holoRotationRef.current) {
-        cancelAnimationFrame(holoRotationRef.current);
-        holoRotationRef.current = null;
-      }
-      return;
-    }
-    const spin = () => {
-      if (!mapRef.current) return;
-      mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
-      holoRotationRef.current = requestAnimationFrame(spin);
-    };
-    holoRotationRef.current = requestAnimationFrame(spin);
-    return () => {
-      if (holoRotationRef.current) {
-        cancelAnimationFrame(holoRotationRef.current);
-        holoRotationRef.current = null;
-      }
-    };
-  }, [mapReady]);
-
-  // Pause spin on gesture; resume after idle
+  // Auto-rotation: only spin when autoRotate is enabled. Disables zoom/pan when active.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !mapReady) return;
+    if (!map || !mapReady) return;
 
-    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const pause = () => {
+    if (!autoRotate) {
       if (holoRotationRef.current) {
         cancelAnimationFrame(holoRotationRef.current);
         holoRotationRef.current = null;
       }
-      if (resumeTimer) clearTimeout(resumeTimer);
-      resumeTimer = setTimeout(() => {
-        if (!mapRef.current) return;
-        const spin = () => {
-          if (!mapRef.current) return;
-          mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
-          holoRotationRef.current = requestAnimationFrame(spin);
-        };
+      // Re-enable interactions when rotation is off
+      try { map.scrollZoom.enable(); } catch { /* ignore */ }
+      try { map.dragPan.enable(); } catch { /* ignore */ }
+      try { map.touchZoomRotate.enable(); } catch { /* ignore */ }
+      return;
+    }
+
+    // Disable pan/zoom while auto-rotating
+    try { map.scrollZoom.disable(); } catch { /* ignore */ }
+    try { map.dragPan.disable(); } catch { /* ignore */ }
+    try { map.touchZoomRotate.disable(); } catch { /* ignore */ }
+
+    const startSpin = () => {
+      if (!autoRotateRef.current || holoRotationRef.current) return;
+      const spin = () => {
+        if (!mapRef.current || !autoRotateRef.current) return;
+        mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
         holoRotationRef.current = requestAnimationFrame(spin);
-      }, 3000);
+      };
+      holoRotationRef.current = requestAnimationFrame(spin);
     };
 
-    map.on('mousedown', pause);
-    map.on('touchstart', pause);
-    map.on('wheel', pause);
+    startSpin();
 
     return () => {
-      map.off('mousedown', pause);
-      map.off('touchstart', pause);
-      map.off('wheel', pause);
-      if (resumeTimer) clearTimeout(resumeTimer);
+      if (holoRotationRef.current) {
+        cancelAnimationFrame(holoRotationRef.current);
+        holoRotationRef.current = null;
+      }
     };
-  }, [mapReady]);
+  }, [autoRotate, mapReady]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -1041,6 +1040,38 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     const source = map.getSource('cedar-cells') as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
     source.setData(buildClearedCellsGeoJSON(bid.pastures, stateRef.current.clearedCellIds));
+  }, []);
+
+  /** Rebuild 3D tree layer excluding cleared cells so trees disappear after mulching. */
+  const updateTreeLayer3d = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const bid = stateRef.current.bid;
+    if (!bid) return;
+    const clearedCellIds = stateRef.current.clearedCellIds;
+
+    const filteredPastures = bid.pastures.map(p => {
+      const features = p.cedarAnalysis?.gridCells?.features ?? [];
+      const kept = features.filter((_, idx) => !clearedCellIds.has(`${p.id}:${idx}`));
+      return {
+        ...p,
+        cedarAnalysis: p.cedarAnalysis
+          ? { ...p.cedarAnalysis, gridCells: { ...p.cedarAnalysis.gridCells, features: kept } }
+          : null,
+      };
+    });
+
+    const treeList = extractTreesFromAnalysis(filteredPastures as Parameters<typeof extractTreesFromAnalysis>[0]);
+
+    const src3d = map.getSource('operate-trees-3d') as mapboxgl.GeoJSONSource | undefined;
+    if (src3d) {
+      const treeFc = treeFeaturesForMapboxExtrusion(treeList, { maxTrees: 2400, circleSteps: 12 });
+      src3d.setData(treeFc);
+    }
+
+    if (treeLayerRef.current) {
+      treeLayerRef.current.updateTrees(treeList);
+    }
   }, []);
 
   const processPosition = useCallback((lng: number, lat: number) => {
@@ -1071,6 +1102,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       });
 
       updateCedarSource();
+      updateTreeLayer3d();
 
       // Best-effort: if shared progress is enabled, append events so other users/devices see progress.
       if (sharedEnabled) {
@@ -1133,7 +1165,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
     }
 
-    trailCoordsRef.current.push([lng, lat]);
+    // Only append trail point when the operator is inside a pasture polygon
+    const bid = stateRef.current.bid;
+    const inPasture = bid?.pastures.some(p => {
+      const ring = p.polygon?.geometry?.coordinates?.[0];
+      if (!ring || ring.length < 3) return false;
+      return pointInPolygon(lng, lat, ring as [number, number][]);
+    }) ?? false;
+
+    if (inPasture) {
+      trailCoordsRef.current.push([lng, lat]);
+    }
 
     const jobId = jobIdFromBidId(bidId);
     saveOperatorTrailToStorage(jobId, trailCoordsRef.current);
@@ -1156,7 +1198,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         });
       }
     }
-  }, [bidId, updateCedarSource, sharedEnabled]);
+  }, [bidId, updateCedarSource, updateTreeLayer3d, sharedEnabled]);
 
   // Start/stop GPS
   const toggleGPS = useCallback(() => {
@@ -1280,6 +1322,11 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     updateCedarSource();
   }, [state.clearedCellIds, updateCedarSource]);
 
+  // Keep 3D tree layer in sync whenever cleared cells change (trees disappear after mulching).
+  useEffect(() => {
+    updateTreeLayer3d();
+  }, [state.clearedCellIds, updateTreeLayer3d]);
+
   // Tap-to-clear: operator can tap an uncleared cedar cell on the map to mark it cleared.
   useEffect(() => {
     const map = mapRef.current;
@@ -1306,6 +1353,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         saveOperatorSession(bidId, Array.from(nextIds), nextCells);
         return { ...prev, clearedCellIds: nextIds, clearedCells: nextCells };
       });
+
+      updateCedarSource();
+      updateTreeLayer3d();
 
       // Best-effort: push clearing event so live monitor / other devices see progress.
       // Failures are intentionally ignored — field connections are unreliable.
@@ -1340,7 +1390,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         map.off('mouseleave', 'cedar-cells-uncleared', handleMouseLeave);
       } catch { /* ignore */ }
     };
-  }, [mapReady, bidId]);
+  }, [mapReady, bidId, updateCedarSource, updateTreeLayer3d]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const elapsedMs = Date.now() - state.sessionStart;
@@ -1458,6 +1508,19 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           <span className="text-[9px] sm:text-[10px] font-mono text-[#a98a7d] hidden sm:inline">
             {state.gpsActive ? 'GPS' : 'NO_GPS'}
           </span>
+          <button
+            type="button"
+            disabled={!mapReady}
+            onClick={() => setAutoRotate(v => !v)}
+            className={`text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+              autoRotate
+                ? 'text-[#FF6B00] border-[#FF6B00] bg-[#1a0800]/90'
+                : 'text-[#a98a7d] border-green-900/40 hover:text-white'
+            }`}
+            title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled) — click to stop' : 'Start auto-rotation (disables zoom/pan)'}
+          >
+            {autoRotate ? '🔄 ROT_ON' : '🔄 ROT_OFF'}
+          </button>
         </div>
       </div>
 
