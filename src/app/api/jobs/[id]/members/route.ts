@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { canManageJobMembers } from '@/lib/job-members-admin';
 
 type Role = 'owner' | 'worker' | 'viewer';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -63,9 +63,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

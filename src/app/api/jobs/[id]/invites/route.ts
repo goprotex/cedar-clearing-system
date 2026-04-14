@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { generateInviteToken, hashInviteToken } from '@/lib/invite-token';
 import { canManageJobMembers } from '@/lib/job-members-admin';
 
@@ -14,9 +14,9 @@ function isValidEmail(email: string): boolean {
 /** Owner creates an invite; returns one-time token for the share link. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -69,9 +69,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 /** Owner cancels a pending invite */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient(req);
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
