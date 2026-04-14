@@ -339,23 +339,26 @@ export const BIDS_MIGRATION_FLAG = 'ccc_bids_supabase_migrated_v1';
  * Reads every `ccc_bid_<id>` key, upserts the full bid (with pastures) into
  * Supabase, then sets a migration flag so it only runs once per browser.
  *
- * Returns the count of bids migrated (0 if already migrated or nothing to do).
+ * Returns the count of bids migrated and any accumulated errors from partial
+ * failures.  The migration flag is set even on partial success so that
+ * already-migrated bids are not re-sent on every page load.
  */
 export async function migrateBidsToSupabase(
   supabase: SupabaseClient,
   userId: string,
-): Promise<{ migrated: number; error: string | null }> {
-  if (typeof window === 'undefined') return { migrated: 0, error: null };
-  if (localStorage.getItem(BIDS_MIGRATION_FLAG) === '1') return { migrated: 0, error: null };
+): Promise<{ migrated: number; failed: number; error: string | null }> {
+  if (typeof window === 'undefined') return { migrated: 0, failed: 0, error: null };
+  if (localStorage.getItem(BIDS_MIGRATION_FLAG) === '1') return { migrated: 0, failed: 0, error: null };
 
   const listRaw = localStorage.getItem('ccc_bid_list');
   const localList: Array<{ id: string }> = listRaw ? JSON.parse(listRaw) : [];
   if (localList.length === 0) {
     localStorage.setItem(BIDS_MIGRATION_FLAG, '1');
-    return { migrated: 0, error: null };
+    return { migrated: 0, failed: 0, error: null };
   }
 
   let migrated = 0;
+  const errors: string[] = [];
   for (const entry of localList) {
     const raw = localStorage.getItem(`ccc_bid_${entry.id}`);
     if (!raw) continue;
@@ -364,15 +367,19 @@ export async function migrateBidsToSupabase(
       const bid: Bid = JSON.parse(raw);
       const { error } = await saveBidToSupabase(supabase, bid, userId);
       if (error) {
-        console.warn(`[db] migration: failed to migrate bid ${entry.id}:`, error);
+        errors.push(`bid ${entry.id}: ${error}`);
         continue;
       }
       migrated++;
     } catch (e) {
-      console.warn(`[db] migration: bad JSON for bid ${entry.id}:`, e);
+      errors.push(`bid ${entry.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   localStorage.setItem(BIDS_MIGRATION_FLAG, '1');
-  return { migrated, error: null };
+  return {
+    migrated,
+    failed: errors.length,
+    error: errors.length > 0 ? errors.join('; ') : null,
+  };
 }

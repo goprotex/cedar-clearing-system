@@ -379,14 +379,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
     // Persist to Supabase as primary data source
     if (isSupabaseConfigured) {
       const sb = createSupabaseBrowser();
-      getAuthUserId(sb).then(async (userId) => {
+      (async () => {
+        const userId = await getAuthUserId(sb);
         if (!userId) return;
         set({ isAuthenticated: true });
         const { error } = await saveBidToSupabase(sb, currentBid, userId);
         if (error) {
           console.warn('[db] Supabase save failed, localStorage is still valid:', error);
         }
-      });
+      })();
     }
   },
 
@@ -414,9 +415,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
             if (data) {
               const localBid = JSON.parse(data) as Bid;
               set({ currentBid: localBid, selectedPastureId: null, drawingMode: false });
-              // Push local-only bid to Supabase
-              saveBidToSupabase(sb, localBid, userId).then(({ error: saveErr }) => {
-                if (saveErr) console.warn('[db] Failed to push local bid to Supabase:', saveErr);
+              // Push local-only bid to Supabase (fire-and-forget; user already sees local data)
+              saveBidToSupabase(sb, localBid, userId).catch((e) => {
+                console.warn('[db] Failed to push local bid to Supabase:', e);
               });
               return;
             }
@@ -474,9 +475,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
           // One-time migration: push localStorage bids into Supabase
           const alreadyMigrated = localStorage.getItem(BIDS_MIGRATION_FLAG) === '1';
           if (!alreadyMigrated) {
-            const { migrated } = await migrateBidsToSupabase(sb, userId);
+            const { migrated, failed, error: migErr } = await migrateBidsToSupabase(sb, userId);
             if (migrated > 0) {
               console.info(`[db] Migrated ${migrated} bids from localStorage to Supabase`);
+            }
+            if (failed > 0) {
+              console.warn(`[db] ${failed} bids failed to migrate:`, migErr);
             }
           }
 
