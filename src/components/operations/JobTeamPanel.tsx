@@ -22,6 +22,14 @@ export default function JobTeamPanel({ jobId }: Props) {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteErr, setInviteErr] = useState<string | null>(null);
 
+  // Account invite state (for new users who don't have an account yet)
+  const [acctEmail, setAcctEmail] = useState('');
+  const [acctName, setAcctName] = useState('');
+  const [acctRole, setAcctRole] = useState('operator');
+  const [acctBusy, setAcctBusy] = useState(false);
+  const [acctMsg, setAcctMsg] = useState<string | null>(null);
+  const [acctErr, setAcctErr] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
@@ -142,6 +150,32 @@ export default function JobTeamPanel({ jobId }: Props) {
     }
   };
 
+  const sendAccountInvite = async () => {
+    setAcctBusy(true);
+    setAcctErr(null);
+    setAcctMsg(null);
+    try {
+      const res = await fetchApiAuthed('/api/company/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: acctEmail.trim(),
+          role: acctRole,
+          fullName: acctName.trim(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+      if (!res.ok) throw new Error(data.error ?? res.statusText);
+      setAcctMsg(data.message ?? 'Invite sent!');
+      setAcctEmail('');
+      setAcctName('');
+    } catch (e) {
+      setAcctErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAcctBusy(false);
+    }
+  };
+
   if (loading) {
     return <div className="mt-3 pl-2 border-l-2 border-[#353534] text-[10px] font-mono text-[#5a4136]">Loading team…</div>;
   }
@@ -193,7 +227,7 @@ export default function JobTeamPanel({ jobId }: Props) {
 
       {canEdit && (
         <>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] pt-1">Invite by email</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d] pt-1">Invite to job (existing user)</div>
           <div className="flex flex-wrap gap-2 items-end">
             <input
               type="email"
@@ -249,6 +283,56 @@ export default function JobTeamPanel({ jobId }: Props) {
               </ul>
             </div>
           )}
+
+          {/* Send account invite email for new users */}
+          <div className="border-t border-[#353534] pt-3 mt-1 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-[#a98a7d]">
+              Invite new user (send account email)
+            </div>
+            <p className="text-[9px] text-[#5a4136]">
+              Person doesn&apos;t have a Cedar account yet? Send them a signup email. Once they create their account, invite them to this job above.
+            </p>
+            <div className="flex flex-wrap gap-2 items-end">
+              <input
+                type="email"
+                value={acctEmail}
+                onChange={(e) => setAcctEmail(e.target.value)}
+                placeholder="newuser@company.com"
+                className="flex-1 min-w-[140px] bg-transparent border border-[#353534] px-2 py-1 text-xs font-mono"
+              />
+              <input
+                type="text"
+                value={acctName}
+                onChange={(e) => setAcctName(e.target.value)}
+                placeholder="Full name (optional)"
+                className="flex-1 min-w-[120px] bg-transparent border border-[#353534] px-2 py-1 text-xs font-mono"
+              />
+              <select
+                value={acctRole}
+                onChange={(e) => setAcctRole(e.target.value)}
+                className="bg-[#1a1a1a] border border-[#353534] text-[10px] px-1 py-1"
+              >
+                <option value="operator">operator</option>
+                <option value="crew_lead">crew lead</option>
+                <option value="manager">manager</option>
+                <option value="viewer">viewer</option>
+              </select>
+              <button
+                type="button"
+                disabled={acctBusy || !acctEmail.trim()}
+                onClick={() => void sendAccountInvite()}
+                className="bg-cyan-600 text-black font-black px-2 py-1 text-[10px] uppercase disabled:opacity-40"
+              >
+                Send email
+              </button>
+            </div>
+            {acctErr && <p className="text-[10px] text-red-400">{acctErr}</p>}
+            {acctMsg && (
+              <div className="border border-[#13ff43]/30 bg-[#0a1a0f]/40 p-2 text-[10px] text-[#13ff43]">
+                {acctMsg}
+              </div>
+            )}
+          </div>
         </>
       )}
 

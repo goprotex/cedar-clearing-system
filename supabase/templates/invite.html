@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You've been invited to Cedar Clearing</title>
+</head>
+<body style="margin:0;padding:0;background-color:#131313;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#131313;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="520" style="max-width:520px;width:100%;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:24px 32px;border-left:4px solid #FF6B00;background-color:#1c1b1b;">
+              <div style="font-size:10px;letter-spacing:3px;color:#a98a7d;font-weight:700;text-transform:uppercase;margin-bottom:8px;">CEDAR CLEARING SYSTEM</div>
+              <h1 style="margin:0;font-size:24px;font-weight:900;color:#e5e2e1;text-transform:uppercase;letter-spacing:-0.5px;">
+                You're Invited
+              </h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px;background-color:#1c1b1b;border:1px solid #353534;border-top:none;">
+              <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#a98a7d;">
+                You've been invited to join <strong style="color:#ffb693;">Cedar Clearing</strong> — a land-clearing operations platform for managing bids, jobs, fleet, and crew.
+              </p>
+
+              <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#a98a7d;">
+                Click the button below to create your account and get started:
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding:8px 0 24px;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block;padding:14px 32px;background-color:#FF6B00;color:#000000;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:1px;text-decoration:none;border:2px solid #FF6B00;">
+                      Accept Invite &amp; Create Account
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:12px;color:#5a4136;">
+                Or copy and paste this link into your browser:
+              </p>
+              <p style="margin:0 0 24px;font-size:11px;color:#13ff43;font-family:monospace;word-break:break-all;background-color:#0a1a0f;padding:12px;border:1px solid rgba(19,255,67,0.2);">
+                {{ .ConfirmationURL }}
+              </p>
+
+              <div style="border-top:1px solid #353534;padding-top:16px;margin-top:8px;">
+                <p style="margin:0;font-size:11px;color:#5a4136;line-height:1.5;">
+                  This invite link will expire. If you didn't expect this invitation, you can safely ignore this email.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 32px;text-align:center;">
+              <p style="margin:0;font-size:10px;color:#5a4136;letter-spacing:1px;text-transform:uppercase;">
+                Cedar Clearing System &bull; Sector Ops
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

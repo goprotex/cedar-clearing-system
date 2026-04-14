@@ -1078,7 +1078,7 @@ function MachineDetailPanel({
   const isCheckedOut = lastCheckout && lastCheckout.status === 'checked_out';
 
   return (
-    <div className="w-full min-w-0 max-w-full lg:w-[28rem] lg:max-w-[28rem] border-2 border-[#FF6B00] bg-[#1c1b1b] p-3 sm:p-4 shrink-0 lg:sticky lg:top-[calc(5.5rem+env(safe-area-inset-top,0px))] flex flex-col max-h-[min(85dvh,32rem)] lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
+    <div className="w-full min-w-0 max-w-full lg:w-[28rem] lg:max-w-[min(28rem,40%)] border-2 border-[#FF6B00] bg-[#1c1b1b] p-3 sm:p-4 shrink-0 lg:sticky lg:top-[calc(5.5rem+env(safe-area-inset-top,0px))] flex flex-col max-h-[min(85dvh,32rem)] lg:max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
           <span className="font-black text-lg uppercase text-[#FF6B00] block truncate">{m.name}</span>
