@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       invited_by: userId,
       company_name: companyName,
     },
-    redirectTo: `${req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback?next=/settings`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback?next=/settings`,
   });
 
   if (inviteErr) {
