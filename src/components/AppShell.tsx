@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: '/bids', label: 'ACTIVE_BIDS', icon: '📋' },
   { href: '/clients', label: 'CLIENTS', icon: '📇' },
   { href: '/bids', label: 'ESTIMATOR', icon: '🧮' },
-  { href: '/monitor', label: 'SCOUT_MONITOR', icon: '🧭' },
+  { href: '/monitor', label: 'LIVE_MONITOR', icon: '🧭' },
   { href: '/dashboard', label: 'TEAM', icon: '👥' },
   { href: '/operations', label: 'OPERATIONS', icon: '📟' },
   { href: '/schedule', label: 'SCHEDULE', icon: '📅' },
