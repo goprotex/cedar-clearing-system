@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { canAccessJob } from '@/lib/job-access';
-import { isCompanyAdmin } from '@/lib/company-admin';
+import { getProfileCompanyContext, isCompanyAdminRole } from '@/lib/company-admin';
+import { jobBidCompanyMatches } from '@/lib/job-company-access';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,19 +44,34 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Only job owners or company admins can delete a job
-  const { data: membership } = await supabase
+  // Check job membership — handle query errors explicitly
+  const { data: membership, error: membershipErr } = await supabase
     .from('job_members')
     .select('role')
     .eq('job_id', id)
     .eq('user_id', userId)
     .maybeSingle();
+  if (membershipErr) {
+    return NextResponse.json({ error: membershipErr.message }, { status: 500 });
+  }
 
-  const isOwner = membership?.role === 'owner';
-  if (!isOwner) {
-    const adminCheck = await isCompanyAdmin(supabase, userId);
-    if (!adminCheck) {
-      return NextResponse.json({ error: 'Forbidden — job owners and company admins only' }, { status: 403 });
+  const isJobOwner = membership?.role === 'owner';
+
+  if (!isJobOwner) {
+    // Company admin check scoped to this job's company (mirrors RLS policy / canAccessJob)
+    const ctx = await getProfileCompanyContext(supabase, userId);
+    if (!ctx?.companyId || !isCompanyAdminRole(ctx.role)) {
+      return NextResponse.json(
+        { error: 'Only the job owner or a company admin can delete a job' },
+        { status: 403 }
+      );
+    }
+    const jobMatchesCompany = await jobBidCompanyMatches(supabase, id, ctx.companyId);
+    if (!jobMatchesCompany) {
+      return NextResponse.json(
+        { error: 'Only the job owner or a company admin can delete a job' },
+        { status: 403 }
+      );
     }
   }
 
@@ -64,4 +80,3 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
   return NextResponse.json({ ok: true });
 }
-
