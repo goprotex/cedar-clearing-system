@@ -52,28 +52,54 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const body = (await req.json()) as Record<string, unknown>;
   const updates: Record<string, unknown> = {};
+  const invalidFields: string[] = [];
 
-  const str = (k: string) => {
+  const nullableString = (k: string) => {
     if (body[k] === undefined) return;
-    updates[k] = body[k] === null ? null : typeof body[k] === 'string' ? (body[k] as string).trim() || null : null;
+    if (body[k] === null) {
+      updates[k] = null;
+      return;
+    }
+    if (typeof body[k] !== 'string') {
+      invalidFields.push(k);
+      return;
+    }
+
+    const value = body[k].trim();
+    updates[k] = value || null;
   };
 
-  str('name');
-  str('address');
-  str('gate_code');
-  str('access_notes');
-  str('soil_summary');
-  str('terrain_notes');
+  const nullableFiniteNumber = (k: string) => {
+    if (body[k] === undefined) return;
+    if (body[k] === null) {
+      updates[k] = null;
+      return;
+    }
+    if (typeof body[k] !== 'number' || !Number.isFinite(body[k])) {
+      invalidFields.push(k);
+      return;
+    }
 
-  if (body.total_acres !== undefined) {
-    updates.total_acres =
-      typeof body.total_acres === 'number' && Number.isFinite(body.total_acres)
-        ? body.total_acres
-        : null;
-  }
+    updates[k] = body[k];
+  };
+
+  nullableString('name');
+  nullableString('address');
+  nullableString('gate_code');
+  nullableString('access_notes');
+  nullableString('soil_summary');
+  nullableString('terrain_notes');
+
+  nullableFiniteNumber('total_acres');
   if (body.center !== undefined) updates.center = body.center ?? null;
   if (body.boundary !== undefined) updates.boundary = body.boundary ?? null;
 
+  if (invalidFields.length > 0) {
+    return NextResponse.json(
+      { error: `Invalid value for field(s): ${invalidFields.join(', ')}` },
+      { status: 400 }
+    );
+  }
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
