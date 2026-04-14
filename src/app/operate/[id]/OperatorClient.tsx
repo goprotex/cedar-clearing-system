@@ -25,6 +25,9 @@ const TRAIL_MAP_MIN_INTERVAL_MS = 200;
 const HUD_GPS_STATE_MIN_INTERVAL_MS = 350;
 /** Throttle auto-center easeTo so rapid GPS ticks don't interrupt in-progress animations. */
 const CENTER_MAP_MIN_INTERVAL_MS = 800;
+const CENTER_MAP_DURATION_MS = 600;
+/** Top bar height used for positioning elements below it (must match the bar's rendered height). */
+const TOP_BAR_HEIGHT = '3.5rem';
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
 
 const VEGETATION_COLORS: Record<string, string> = {
@@ -1218,7 +1221,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           lastCenterMapRef.current = centerNow;
           mapRef.current.easeTo({
             center: [lng, lat],
-            duration: 600,
+            duration: CENTER_MAP_DURATION_MS,
           });
         }
 
@@ -1387,7 +1390,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* Map error banner — does not cover the header or block the whole map */}
       {bid && mapError && (
-        <div className="absolute left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+        <div className="absolute left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]" style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}>
           <div className="text-[#FF6B00] text-sm font-black uppercase tracking-widest">MAP_ISSUE</div>
           <div className="text-[10px] font-mono text-[#a98a7d] break-words mt-1">{mapError}</div>
           <div className="text-[10px] text-[#a98a7d] mt-2">
@@ -1460,7 +1463,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* HUD panel — pass-through outside the card so the map isn’t blocked on phones */}
       {bid && hudOpen && (
-        <div className="absolute left-3 z-10 pointer-events-none" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
+        <div className="absolute left-3 z-10 pointer-events-none" style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}>
           <div className="holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3 pointer-events-auto">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Field HUD</span>
@@ -1542,7 +1545,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         <button
           onClick={() => setHudOpen(true)}
           className="absolute left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
-          style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+          style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}
         >
           HUD ({stats.pct}%)
         </button>
