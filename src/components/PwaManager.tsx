@@ -17,6 +17,7 @@ export default function PwaManager() {
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used for cleanup ref
     let reg: ServiceWorkerRegistration | null = null;
 
     navigator.serviceWorker.getRegistration().then((r) => {

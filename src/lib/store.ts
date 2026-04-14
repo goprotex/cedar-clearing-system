@@ -525,9 +525,13 @@ export const useBidStore = create<BidStore>((set, get) => ({
     const totalChunks = chunkCoords.length;
     const polygonHash = hashPasturePolygon(pasture.polygon.geometry.coordinates);
 
-    let parts: CedarAnalysis[] = [];
-    let startIndex = 0;
+    // Sparse array: null = not yet attempted or failed; CedarAnalysis = success
+    const parts: (CedarAnalysis | null)[] = new Array(totalChunks).fill(null);
+    let failedIndices: number[] = [];
+    // Indices we still need to process
+    let pendingIndices: number[] = Array.from({ length: totalChunks }, (_, i) => i);
 
+    // --- Restore checkpoint (Supabase-first, then localStorage) ---
     const saved = await loadCedarChunkResumeHybrid(bidId, pastureId);
     if (
       saved &&
@@ -535,113 +539,203 @@ export const useBidStore = create<BidStore>((set, get) => ({
       saved.pastureId === pastureId &&
       saved.polygonHash === polygonHash &&
       Math.abs(saved.acreage - pasture.acreage) < 0.02 &&
-      chunkKeysEqual(saved.chunkKeys, chunkKeys) &&
-      saved.parts.length > 0 &&
-      saved.parts.length < chunkKeys.length
+      chunkKeysEqual(saved.chunkKeys, chunkKeys)
     ) {
-      parts = [...saved.parts];
-      startIndex = saved.parts.length;
-      toast.info(
-        `Resuming spectral analysis from region ${startIndex + 1} of ${totalChunks} (${parts.length} already complete).`,
-        { duration: 6000 }
-      );
-      set({
-        analysisProgress: {
-          active: true,
-          phase: 'init',
-          step: 'Resuming spectral analysis…',
-          detail: `${parts.length} of ${totalChunks} regions restored — continuing where you left off`,
-          pct: Math.round((parts.length / totalChunks) * 90),
-          percent: Math.round((parts.length / totalChunks) * 90),
-          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-        },
-      });
-    } else {
-      set({
-        analysisProgress: {
-          active: true,
-          phase: 'init',
-          step: 'Initializing spectral analysis…',
-          detail:
-            totalChunks > 1
-              ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, 15 m cells). Progress is saved after each region — you can resume if interrupted.`
-              : `Scanning ~${Math.round(pasture.acreage)} acres at 15 m resolution`,
-          pct: 0,
-          percent: 0,
-          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-        },
-      });
+      // Restore completed chunks from checkpoint
+      for (let i = 0; i < Math.min(saved.parts.length, totalChunks); i++) {
+        if (saved.parts[i] !== null) {
+          parts[i] = saved.parts[i];
+        }
+      }
+      // Determine which chunks still need work
+      pendingIndices = [];
+      for (let i = 0; i < totalChunks; i++) {
+        if (parts[i] === null) pendingIndices.push(i);
+      }
+
+      const completedCount = totalChunks - pendingIndices.length;
+      if (completedCount > 0 && pendingIndices.length > 0) {
+        toast.info(
+          `Resuming spectral analysis: ${completedCount} of ${totalChunks} regions already complete, ${pendingIndices.length} remaining.`,
+          { duration: 6000 }
+        );
+        set({
+          analysisProgress: {
+            active: true,
+            phase: 'init',
+            step: 'Resuming spectral analysis…',
+            detail: `${completedCount} of ${totalChunks} regions restored — continuing where you left off`,
+            pct: Math.round((completedCount / totalChunks) * 90),
+            percent: Math.round((completedCount / totalChunks) * 90),
+            processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+          },
+        });
+      } else if (completedCount === totalChunks) {
+        // All chunks already done — re-apply (edge case: user re-ran after complete)
+        pendingIndices = [];
+      }
     }
+
+    if (pendingIndices.length > 0) {
+      const completedCount = totalChunks - pendingIndices.length;
+      if (completedCount === 0) {
+        set({
+          analysisProgress: {
+            active: true,
+            phase: 'init',
+            step: 'Initializing spectral analysis…',
+            detail:
+              totalChunks > 1
+                ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, 15 m cells). Progress is saved after each region — you can resume if interrupted.`
+                : `Scanning ~${Math.round(pasture.acreage)} acres at 15 m resolution`,
+            pct: 0,
+            percent: 0,
+            processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+          },
+        });
+      }
+    }
+
+    /**
+     * Process a single chunk. Returns true on success, false on failure.
+     * On failure the chunk is left as null in the parts array.
+     */
+    const processChunk = async (i: number): Promise<boolean> => {
+      const coords = chunkCoords[i];
+      const chunkAcres = polygonAcreage(coords);
+      console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks}: ${chunkAcres.toFixed(1)} ac`);
+
+      try {
+        const chunkData = await fetchCedarDetectChunkWithRetry(
+          coords,
+          chunkAcres,
+          new Date().getMonth() + 1,
+          pasture.centroid[1],
+          (payload) => {
+            const innerPct = Number(payload.pct ?? payload.percent ?? 0);
+            const completedSoFar = parts.filter((p) => p !== null).length;
+            const effectiveIndex = completedSoFar;
+            const pct = scaledChunkProgress(effectiveIndex, totalChunks, innerPct);
+            const msg = (payload.message as string) || 'Processing…';
+            set({
+              analysisProgress: {
+                active: true,
+                phase: (payload.phase as string) || 'sampling',
+                step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
+                detail: (payload.detail as string) || '',
+                pct,
+                percent: pct,
+                cedarCount: payload.cedarCount as number | undefined,
+                oakCount: payload.oakCount as number | undefined,
+                totalPoints: payload.totalPoints as number | undefined,
+                completed: payload.completed as number | undefined,
+                processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+              },
+            });
+          }
+        );
+        console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks} complete: ${chunkData.summary?.totalSamples ?? '?'} samples, cedar=${chunkData.summary?.cedar?.pct ?? '?'}%`);
+        parts[i] = chunkData;
+
+        // Persist after every successful chunk
+        await saveCedarChunkResumeHybrid({
+          v: CEDAR_RESUME_VERSION,
+          bidId,
+          pastureId,
+          polygonHash,
+          acreage: pasture.acreage,
+          chunkKeys,
+          parts: [...parts],
+          failedChunkIndices: failedIndices,
+          updatedAt: Date.now(),
+        });
+        return true;
+      } catch (chunkErr) {
+        const msg = chunkErr instanceof Error ? chunkErr.message : 'Spectral analysis failed';
+        console.error(`[analyzeCedar] chunk ${i + 1}/${totalChunks} FAILED: ${msg}`);
+        return false;
+      }
+    };
 
     try {
       console.log(`[analyzeCedar] starting: ${totalChunks} chunk(s), ${Math.round(pasture.acreage)} ac, centroid=[${pasture.centroid.map(n => n.toFixed(4))}]`);
-      for (let i = startIndex; i < chunkCoords.length; i++) {
-        const coords = chunkCoords[i];
-        const chunkAcres = polygonAcreage(coords);
-        console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks}: ${chunkAcres.toFixed(1)} ac`);
 
-        try {
-          const chunkData = await fetchCedarDetectChunkWithRetry(
-            coords,
-            chunkAcres,
-            new Date().getMonth() + 1,
-            pasture.centroid[1],
-            (payload) => {
-              const innerPct = Number(payload.pct ?? payload.percent ?? 0);
-              const pct = scaledChunkProgress(i, totalChunks, innerPct);
-              const msg = (payload.message as string) || 'Processing…';
-              set({
-                analysisProgress: {
-                  active: true,
-                  phase: (payload.phase as string) || 'sampling',
-                  step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
-                  detail: (payload.detail as string) || '',
-                  pct,
-                  percent: pct,
-                  cedarCount: payload.cedarCount as number | undefined,
-                  oakCount: payload.oakCount as number | undefined,
-                  totalPoints: payload.totalPoints as number | undefined,
-                  completed: payload.completed as number | undefined,
-                  processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-                },
-              });
-            }
-          );
-          console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks} complete: ${chunkData.summary?.totalSamples ?? '?'} samples, cedar=${chunkData.summary?.cedar?.pct ?? '?'}%`);
-          parts.push(chunkData);
+      // --- First pass: process all pending chunks ---
+      const firstPassFailed: number[] = [];
+      for (const i of pendingIndices) {
+        const ok = await processChunk(i);
+        if (!ok) firstPassFailed.push(i);
+      }
 
-          await saveCedarChunkResumeHybrid({
-            v: CEDAR_RESUME_VERSION,
-            bidId,
-            pastureId,
-            polygonHash,
-            acreage: pasture.acreage,
-            chunkKeys,
-            parts: [...parts],
-            updatedAt: Date.now(),
-          });
-        } catch (chunkErr) {
-          let msg = chunkErr instanceof Error ? chunkErr.message : 'Spectral analysis failed';
-          console.error(`[analyzeCedar] chunk ${i + 1}/${totalChunks} FAILED: ${msg}`);
-          if (totalChunks > 1) {
-            msg = `Region ${i + 1} of ${totalChunks}: ${msg}`;
-          }
-          throw new Error(msg);
+      // --- Retry pass: retry failed chunks with increasing backoff ---
+      const MAX_RETRY_ROUNDS = 2;
+      let retryQueue = [...firstPassFailed];
+      for (let round = 0; round < MAX_RETRY_ROUNDS && retryQueue.length > 0; round++) {
+        const backoffMs = 3000 + round * 3000 + Math.random() * 2000;
+        console.log(`[analyzeCedar] retry round ${round + 1}: ${retryQueue.length} chunks, backoff ${Math.round(backoffMs)}ms`);
+
+        set({
+          analysisProgress: {
+            active: true,
+            phase: 'retry',
+            step: `Retrying ${retryQueue.length} failed region(s)…`,
+            detail: `Retry round ${round + 1} of ${MAX_RETRY_ROUNDS} — waiting ${Math.round(backoffMs / 1000)}s before retrying`,
+            pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+            percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+            processLines: spectralProcessLines,
+          },
+        });
+
+        await new Promise((r) => setTimeout(r, backoffMs));
+
+        const stillFailed: number[] = [];
+        for (const i of retryQueue) {
+          const ok = await processChunk(i);
+          if (!ok) stillFailed.push(i);
         }
+        retryQueue = stillFailed;
+      }
+
+      failedIndices = retryQueue;
+
+      // Save final state with failed indices
+      await saveCedarChunkResumeHybrid({
+        v: CEDAR_RESUME_VERSION,
+        bidId,
+        pastureId,
+        polygonHash,
+        acreage: pasture.acreage,
+        chunkKeys,
+        parts: [...parts],
+        failedChunkIndices: failedIndices,
+        updatedAt: Date.now(),
+      });
+
+      // --- Merge successful chunks ---
+      const successParts = parts.filter((p): p is CedarAnalysis => p !== null);
+      if (successParts.length === 0) {
+        throw new Error(
+          `All ${totalChunks} spectral analysis regions failed. Check your network connection and try again.`
+        );
       }
 
       const resultData: CedarAnalysis =
-        parts.length === 1 ? parts[0] : mergeCedarAnalyses(parts, pasture.acreage);
-      console.log(`[analyzeCedar] all chunks done: ${resultData.summary?.totalSamples ?? '?'} total samples, cedar=${resultData.summary?.cedar?.pct ?? '?'}%`);
+        successParts.length === 1 ? successParts[0] : mergeCedarAnalyses(successParts, pasture.acreage);
+      console.log(`[analyzeCedar] done: ${successParts.length}/${totalChunks} chunks succeeded, ${resultData.summary?.totalSamples ?? '?'} total samples, cedar=${resultData.summary?.cedar?.pct ?? '?'}%`);
 
-      await clearCedarChunkResumeHybrid(bidId, pastureId);
+      // Only clear checkpoint if ALL chunks succeeded
+      if (failedIndices.length === 0) {
+        await clearCedarChunkResumeHybrid(bidId, pastureId);
+      }
 
       set({
         analysisProgress: {
           active: true,
           phase: 'applying',
           step: 'Applying results to map…',
-          detail: '',
+          detail: failedIndices.length > 0
+            ? `${failedIndices.length} of ${totalChunks} regions failed — partial results applied`
+            : '',
           pct: 96,
           percent: 96,
           totalPoints: resultData.summary?.totalSamples,
@@ -696,25 +790,42 @@ export const useBidStore = create<BidStore>((set, get) => ({
       }
 
       const s = resultData.summary;
+      const doneDetail = failedIndices.length > 0
+        ? `${s.cedar.pct}% cedar · ~${s.estimatedCedarAcres} cedar ac · ${s.totalSamples} cells — ⚠ ${failedIndices.length} region(s) failed. Run again to retry.`
+        : `${s.cedar.pct}% cedar · ${s.oak?.pct ?? 0}% oak · ~${s.estimatedCedarAcres} cedar ac (mulch) of ${Math.round(pasture.acreage)} ac · ${s.totalSamples} cells`;
+
       set({
         analysisProgress: {
           active: true,
           phase: 'done',
-          step: 'Analysis complete',
-          detail: `${s.cedar.pct}% cedar · ${s.oak?.pct ?? 0}% oak · ~${s.estimatedCedarAcres} cedar ac (mulch) of ${Math.round(pasture.acreage)} ac · ${s.totalSamples} cells`,
+          step: failedIndices.length > 0 ? 'Analysis complete (partial)' : 'Analysis complete',
+          detail: doneDetail,
           pct: 100,
           percent: 100,
           totalPoints: s.totalSamples,
         },
       });
       console.log(`[analyzeCedar] complete — displayed to user`);
-      setTimeout(() => set({ analysisProgress: null }), 3200);
+
+      if (failedIndices.length > 0) {
+        toast.warning(
+          `${failedIndices.length} of ${totalChunks} regions failed — partial results applied. Run Spectral Analysis again to retry the failed regions.`,
+          { duration: 10000 }
+        );
+      }
+
+      setTimeout(() => set({ analysisProgress: null }), failedIndices.length > 0 ? 6000 : 3200);
     } catch (e) {
       console.error(`[analyzeCedar] top-level error: ${e instanceof Error ? e.message : e}`);
       const msg = e instanceof Error ? e.message : 'Spectral analysis failed';
       toast.error(msg, { duration: 8000 });
-      if (parts.length > 0 && parts.length < totalChunks) {
-        toast.info('Progress saved — run Spectral Analysis again to resume remaining regions.', {
+      const successCount = parts.filter((p) => p !== null).length;
+      if (successCount > 0 && successCount < totalChunks) {
+        toast.info('Partial progress saved — run Spectral Analysis again to retry failed regions.', {
+          duration: 9000,
+        });
+      } else if (successCount === 0 && totalChunks > 1) {
+        toast.info('Progress saved — run Spectral Analysis again to resume.', {
           duration: 9000,
         });
       }

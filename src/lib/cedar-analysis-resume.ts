@@ -1,13 +1,13 @@
 /**
- * Persists partial chunked spectral analysis to localStorage so a failed run
- * can resume after refresh (same bid + pasture + polygon + chunk layout).
+ * Persists partial chunked spectral analysis to Supabase (primary) and localStorage
+ * (fallback) so a failed or interrupted run can resume — even across devices.
  */
 
 import type { CedarAnalysis } from '@/types';
 
 const STORAGE_PREFIX = 'ccc_cedar_resume_';
 
-export const CEDAR_RESUME_VERSION = 1 as const;
+export const CEDAR_RESUME_VERSION = 2 as const;
 
 export interface CedarChunkResumeState {
   v: typeof CEDAR_RESUME_VERSION;
@@ -17,8 +17,19 @@ export interface CedarChunkResumeState {
   acreage: number;
   /** Stable fingerprint per chunk polygon ring (matches current chunk layout). */
   chunkKeys: string[];
-  parts: CedarAnalysis[];
+  /**
+   * Results per chunk, indexed by position. `null` entries indicate chunks that
+   * failed during the last run and still need to be retried.
+   */
+  parts: (CedarAnalysis | null)[];
+  /** Indices of chunks that permanently failed (after all retries). */
+  failedChunkIndices: number[];
   updatedAt: number;
+}
+
+/** Number of successfully completed (non-null) parts. */
+export function completedPartCount(state: CedarChunkResumeState): number {
+  return state.parts.filter((p) => p !== null).length;
 }
 
 export function hashPasturePolygon(coordinates: number[][][]): string {
@@ -47,15 +58,32 @@ function storageKey(bidId: string, pastureId: string): string {
   return `${STORAGE_PREFIX}${bidId}_${pastureId}`;
 }
 
+/** Upgrade v1 state to v2 (add failedChunkIndices, allow null parts). */
+function migrateState(raw: Record<string, unknown>): CedarChunkResumeState | null {
+  if (!raw || !Array.isArray(raw.parts) || !Array.isArray(raw.chunkKeys)) return null;
+  const version = raw.v as number;
+  if (version !== 1 && version !== 2) return null;
+
+  return {
+    v: CEDAR_RESUME_VERSION,
+    bidId: raw.bidId as string,
+    pastureId: raw.pastureId as string,
+    polygonHash: raw.polygonHash as string,
+    acreage: raw.acreage as number,
+    chunkKeys: raw.chunkKeys as string[],
+    parts: raw.parts as (CedarAnalysis | null)[],
+    failedChunkIndices: Array.isArray(raw.failedChunkIndices)
+      ? (raw.failedChunkIndices as number[])
+      : [],
+    updatedAt: raw.updatedAt as number,
+  };
+}
+
 export function loadCedarChunkResume(bidId: string, pastureId: string): CedarChunkResumeState | null {
   try {
     const raw = localStorage.getItem(storageKey(bidId, pastureId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as CedarChunkResumeState;
-    if (parsed.v !== CEDAR_RESUME_VERSION || !Array.isArray(parsed.parts) || !Array.isArray(parsed.chunkKeys)) {
-      return null;
-    }
-    return parsed;
+    return migrateState(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -81,8 +109,10 @@ function pickNewerResume(
   a: CedarChunkResumeState,
   b: CedarChunkResumeState
 ): CedarChunkResumeState {
-  if (a.parts.length !== b.parts.length) {
-    return a.parts.length >= b.parts.length ? a : b;
+  const aCompleted = completedPartCount(a);
+  const bCompleted = completedPartCount(b);
+  if (aCompleted !== bCompleted) {
+    return aCompleted >= bCompleted ? a : b;
   }
   return (a.updatedAt ?? 0) >= (b.updatedAt ?? 0) ? a : b;
 }
@@ -105,10 +135,10 @@ export async function loadCedarChunkResumeHybrid(
     if (res.ok) {
       const data = (await res.json()) as {
         configured?: boolean;
-        checkpoint?: CedarChunkResumeState | null;
+        checkpoint?: Record<string, unknown> | null;
       };
       if (data.checkpoint && typeof data.checkpoint === 'object') {
-        remote = data.checkpoint;
+        remote = migrateState(data.checkpoint);
       }
     }
   } catch {

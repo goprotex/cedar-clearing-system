@@ -1,3 +1,5 @@
+'use client';
+
 import Link from "next/link";
 
 /** Offline fallback for the PWA service worker (referenced in next.config). */

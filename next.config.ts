@@ -5,7 +5,6 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
-  skipWaiting: true,
   cacheOnFrontEndNav: true,
   /** Precache shell + faster repeat visits; operate route benefits from cached JS/CSS. */
   aggressiveFrontEndNavCaching: true,
