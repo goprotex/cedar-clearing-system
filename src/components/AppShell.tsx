@@ -270,7 +270,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="w-full min-w-0 max-w-[100vw] md:ml-64 pt-[calc(5rem+env(safe-area-inset-top,0px))] px-4 sm:px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] min-h-[100dvh] min-h-screen">
+      <main className="min-w-0 md:ml-64 pt-[calc(5rem+env(safe-area-inset-top,0px))] px-4 sm:px-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] min-h-[100dvh] min-h-screen">
         {children}
       </main>
     </div>
