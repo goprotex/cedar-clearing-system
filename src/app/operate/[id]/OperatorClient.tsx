@@ -467,7 +467,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           style: coarsePointer ? OPERATOR_STYLE_LOW : OPERATOR_STYLE_HIGH,
           center,
           zoom,
-          pitch: coarsePointer ? 0 : 45,
+          pitch: 45,
           antialias: true,
           preserveDrawingBuffer: true,
           failIfMajorPerformanceCaveat: false,
@@ -953,7 +953,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
   // Slow bearing drift only in HOLO mode — constant spin in “normal” operate fights pinch/rotate.
   useEffect(() => {
-    if (!mapReady || !layers.hologram) {
+    if (!mapReady) {
       if (holoRotationRef.current) {
         cancelAnimationFrame(holoRotationRef.current);
         holoRotationRef.current = null;
@@ -961,7 +961,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       return;
     }
     const spin = () => {
-      if (!mapRef.current || !layersRef.current.hologram) return;
+      if (!mapRef.current) return;
       mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
       holoRotationRef.current = requestAnimationFrame(spin);
     };
@@ -972,12 +972,12 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         holoRotationRef.current = null;
       }
     };
-  }, [mapReady, layers.hologram]);
+  }, [mapReady]);
 
-  // Pause HOLO spin on gesture; resume after idle
+  // Pause spin on gesture; resume after idle
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !mapReady || !layers.hologram) return;
+    if (!map || !map.isStyleLoaded() || !mapReady) return;
 
     let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -988,9 +988,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
       if (resumeTimer) clearTimeout(resumeTimer);
       resumeTimer = setTimeout(() => {
-        if (!mapRef.current || !layersRef.current.hologram) return;
+        if (!mapRef.current) return;
         const spin = () => {
-          if (!mapRef.current || !layersRef.current.hologram) return;
+          if (!mapRef.current) return;
           mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
           holoRotationRef.current = requestAnimationFrame(spin);
         };
@@ -1008,7 +1008,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       map.off('wheel', pause);
       if (resumeTimer) clearTimeout(resumeTimer);
     };
-  }, [mapReady, layers.hologram]);
+  }, [mapReady]);
 
   // Resize on orientation change / viewport changes (iPad/Safari)
   useEffect(() => {
@@ -1205,6 +1205,15 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(mapRef.current);
         }
 
+        // Auto-center map on operator position so the field worker is always visible
+        if (mapRef.current && mapRef.current.isStyleLoaded()) {
+          mapRef.current.easeTo({
+            center: [lng, lat],
+            pitch: 45,
+            duration: 600,
+          });
+        }
+
         processPosition(lng, lat);
       },
       (err) => {
@@ -1370,7 +1379,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* Map error banner — does not cover the header or block the whole map */}
       {bid && mapError && (
-        <div className="absolute top-14 left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]">
+        <div className="absolute left-2 right-2 z-30 max-h-[40vh] overflow-y-auto rounded-lg border border-[#353534] bg-[#0e0e0e]/95 backdrop-blur-sm p-3 shadow-lg text-[#e5e2e1]" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
           <div className="text-[#FF6B00] text-sm font-black uppercase tracking-widest">MAP_ISSUE</div>
           <div className="text-[10px] font-mono text-[#a98a7d] break-words mt-1">{mapError}</div>
           <div className="text-[10px] text-[#a98a7d] mt-2">
@@ -1397,7 +1406,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       )}
 
       {/* Top bar — pointer-events-none on strip so the map receives pan/pinch in the gaps; controls opt in */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 py-2 pointer-events-none bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40">
+      <div
+        className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 pb-2 pointer-events-none bg-[#000a02]/95 backdrop-blur-sm border-b border-green-900/40"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))', paddingLeft: 'max(0.5rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.5rem, env(safe-area-inset-right, 0px))' }}
+      >
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 pointer-events-auto">
           <Link href={bid ? `/bid/${bidId}` : '/bids'} className="text-[#00ff41] font-black text-xs sm:text-sm tracking-widest hover:text-white transition-colors shrink-0">
             ← CEDAR_HACK
@@ -1440,7 +1452,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* HUD panel — pass-through outside the card so the map isn’t blocked on phones */}
       {bid && hudOpen && (
-        <div className="absolute top-14 left-3 z-10 pointer-events-none">
+        <div className="absolute left-3 z-10 pointer-events-none" style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
           <div className="holo-panel backdrop-blur-sm rounded-lg p-3 min-w-[220px] space-y-3 pointer-events-auto">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-[#00ff41] font-bold uppercase tracking-widest">Field HUD</span>
@@ -1521,7 +1533,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       {bid && !hudOpen && (
         <button
           onClick={() => setHudOpen(true)}
-          className="absolute top-14 left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+          className="absolute left-3 z-10 holo-button backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+          style={{ top: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
         >
           HUD ({stats.pct}%)
         </button>
@@ -1529,7 +1542,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
 
       {/* Bottom controls */}
       {bid && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
+        <div className="absolute left-1/2 -translate-x-1/2 z-10 flex items-center gap-2" style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
           <button
             onClick={toggleGPS}
             className={`px-5 py-3 rounded-lg font-bold text-sm uppercase tracking-widest transition-all ${
