@@ -234,8 +234,8 @@ export default function SettingsClient() {
     setErr(null);
     try {
       const supabase = createClient();
-      const { data: { session: s } } = await supabase.auth.getSession();
-      const uid = s?.user?.id;
+      const { data: { user } } = await supabase.auth.getUser();
+      const uid = user?.id;
       if (!uid) throw new Error('Not signed in');
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const path = `${uid}/avatar-${Date.now()}.${ext}`;
@@ -258,8 +258,8 @@ export default function SettingsClient() {
     setCoErr(null);
     try {
       const supabase = createClient();
-      const { data: { session: s } } = await supabase.auth.getSession();
-      if (!s?.user?.id) throw new Error('Not signed in');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error('Not signed in');
       if (!company?.id) throw new Error('No company linked');
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const path = `${company.id}/logo-${Date.now()}.${ext}`;

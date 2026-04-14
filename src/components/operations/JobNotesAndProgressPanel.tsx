@@ -131,8 +131,8 @@ export default function JobNotesAndProgressPanel({ job, onJobPatch }: Props) {
     setErr(null);
     try {
       const supabase = createClient();
-      const { data: { session: s } } = await supabase.auth.getSession();
-      const uid = s?.user?.id;
+      const { data: { user } } = await supabase.auth.getUser();
+      const uid = user?.id;
       if (!uid) throw new Error('Sign in to upload');
 
       const next: Array<{ url: string; kind: 'image' | 'pdf'; name: string }> = [...pendingUrls];
