@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   if (!ctx.companyId) {
-    return NextResponse.json({ properties: [] as unknown[], needsCompany: true });
+    return NextResponse.json({ properties: [], needsCompany: true });
   }
 
   const { searchParams } = new URL(req.url);

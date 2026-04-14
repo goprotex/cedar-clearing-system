@@ -229,7 +229,8 @@ export default function SettingsClient() {
     }
   };
 
-  const uploadAvatar = async (file: File) => {    setAvatarUploading(true);
+  const uploadAvatar = async (file: File) => {
+    setAvatarUploading(true);
     setErr(null);
     try {
       const supabase = createClient();

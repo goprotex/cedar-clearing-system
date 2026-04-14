@@ -84,16 +84,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     updates.status = body.status;
   }
   if (body.client_name !== undefined) {
-    updates.client_name = typeof body.client_name === 'string' ? body.client_name.trim().slice(0, 200) : '';
+    if (typeof body.client_name === 'string' && body.client_name.trim().length > 200) {
+      return NextResponse.json({ error: 'client_name must be 200 characters or fewer' }, { status: 400 });
+    }
+    updates.client_name = typeof body.client_name === 'string' ? body.client_name.trim() || null : null;
   }
   if (body.property_name !== undefined) {
-    updates.property_name = typeof body.property_name === 'string' ? body.property_name.trim().slice(0, 200) : '';
+    if (typeof body.property_name === 'string' && body.property_name.trim().length > 200) {
+      return NextResponse.json({ error: 'property_name must be 200 characters or fewer' }, { status: 400 });
+    }
+    updates.property_name = typeof body.property_name === 'string' ? body.property_name.trim() || null : null;
   }
   if (body.notes !== undefined) {
     updates.notes = typeof body.notes === 'string' ? body.notes : '';
   }
   if (body.valid_until !== undefined) {
-    updates.valid_until = body.valid_until === null ? null : typeof body.valid_until === 'string' ? body.valid_until : null;
+    if (body.valid_until === null) {
+      updates.valid_until = null;
+    } else if (typeof body.valid_until === 'string') {
+      const parsed = new Date(body.valid_until);
+      if (isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: 'valid_until must be a valid ISO 8601 date string' }, { status: 400 });
+      }
+      updates.valid_until = parsed.toISOString();
+    } else {
+      return NextResponse.json({ error: 'valid_until must be an ISO 8601 date string or null' }, { status: 400 });
+    }
   }
 
   if (Object.keys(updates).length === 0) {
