@@ -1117,7 +1117,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         body: JSON.stringify({ ...posData, jobId, trailPoint: [lng, lat] }),
       }).catch(() => { /* best-effort */ });
 
-      // Push to Supabase when signed in so scout monitor realtime works (shared progress is separate).
+      // Push to Supabase when signed in so live monitor realtime works (shared progress is separate).
       if (supabaseSessionRef.current) {
         void fetchApiAuthed(`/api/jobs/${jobId}/operator-positions`, {
           method: 'POST',

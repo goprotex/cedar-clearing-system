@@ -31,6 +31,9 @@ export async function GET() {
       clearedByJob: {} as Record<string, string[]>,
       operatorsByJob: {} as Record<string, unknown[]>,
       telemetryByJob: {} as Record<string, MonitorTelemetryRow[]>,
+      operatorProfiles: {},
+      activeTimeEntries: {},
+      membersByJob: {},
       scope: 'membership',
     } satisfies MonitorBootstrapResponse);
   }
@@ -94,6 +97,9 @@ export async function GET() {
       clearedByJob: {} as Record<string, string[]>,
       operatorsByJob: {} as Record<string, unknown[]>,
       telemetryByJob: {} as Record<string, MonitorTelemetryRow[]>,
+      operatorProfiles: {},
+      activeTimeEntries: {},
+      membersByJob: {},
       scope,
     } satisfies MonitorBootstrapResponse);
   }
@@ -154,6 +160,65 @@ export async function GET() {
       (telemetryByJob[jid] ??= []).push(entry);
     }
   }
+
+  // Fetch operator profiles for display names
+  const allOperatorIds = new Set<string>();
+  for (const ops of Object.values(operatorsByJob)) {
+    for (const op of ops as Array<{ user_id: string }>) {
+      if (op.user_id && op.user_id !== 'operator') allOperatorIds.add(op.user_id);
+    }
+  }
+
+  const operatorProfiles: Record<string, { display_name: string; email: string }> = {};
+  if (allOperatorIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, email')
+      .in('id', Array.from(allOperatorIds));
+    for (const p of profiles ?? []) {
+      const displayName = p.display_name as string | null;
+      const email = p.email as string | null;
+      operatorProfiles[p.id as string] = {
+        display_name: displayName ?? email ?? 'Unknown',
+        email: email ?? '',
+      };
+    }
+  }
+
+  // Fetch active (open) time entries — clock_out IS NULL
+  const activeTimeEntries: Record<string, Array<{ user_id: string; clock_in: string; job_id: string }>> = {};
+  {
+    const { data: openEntries } = await supabase
+      .from('job_time_entries')
+      .select('job_id, operator_id, clock_in')
+      .in('job_id', jobIds)
+      .is('clock_out', null);
+    for (const e of openEntries ?? []) {
+      const jid = e.job_id as string;
+      (activeTimeEntries[jid] ??= []).push({
+        user_id: e.operator_id as string,
+        clock_in: e.clock_in as string,
+        job_id: jid,
+      });
+    }
+  }
+
+  // Fetch job members (operator assignments)
+  const membersByJob: Record<string, Array<{ user_id: string; role: string }>> = {};
+  {
+    const { data: members } = await supabase
+      .from('job_members')
+      .select('job_id, user_id, role')
+      .in('job_id', jobIds);
+    for (const m of members ?? []) {
+      const jid = m.job_id as string;
+      (membersByJob[jid] ??= []).push({
+        user_id: m.user_id as string,
+        role: (m.role as string) || 'worker',
+      });
+    }
+  }
+
   // If migration not applied yet or RLS blocks, bootstrap still returns jobs/operators.
 
   return NextResponse.json({
@@ -161,6 +226,9 @@ export async function GET() {
     clearedByJob,
     operatorsByJob,
     telemetryByJob,
+    operatorProfiles,
+    activeTimeEntries,
+    membersByJob,
     scope,
   } satisfies MonitorBootstrapResponse);
 }

@@ -24,7 +24,7 @@ export function mergeJobsById(remote: ActiveJobSummary[], local: ActiveJobSummar
   return Array.from(byId.values());
 }
 
-/** Local converted jobs from `ccc_job_*` keys (same rules as scout monitor). */
+/** Local converted jobs from `ccc_job_*` keys (same rules as live monitor). */
 export function loadLocalStorageJobs(): ActiveJobSummary[] {
   if (typeof window === 'undefined') return [];
   const results: ActiveJobSummary[] = [];

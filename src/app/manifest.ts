@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Cedar Hack — Field Ops",
     short_name: "Cedar Hack",
     description:
-      "AI-powered clearing company OS: bids, GPS operate mode, scout monitor, and job execution for crews in the field.",
+      "AI-powered clearing company OS: bids, GPS operate mode, live monitor, and job execution for crews in the field.",
     start_url: "/",
     scope: "/",
     display: "standalone",
