@@ -44,12 +44,15 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Require job owner role OR company admin
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipErr } = await supabase
     .from('job_members')
     .select('role')
     .eq('job_id', id)
     .eq('user_id', userId)
     .maybeSingle();
+  if (membershipErr) {
+    return NextResponse.json({ error: membershipErr.message }, { status: 500 });
+  }
 
   const isJobOwner = membership?.role === 'owner';
   const isAdmin = !isJobOwner && (await isCompanyAdmin(supabase, userId));
