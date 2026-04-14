@@ -921,8 +921,8 @@ function MachineDetailPanel({
       try {
         // Try uploading to Supabase Storage first
         const supabase = createClient();
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (s?.user) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
           const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
           const pathPrefix = companyId || 'unknown';
           const path = `${pathPrefix}/${m.id}/${Date.now()}-${uuidv4().slice(0, 8)}.${ext}`;
