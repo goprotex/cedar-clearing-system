@@ -61,12 +61,12 @@ export async function GET(req: Request) {
       .select('id, data')
       .eq('company_id', companyId),
 
-    // Pending time entry approvals (no approved_by set, clock_out is set)
+    // Pending time entry approvals (no approved_by, and entry is complete — has clock_out or hours_manual)
     supabase
       .from('job_time_entries')
       .select('id, job_id, operator_id, clock_in, clock_out, hours_manual, approved_by')
       .is('approved_by', null)
-      .not('clock_out', 'is', null),
+      .or('clock_out.not.is.null,hours_manual.not.is.null'),
 
     // Recent job events for activity feed
     supabase

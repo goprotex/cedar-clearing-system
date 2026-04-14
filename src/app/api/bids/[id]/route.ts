@@ -73,7 +73,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof body.client_email === 'string') patch.client_email = body.client_email.slice(0, 200);
   if (typeof body.client_phone === 'string') patch.client_phone = body.client_phone.slice(0, 50);
 
-  if (Object.keys(patch).length === 1) {
+  if (Object.keys(patch).length <= 1) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
 
