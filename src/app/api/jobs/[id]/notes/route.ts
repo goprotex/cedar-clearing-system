@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { canAccessJob } from '@/lib/job-access';
 
 export type NoteAttachment = { url: string; kind?: 'image' | 'pdf'; name?: string };
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
+  const supabase = await createClient(req);
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!(await canAccessJob(supabase, userId, jobId))) {
@@ -27,8 +27,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
+  const supabase = await createClient(req);
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!(await canAccessJob(supabase, userId, jobId))) {

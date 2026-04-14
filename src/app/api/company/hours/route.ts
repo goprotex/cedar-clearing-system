@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { isCompanyAdmin } from '@/lib/company-admin';
 
 export type EmployeeHoursSummary = {
@@ -12,7 +12,7 @@ export type EmployeeHoursSummary = {
 
 export async function GET() {
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -41,19 +41,19 @@ export async function GET() {
   // Get all time entries for these users
   const { data: entries, error: teErr } = await supabase
     .from('job_time_entries')
-    .select('user_id, clock_in, clock_out, manual_hours, job_id')
-    .in('user_id', profileIds);
+    .select('operator_id, clock_in, clock_out, hours_manual, job_id')
+    .in('operator_id', profileIds);
   if (teErr) return NextResponse.json({ error: teErr.message }, { status: 500 });
 
   // Aggregate hours per user
   const hoursMap = new Map<string, { hours: number; jobIds: Set<string> }>();
   for (const e of entries ?? []) {
-    const uid = e.user_id as string;
+    const uid = e.operator_id as string;
     if (!hoursMap.has(uid)) hoursMap.set(uid, { hours: 0, jobIds: new Set() });
     const agg = hoursMap.get(uid)!;
     if (e.job_id) agg.jobIds.add(e.job_id as string);
-    if (typeof e.manual_hours === 'number' && e.manual_hours > 0) {
-      agg.hours += e.manual_hours as number;
+    if (typeof e.hours_manual === 'number' && e.hours_manual > 0) {
+      agg.hours += e.hours_manual as number;
     } else if (e.clock_in && e.clock_out) {
       const diffMs = new Date(e.clock_out as string).getTime() - new Date(e.clock_in as string).getTime();
       if (diffMs > 0) agg.hours += diffMs / (1000 * 60 * 60);
