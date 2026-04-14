@@ -899,17 +899,17 @@ function MachineDetailPanel({
 
   // Max size for a compressed fleet photo stored as base64 in Supabase JSONB (~225KB actual)
   const MAX_COMPRESSED_IMAGE_BYTES = 300_000;
+  const MAX_PHOTOS_PER_MACHINE = 20;
 
   async function onPhotoPick(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     e.target.value = '';
     if (!files?.length) return;
-    const maxPhotos = 20;
-    if (m.photoUrls.length >= maxPhotos) {
-      toast.error(`Max ${maxPhotos} photos per unit`);
+    if (m.photoUrls.length >= MAX_PHOTOS_PER_MACHINE) {
+      toast.error(`Max ${MAX_PHOTOS_PER_MACHINE} photos per unit`);
       return;
     }
-    const cap = maxPhotos - m.photoUrls.length;
+    const cap = MAX_PHOTOS_PER_MACHINE - m.photoUrls.length;
     const toRead = Array.from(files)
       .filter((f) => f.type.startsWith('image/'))
       .slice(0, cap);
@@ -982,7 +982,13 @@ function MachineDetailPanel({
 
   function removePhoto(idx: number) {
     const updated = m.photoUrls.filter((_, i) => i !== idx);
-    const newThumb = m.thumbnailIndex >= updated.length ? 0 : m.thumbnailIndex;
+    let newThumb = m.thumbnailIndex;
+    if (idx < m.thumbnailIndex) {
+      newThumb = m.thumbnailIndex - 1;
+    } else if (idx === m.thumbnailIndex) {
+      newThumb = 0;
+    }
+    if (newThumb >= updated.length) newThumb = 0;
     onUpdate({ photoUrls: updated, thumbnailIndex: newThumb });
   }
 
@@ -1252,7 +1258,7 @@ function MachineDetailPanel({
               rows={6}
               className="w-full min-w-0 max-h-40 sm:max-h-48 bg-[#1c1b1b] border border-[#353534] px-2 py-2 text-[#a98a7d] font-mono text-[11px] leading-relaxed resize-y min-h-[100px] overflow-y-auto"
             />
-            <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1 mt-4">PHOTOS ({m.photoUrls.length}/20)</div>
+            <div className="text-[10px] text-[#5a4136] uppercase tracking-widest mb-1 mt-4">PHOTOS ({m.photoUrls.length}/{MAX_PHOTOS_PER_MACHINE})</div>
             <p className="text-[10px] text-[#5a4136] mb-2">Click a photo to set it as the list thumbnail. Photos are stored in Supabase Storage when available.</p>
             <input
               type="file"
