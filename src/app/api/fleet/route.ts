@@ -62,13 +62,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  const VALID_CATEGORIES = new Set(['truck', 'trailer', 'skid_steer', 'skid_steer_attachment', 'barko', 'dozer', 'excavator', 'small_equipment', 'other']);
+  const VALID_CONDITIONS = new Set(['excellent', 'good', 'fair', 'poor', 'needs_repair']);
+
   const machineData = {
     id: newMachineId(),
     name: typeof body.name === 'string' && body.name.trim() ? body.name.trim().toUpperCase().replace(/\s+/g, '_') : 'NEW_UNIT',
     type: typeof body.type === 'string' ? body.type.trim().slice(0, 100) : 'Equipment',
+    category: typeof body.category === 'string' && VALID_CATEGORIES.has(body.category) ? body.category : 'other',
     model: typeof body.model === 'string' ? body.model.trim().slice(0, 100) : '—',
     status: 'idle',
     hours: typeof body.hours === 'number' && Number.isFinite(body.hours) ? body.hours : 0,
+    mileage: typeof body.mileage === 'number' && Number.isFinite(body.mileage) ? body.mileage : 0,
     fuelLevel: 0,
     lastLocation: typeof body.lastLocation === 'string' ? body.lastLocation.trim().slice(0, 200) : '—',
     operator: typeof body.operator === 'string' ? body.operator.trim().slice(0, 100) : 'Unassigned',
@@ -76,11 +81,18 @@ export async function POST(req: Request) {
     dailyAcres: 0,
     avgFuelPerHr: typeof body.avgFuelPerHr === 'number' && Number.isFinite(body.avgFuelPerHr) ? body.avgFuelPerHr : 0,
     nextService: typeof body.nextService === 'string' ? body.nextService.slice(0, 20) : '',
+    nextServiceHours: typeof body.nextServiceHours === 'number' && Number.isFinite(body.nextServiceHours) ? body.nextServiceHours : 0,
+    condition: typeof body.condition === 'string' && VALID_CONDITIONS.has(body.condition) ? body.condition : 'good',
+    serialNumber: typeof body.serialNumber === 'string' ? body.serialNumber.slice(0, 100) : '',
+    year: typeof body.year === 'number' && Number.isFinite(body.year) ? body.year : null,
+    make: typeof body.make === 'string' ? body.make.slice(0, 100) : '',
     notes: typeof body.notes === 'string' ? body.notes.slice(0, 2000) : '',
     photoUrls: [],
+    thumbnailIndex: 0,
     maintenanceLog: [],
     fuelLog: [],
     hoursLog: [],
+    checkoutHistory: [],
   };
 
   const { data, error } = await supabase

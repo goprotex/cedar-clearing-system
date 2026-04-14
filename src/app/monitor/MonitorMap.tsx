@@ -34,6 +34,7 @@ type Props = {
   membersByJob: Record<string, JobMember[]>;
   operateMode?: boolean;
   operateModeUserId?: string | null;
+  autoRotate?: boolean;
 };
 
 function fc(features: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
@@ -57,7 +58,7 @@ function formatTime(iso: string): string {
   } catch { return iso; }
 }
 
-export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, flyToJobId, onMapReady, operatorProfiles, activeTimeEntries, membersByJob, operateMode, operateModeUserId }: Props) {
+export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, flyToJobId, onMapReady, operatorProfiles, activeTimeEntries, membersByJob, operateMode, operateModeUserId, autoRotate = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const operatorMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -65,6 +66,8 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
   const popupRef = useRef<mapboxgl.Popup | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const rotationRef = useRef<number | null>(null);
+  const autoRotateRef = useRef(autoRotate);
+  autoRotateRef.current = autoRotate;
 
   // Refs for latest data so click handlers can access current state
   const jobsRef = useRef(jobs);
@@ -152,7 +155,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
 
       // Operator trails
       map.addSource('operator-trails', { type: 'geojson', data: fc([]) });
-      map.addLayer({ id: 'operator-trails-line', type: 'line', source: 'operator-trails', paint: { 'line-color': '#FF6B00', 'line-width': 3, 'line-opacity': 0.7 } });
+      map.addLayer({ id: 'operator-trails-line', type: 'line', source: 'operator-trails', paint: { 'line-color': '#FF6B00', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 14, 2, 17, 4, 18, 7, 19, 14, 22, 80], 'line-opacity': 0.7 } });
 
       // Click handlers — property/pasture popup with full job details
       map.on('click', 'monitor-pastures-fill', (e) => {
@@ -488,54 +491,44 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     }
   }, [layers, mapLoaded]);
 
-  // Hologram auto-rotation: start when hologram on, stop when off.
-  // Delayed 1.3s to let the easeTo pitch animation finish first.
-  // Pauses for 3s on user interaction then resumes.
+  // Auto-rotation: controlled by the autoRotate prop. Disables zoom/pan when active.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    if (!layers.hologram) {
+    if (!autoRotate) {
       if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
+      try { map.scrollZoom.enable(); } catch { /* ignore */ }
+      try { map.dragPan.enable(); } catch { /* ignore */ }
+      try { map.touchZoomRotate.enable(); } catch { /* ignore */ }
       return;
     }
 
+    // Disable pan/zoom while auto-rotating
+    try { map.scrollZoom.disable(); } catch { /* ignore */ }
+    try { map.dragPan.disable(); } catch { /* ignore */ }
+    try { map.touchZoomRotate.disable(); } catch { /* ignore */ }
+
     let alive = true;
-    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
     const startRotation = () => {
-      if (!alive || rotationRef.current) return;
+      if (!alive || rotationRef.current || !autoRotateRef.current) return;
       const spin = () => {
-        if (!alive || !mapRef.current) return;
+        if (!alive || !mapRef.current || !autoRotateRef.current) return;
         mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
         rotationRef.current = requestAnimationFrame(spin);
       };
       rotationRef.current = requestAnimationFrame(spin);
     };
 
-    const pause = () => {
-      if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
-      if (resumeTimer) clearTimeout(resumeTimer);
-      resumeTimer = setTimeout(startRotation, 3000);
-    };
-
-    // Wait for the easeTo animation to finish before starting rotation
-    const startDelay = setTimeout(startRotation, 1400);
-
-    map.on('mousedown', pause);
-    map.on('touchstart', pause);
-    map.on('wheel', pause);
+    const startDelay = setTimeout(startRotation, 400);
 
     return () => {
       alive = false;
       clearTimeout(startDelay);
       if (rotationRef.current) { cancelAnimationFrame(rotationRef.current); rotationRef.current = null; }
-      if (resumeTimer) clearTimeout(resumeTimer);
-      map.off('mousedown', pause);
-      map.off('touchstart', pause);
-      map.off('wheel', pause);
     };
-  }, [layers.hologram, mapLoaded]);
+  }, [autoRotate, mapLoaded]);
 
   // ── Operator trails ──
   useEffect(() => {
@@ -857,45 +850,12 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     // Set initial 45° pitch
     map.easeTo({ pitch: 45, duration: 1000 });
 
-    // Disable drag rotate and keyboard (only allow zoom and layer switching)
+    // Disable drag rotate and keyboard in operate mode
     map.dragRotate.disable();
     map.keyboard.disable();
     map.touchPitch.disable();
 
-    // Start slow rotation
-    let alive = true;
-    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
-    let frameId: number | null = null;
-
-    const startRotation = () => {
-      if (!alive || frameId) return;
-      const spin = () => {
-        if (!alive || !mapRef.current) return;
-        mapRef.current.setBearing(mapRef.current.getBearing() + 0.03);
-        frameId = requestAnimationFrame(spin);
-      };
-      frameId = requestAnimationFrame(spin);
-    };
-
-    const pause = () => {
-      if (frameId) { cancelAnimationFrame(frameId); frameId = null; }
-      if (resumeTimer) clearTimeout(resumeTimer);
-      resumeTimer = setTimeout(startRotation, 3000);
-    };
-
-    // Start rotation after initial animation
-    const startDelay = setTimeout(startRotation, 1200);
-
-    map.on('wheel', pause);
-    map.on('touchstart', pause);
-
     return () => {
-      alive = false;
-      clearTimeout(startDelay);
-      if (frameId) cancelAnimationFrame(frameId);
-      if (resumeTimer) clearTimeout(resumeTimer);
-      map.off('wheel', pause);
-      map.off('touchstart', pause);
       // Restore controls
       map.dragRotate.enable();
       map.keyboard.enable();
