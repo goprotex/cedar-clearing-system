@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { rowToBid, rowToPasture, type BidRow, type PastureRow } from '@/lib/db';
 
+// Matches the DB check constraint: check (status in ('draft','sent','accepted','declined','expired'))
 const ALLOWED_STATUSES = new Set(['draft', 'sent', 'accepted', 'declined', 'expired']);
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -52,6 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     client_name?: string;
     client_email?: string;
     client_phone?: string;
+    property_name?: string | null;
   };
   try {
     body = await req.json();
@@ -67,11 +69,49 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     patch.status = body.status;
   }
+
+  // client_name is text not null — reject null/non-string/empty
+  if (body.client_name !== undefined) {
+    if (typeof body.client_name !== 'string') {
+      return NextResponse.json({ error: 'client_name must be a string' }, { status: 400 });
+    }
+    const clientName = body.client_name.trim();
+    if (clientName.length === 0) {
+      return NextResponse.json({ error: 'client_name cannot be empty' }, { status: 400 });
+    }
+    if (clientName.length > 200) {
+      return NextResponse.json({ error: 'client_name must be 200 characters or fewer' }, { status: 400 });
+    }
+    patch.client_name = clientName;
+  }
+
+  if (body.property_name !== undefined) {
+    if (body.property_name !== null && typeof body.property_name !== 'string') {
+      return NextResponse.json({ error: 'property_name must be a string or null' }, { status: 400 });
+    }
+    if (typeof body.property_name === 'string' && body.property_name.trim().length > 200) {
+      return NextResponse.json({ error: 'property_name must be 200 characters or fewer' }, { status: 400 });
+    }
+    patch.property_name = typeof body.property_name === 'string' ? body.property_name.trim() : null;
+  }
+
   if (typeof body.notes === 'string') patch.notes = body.notes.slice(0, 10000);
-  if ('valid_until' in body) patch.valid_until = body.valid_until ?? null;
-  if (typeof body.client_name === 'string') patch.client_name = body.client_name.slice(0, 200);
   if (typeof body.client_email === 'string') patch.client_email = body.client_email.slice(0, 200);
   if (typeof body.client_phone === 'string') patch.client_phone = body.client_phone.slice(0, 50);
+
+  // valid_until is a `date` column — require strict YYYY-MM-DD format
+  if ('valid_until' in body) {
+    if (body.valid_until === null) {
+      patch.valid_until = null;
+    } else if (typeof body.valid_until === 'string') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.valid_until)) {
+        return NextResponse.json({ error: 'valid_until must be a date in YYYY-MM-DD format' }, { status: 400 });
+      }
+      patch.valid_until = body.valid_until;
+    } else {
+      return NextResponse.json({ error: 'valid_until must be a YYYY-MM-DD date string or null' }, { status: 400 });
+    }
+  }
 
   if (Object.keys(patch).length <= 1) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });

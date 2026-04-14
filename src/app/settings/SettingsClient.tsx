@@ -64,6 +64,8 @@ export default function SettingsClient() {
   const [coWebsite, setCoWebsite] = useState('');
   const [coLicense, setCoLicense] = useState('');
   const [coInsurance, setCoInsurance] = useState('');
+  const [coLogoUrl, setCoLogoUrl] = useState<string | null>(null);
+  const [coLogoUploading, setCoLogoUploading] = useState(false);
   const [coSaving, setCoSaving] = useState(false);
   const [coSaved, setCoSaved] = useState(false);
   const [coErr, setCoErr] = useState<string | null>(null);
@@ -120,6 +122,7 @@ export default function SettingsClient() {
           setCoWebsite(co.website ?? '');
           setCoLicense(co.license_number ?? '');
           setCoInsurance(co.insurance_info ?? '');
+          setCoLogoUrl(co.logo_url ?? null);
         }
       }
     } catch (e) {
@@ -206,6 +209,7 @@ export default function SettingsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: coName,
+          logo_url: coLogoUrl,
           address: coAddress.trim() || null,
           phone: coPhone.trim() || null,
           email: coEmail.trim() || null,
@@ -246,6 +250,30 @@ export default function SettingsClient() {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setAvatarUploading(false);
+    }
+  };
+
+  const uploadCompanyLogo = async (file: File) => {
+    setCoLogoUploading(true);
+    setCoErr(null);
+    try {
+      const supabase = createClient();
+      const { data: { session: s } } = await supabase.auth.getSession();
+      if (!s?.user?.id) throw new Error('Not signed in');
+      if (!company?.id) throw new Error('No company linked');
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `${company.id}/logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('company-logos').upload(path, file, {
+        upsert: true,
+        contentType: file.type || 'image/jpeg',
+      });
+      if (upErr) throw new Error(upErr.message);
+      const { data: pub } = supabase.storage.from('company-logos').getPublicUrl(path);
+      setCoLogoUrl(pub.publicUrl);
+    } catch (e) {
+      setCoErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCoLogoUploading(false);
     }
   };
 
@@ -451,6 +479,45 @@ export default function SettingsClient() {
               {company && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Company logo</label>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {coLogoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={coLogoUrl} alt="" className="h-12 max-w-[120px] object-contain border border-[#353534] bg-black p-1" />
+                        ) : (
+                          <div className="h-12 w-24 bg-[#353534] flex items-center justify-center text-xs text-[#a98a7d] font-mono border border-[#353534]">
+                            —
+                          </div>
+                        )}
+                        {canEditCompany && (
+                          <label className="cursor-pointer text-[10px] font-mono border border-[#353534] px-3 py-2 hover:border-[#FF6B00]">
+                            {coLogoUploading ? 'Uploading…' : 'Upload logo'}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                              className="hidden"
+                              disabled={coLogoUploading}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = '';
+                                if (f) void uploadCompanyLogo(f);
+                              }}
+                            />
+                          </label>
+                        )}
+                        {canEditCompany && coLogoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setCoLogoUrl(null)}
+                            className="text-[10px] font-mono text-red-400 hover:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-[#5a4136] mt-1">JPEG, PNG, WebP, GIF, or SVG — appears on bids and invoices. Then save company info.</p>
+                    </div>
                     <div>
                       <label className="text-[9px] text-[#5a4136] uppercase block mb-1">Company name *</label>
                       <input
