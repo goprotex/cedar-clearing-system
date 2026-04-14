@@ -337,10 +337,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       try {
         setSharedStatus('syncing');
         const jobId = jobIdFromBidId(bidId);
-        const res = await fetch(`/api/jobs/${jobId}/cleared-cells`, {
-          cache: 'no-store',
-          credentials: 'same-origin',
-        });
+        const res = await fetchApiAuthed(`/api/jobs/${jobId}/cleared-cells`);
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) {
             if (!cancelled) {
@@ -1109,7 +1106,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         const jobId = jobIdFromBidId(bidId);
         void Promise.allSettled(
           newlyCleared.map((cellId) =>
-            fetch(`/api/jobs/${jobId}/events`, {
+            fetchApiAuthed(`/api/jobs/${jobId}/events`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ type: 'operator_cell_cleared', data: { cellId, timestamp: ts } }),
@@ -1361,7 +1358,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       // Failures are intentionally ignored — field connections are unreliable.
       if (sharedEnabledRef.current) {
         const jobId = jobIdFromBidId(bidId);
-        void fetch(`/api/jobs/${jobId}/events`, {
+        void fetchApiAuthed(`/api/jobs/${jobId}/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'operator_cell_cleared', data: { cellId, timestamp: ts } }),

@@ -21,10 +21,10 @@ function isCompanySupervisorRole(role: string | null | undefined): boolean {
   return role === 'owner' || role === 'manager';
 }
 
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(req: Request) {
+  const supabase = await createClient(req);
 
-  const { data: auth, error: authErr } = await getUserFromRequest(supabase);
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase, req);
   if (authErr || !auth.user?.id) {
     return NextResponse.json({
       jobs: [],
@@ -173,14 +173,13 @@ export async function GET() {
   if (allOperatorIds.size > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, email')
+      .select('id, full_name')
       .in('id', Array.from(allOperatorIds));
     for (const p of profiles ?? []) {
-      const displayName = p.display_name as string | null;
-      const email = p.email as string | null;
+      const fullName = p.full_name as string | null;
       operatorProfiles[p.id as string] = {
-        display_name: displayName ?? email ?? 'Unknown',
-        email: email ?? '',
+        display_name: fullName || 'Unknown',
+        email: '',
       };
     }
   }
