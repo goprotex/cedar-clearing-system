@@ -73,13 +73,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const current = machineFromJson(existing.data, existing.id);
 
   const VALID_STATUSES = new Set(['active', 'idle', 'maintenance', 'offline']);
+  const VALID_CATEGORIES = new Set(['truck', 'trailer', 'skid_steer', 'skid_steer_attachment', 'barko', 'dozer', 'excavator', 'small_equipment', 'other']);
+  const VALID_CONDITIONS = new Set(['excellent', 'good', 'fair', 'poor', 'needs_repair']);
 
   // Merge allowed fields
   if (typeof body.name === 'string' && body.name.trim()) current.name = body.name.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 100);
   if (typeof body.type === 'string') current.type = body.type.trim().slice(0, 100);
+  if (typeof body.category === 'string' && VALID_CATEGORIES.has(body.category)) current.category = body.category as typeof current.category;
   if (typeof body.model === 'string') current.model = body.model.trim().slice(0, 100);
   if (typeof body.status === 'string' && VALID_STATUSES.has(body.status)) current.status = body.status as typeof current.status;
   if (typeof body.hours === 'number' && Number.isFinite(body.hours) && body.hours >= 0) current.hours = body.hours;
+  if (typeof body.mileage === 'number' && Number.isFinite(body.mileage) && body.mileage >= 0) current.mileage = body.mileage;
   if (typeof body.fuelLevel === 'number' && Number.isFinite(body.fuelLevel)) current.fuelLevel = Math.max(0, Math.min(100, body.fuelLevel));
   if (typeof body.lastLocation === 'string') current.lastLocation = body.lastLocation.slice(0, 200);
   if (typeof body.operator === 'string') current.operator = body.operator.slice(0, 100);
@@ -87,12 +91,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof body.dailyAcres === 'number' && Number.isFinite(body.dailyAcres)) current.dailyAcres = Math.max(0, body.dailyAcres);
   if (typeof body.avgFuelPerHr === 'number' && Number.isFinite(body.avgFuelPerHr)) current.avgFuelPerHr = Math.max(0, body.avgFuelPerHr);
   if (typeof body.nextService === 'string') current.nextService = body.nextService.slice(0, 20);
+  if (typeof body.nextServiceHours === 'number' && Number.isFinite(body.nextServiceHours)) current.nextServiceHours = Math.max(0, body.nextServiceHours);
+  if (typeof body.condition === 'string' && VALID_CONDITIONS.has(body.condition)) current.condition = body.condition as typeof current.condition;
+  if (typeof body.serialNumber === 'string') current.serialNumber = body.serialNumber.slice(0, 100);
+  if (typeof body.year === 'number' && Number.isFinite(body.year)) current.year = body.year;
+  if (typeof body.make === 'string') current.make = body.make.slice(0, 100);
   if (typeof body.notes === 'string') current.notes = body.notes.slice(0, 2000);
+  if (typeof body.thumbnailIndex === 'number' && Number.isFinite(body.thumbnailIndex)) current.thumbnailIndex = Math.max(0, body.thumbnailIndex);
 
   // Append-only log entries
   if (Array.isArray(body.maintenanceLog)) current.maintenanceLog = body.maintenanceLog as typeof current.maintenanceLog;
   if (Array.isArray(body.fuelLog)) current.fuelLog = body.fuelLog as typeof current.fuelLog;
   if (Array.isArray(body.hoursLog)) current.hoursLog = body.hoursLog as typeof current.hoursLog;
+  if (Array.isArray(body.checkoutHistory)) current.checkoutHistory = body.checkoutHistory as typeof current.checkoutHistory;
   if (Array.isArray(body.photoUrls)) current.photoUrls = (body.photoUrls as string[]).filter((u) => typeof u === 'string').slice(0, 50);
 
   const { data, error } = await supabase
