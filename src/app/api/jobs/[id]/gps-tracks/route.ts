@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { requireJobWorker } from '@/lib/job-api-auth';
 import { canAccessJob } from '@/lib/job-access';
 
@@ -18,7 +18,7 @@ function haversineM(a: [number, number], b: [number, number]): number {
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -79,10 +79,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json({ gpsTrack: data });
 }
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await params;
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

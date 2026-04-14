@@ -5,7 +5,7 @@ import { getUserCompanyId } from '@/lib/user-company';
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
-  const ctx = await getUserCompanyId(supabase);
+  const ctx = await getUserCompanyId(supabase, req);
   if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
-  const ctx = await getUserCompanyId(supabase);
+  const ctx = await getUserCompanyId(supabase, req);
   if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

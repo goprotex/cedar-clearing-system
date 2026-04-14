@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { canAccessJob } from '@/lib/job-access';
-import { isCompanyAdmin } from '@/lib/company-admin';
+import { getProfileCompanyContext, isCompanyAdminRole } from '@/lib/company-admin';
+import { jobBidCompanyMatches } from '@/lib/job-company-access';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -39,11 +40,11 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await getUserFromRequest(supabase);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Require job owner role OR company admin
+  // Check job membership — handle query errors explicitly
   const { data: membership, error: membershipErr } = await supabase
     .from('job_members')
     .select('role')
@@ -55,13 +56,23 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   }
 
   const isJobOwner = membership?.role === 'owner';
-  const isAdmin = !isJobOwner && (await isCompanyAdmin(supabase, userId));
 
-  if (!isJobOwner && !isAdmin) {
-    return NextResponse.json(
-      { error: 'Only the job owner or a company admin can delete a job' },
-      { status: 403 }
-    );
+  if (!isJobOwner) {
+    // Company admin check scoped to this job's company (mirrors canAccessJob logic)
+    const ctx = await getProfileCompanyContext(supabase, userId);
+    if (!ctx?.companyId || !isCompanyAdminRole(ctx.role)) {
+      return NextResponse.json(
+        { error: 'Only the job owner or a company admin can delete a job' },
+        { status: 403 }
+      );
+    }
+    const jobMatchesCompany = await jobBidCompanyMatches(supabase, id, ctx.companyId);
+    if (!jobMatchesCompany) {
+      return NextResponse.json(
+        { error: 'Only the job owner or a company admin can delete a job' },
+        { status: 403 }
+      );
+    }
   }
 
   const { error } = await supabase.from('jobs').delete().eq('id', id);

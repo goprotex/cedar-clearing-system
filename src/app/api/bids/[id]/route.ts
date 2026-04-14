@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { rowToBid, rowToPasture, type BidRow, type PastureRow } from '@/lib/db';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase);
   if (authErr || !auth.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -38,7 +38,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase);
   if (authErr || !auth.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -53,7 +53,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase, req);
   if (authErr || !auth.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -74,7 +74,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const VALID_STATUSES = ['draft', 'sent', 'approved', 'active', 'completed', 'rejected', 'cancelled'];
+  // Matches the DB check constraint: check (status in ('draft','sent','accepted','declined','expired'))
+  const VALID_STATUSES = ['draft', 'sent', 'accepted', 'declined', 'expired'];
   const updates: Record<string, unknown> = {};
 
   if (typeof body.status === 'string') {
@@ -97,10 +98,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     updates.client_name = clientName;
   }
   if (body.property_name !== undefined) {
+    if (body.property_name !== null && typeof body.property_name !== 'string') {
+      return NextResponse.json({ error: 'property_name must be a string or null' }, { status: 400 });
+    }
     if (typeof body.property_name === 'string' && body.property_name.trim().length > 200) {
       return NextResponse.json({ error: 'property_name must be 200 characters or fewer' }, { status: 400 });
     }
-    updates.property_name = typeof body.property_name === 'string' ? body.property_name.trim() || null : null;
+    updates.property_name = typeof body.property_name === 'string' ? body.property_name.trim() : null;
   }
   if (body.notes !== undefined) {
     updates.notes = typeof body.notes === 'string' ? body.notes : '';
@@ -109,13 +113,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.valid_until === null) {
       updates.valid_until = null;
     } else if (typeof body.valid_until === 'string') {
-      const parsed = new Date(body.valid_until);
-      if (isNaN(parsed.getTime())) {
-        return NextResponse.json({ error: 'valid_until must be a valid ISO 8601 date string' }, { status: 400 });
+      // Require YYYY-MM-DD format to match the `date` column type
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.valid_until)) {
+        return NextResponse.json({ error: 'valid_until must be a date in YYYY-MM-DD format' }, { status: 400 });
       }
-      updates.valid_until = parsed.toISOString();
+      updates.valid_until = body.valid_until;
     } else {
-      return NextResponse.json({ error: 'valid_until must be an ISO 8601 date string or null' }, { status: 400 });
+      return NextResponse.json({ error: 'valid_until must be a YYYY-MM-DD date string or null' }, { status: 400 });
     }
   }
 
