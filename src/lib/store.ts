@@ -14,7 +14,7 @@ import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analy
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
 import { fetchCedarDetectChunkWithRetry, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
-import { saveBidToSupabase, loadBidFromSupabase, loadBidListFromSupabase, deleteBidFromSupabase, getAuthUserId } from '@/lib/db';
+import { saveBidToSupabase, loadBidFromSupabase, loadBidListFromSupabase, deleteBidFromSupabase, getAuthUserId, migrateBidsToSupabase, BIDS_MIGRATION_FLAG } from '@/lib/db';
 import {
   clearCedarChunkResumeHybrid,
   hashPasturePolygon,
@@ -115,7 +115,7 @@ interface BidStore {
     processLines?: string[];
   } | null;
 
-  // All saved bids (local storage for Phase 1)
+  // All saved bids (Supabase primary, localStorage fallback)
   savedBids: BidSummary[];
 
   // Actions
@@ -166,7 +166,7 @@ interface BidStore {
   // Rate card
   updateRateCard: (updates: Partial<RateCard>) => void;
 
-  // Persistence (Supabase when authenticated, localStorage fallback)
+  // Persistence (Supabase primary, localStorage offline fallback)
   saveBid: () => void;
   loadBid: (id: string) => Promise<void>;
   deleteBid: (id: string) => Promise<void>;
@@ -376,23 +376,25 @@ export const useBidStore = create<BidStore>((set, get) => ({
     localStorage.setItem(listKey, JSON.stringify(updated));
     set({ savedBids: updated });
 
-    // Persist to Supabase if authenticated
+    // Persist to Supabase as primary data source
     if (isSupabaseConfigured) {
       const sb = createSupabaseBrowser();
-      getAuthUserId(sb).then((userId) => {
+      (async () => {
+        const userId = await getAuthUserId(sb);
         if (!userId) return;
         set({ isAuthenticated: true });
-        saveBidToSupabase(sb, currentBid, userId).then(({ error }) => {
-          if (error) console.warn('[db] Supabase save failed, localStorage is still valid:', error);
-        });
-      });
+        const { error } = await saveBidToSupabase(sb, currentBid, userId);
+        if (error) {
+          console.warn('[db] Supabase save failed, localStorage is still valid:', error);
+        }
+      })();
     }
   },
 
   loadBid: async (id) => {
     if (typeof window === 'undefined') return;
 
-    // Try Supabase first when configured
+    // Try Supabase first (primary data source)
     if (isSupabaseConfigured) {
       try {
         const sb = createSupabaseBrowser();
@@ -405,6 +407,20 @@ export const useBidStore = create<BidStore>((set, get) => ({
             // Update localStorage cache
             localStorage.setItem(`ccc_bid_${id}`, JSON.stringify(bid));
             return;
+          }
+
+          // Bid not in Supabase — check localStorage and push it up
+          if (!error && !bid) {
+            const data = localStorage.getItem(`ccc_bid_${id}`);
+            if (data) {
+              const localBid = JSON.parse(data) as Bid;
+              set({ currentBid: localBid, selectedPastureId: null, drawingMode: false });
+              // Push local-only bid to Supabase (fire-and-forget; user already sees local data)
+              saveBidToSupabase(sb, localBid, userId).catch((e) => {
+                console.warn('[db] Failed to push local bid to Supabase:', e);
+              });
+              return;
+            }
           }
         }
       } catch {
@@ -422,7 +438,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
   deleteBid: async (id) => {
     if (typeof window === 'undefined') return;
 
-    // Remove from localStorage
+    // Remove from localStorage cache
     localStorage.removeItem(`ccc_bid_${id}`);
     const listKey = 'ccc_bid_list';
     const existingList: BidSummary[] = JSON.parse(localStorage.getItem(listKey) || '[]');
@@ -430,16 +446,17 @@ export const useBidStore = create<BidStore>((set, get) => ({
     localStorage.setItem(listKey, JSON.stringify(updatedList));
     set({ savedBids: updatedList });
 
-    // Remove from Supabase if authenticated
+    // Remove from Supabase (primary data source)
     if (isSupabaseConfigured) {
       try {
         const sb = createSupabaseBrowser();
         const userId = await getAuthUserId(sb);
         if (userId) {
-          await deleteBidFromSupabase(sb, id);
+          const { error } = await deleteBidFromSupabase(sb, id);
+          if (error) console.warn('[db] Supabase delete failed:', error);
         }
-      } catch {
-        // localStorage already cleaned up
+      } catch (e) {
+        console.warn('[db] Supabase delete error:', e);
       }
     }
   },
@@ -447,21 +464,37 @@ export const useBidStore = create<BidStore>((set, get) => ({
   loadBidList: async () => {
     if (typeof window === 'undefined') return;
 
-    // Try Supabase first
+    // Try Supabase first (primary data source)
     if (isSupabaseConfigured) {
       try {
         const sb = createSupabaseBrowser();
         const userId = await getAuthUserId(sb);
         if (userId) {
           set({ isAuthenticated: true });
+
+          // One-time migration: push localStorage bids into Supabase
+          const alreadyMigrated = localStorage.getItem(BIDS_MIGRATION_FLAG) === '1';
+          if (!alreadyMigrated) {
+            const { migrated, failed, error: migErr } = await migrateBidsToSupabase(sb, userId);
+            if (migrated > 0) {
+              console.info(`[db] Migrated ${migrated} bids from localStorage to Supabase`);
+            }
+            if (failed > 0) {
+              console.warn(`[db] ${failed} bids failed to migrate:`, migErr);
+            }
+          }
+
           const { bids, error } = await loadBidListFromSupabase(sb);
-          if (!error && bids.length > 0) {
-            // Merge with localStorage bids (local-only bids stay visible)
+          if (!error) {
+            // Merge with any local-only bids not yet in Supabase (e.g. created offline)
             const localData = localStorage.getItem('ccc_bid_list');
             const localBids: BidSummary[] = localData ? JSON.parse(localData) : [];
             const supabaseIds = new Set(bids.map((b) => b.id));
             const localOnly = localBids.filter((b) => !supabaseIds.has(b.id));
             const merged = [...bids, ...localOnly];
+
+            // Update localStorage cache to reflect Supabase truth
+            localStorage.setItem('ccc_bid_list', JSON.stringify(merged));
             set({ savedBids: merged });
             return;
           }
