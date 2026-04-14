@@ -179,6 +179,39 @@ function formatDuration(ms: number): string {
   return `${sec}s`;
 }
 
+/** Build a GeoJSON FeatureCollection from all vegetation cells in the bid pastures,
+ *  tagging each cell with whether it has been cleared. */
+function buildClearedCellsGeoJSON(
+  pastures: Bid['pastures'],
+  clearedCellIds: Set<string>,
+): GeoJSON.FeatureCollection {
+  const classColor: Record<string, string> = {
+    cedar: '#ef4444',
+    oak: '#92400e',
+    mixed_brush: '#f97316',
+  };
+  const features: GeoJSON.Feature[] = [];
+  for (const p of pastures) {
+    if (!p.cedarAnalysis?.gridCells?.features) continue;
+    p.cedarAnalysis.gridCells.features.forEach((f, idx) => {
+      const cls = f.properties?.classification as string | undefined;
+      if (!cls || !(cls in classColor)) return;
+      const cellId = `${p.id}:${idx}`;
+      features.push({
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: {
+          ...f.properties,
+          cellId,
+          cleared: clearedCellIds.has(cellId),
+          color: classColor[cls],
+        },
+      });
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
+
 export default function OperatorClient({ bidId }: { bidId: string }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -200,6 +233,8 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const [hudOpen, setHudOpen] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [sharedEnabled, setSharedEnabled] = useState(false);
+  const sharedEnabledRef = useRef(sharedEnabled);
+  sharedEnabledRef.current = sharedEnabled;
   const lastPublishRef = useRef<number>(0);
   const lastTrailMapDrawRef = useRef<number>(0);
   const lastHudGpsEmitRef = useRef<number>(0);
@@ -609,6 +644,28 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           map.addLayer({ id: 'pastures-border', type: 'line', source: 'pastures', paint: { 'line-color': '#00ff41', 'line-width': 2, 'line-dasharray': [2, 1] } });
           map.addLayer({ id: 'pastures-label', type: 'symbol', source: 'pastures', layout: { 'text-field': ['get', 'name'], 'text-size': 14, 'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'] }, paint: { 'text-color': '#00ff41', 'text-halo-color': '#000', 'text-halo-width': 1.5 } });
 
+          // Cedar analysis grid cells — uncleared shown as semi-transparent fill, cleared shown green.
+          try {
+            const initialCedarData = buildClearedCellsGeoJSON(bid.pastures, stateRef.current.clearedCellIds);
+            map.addSource('cedar-cells', { type: 'geojson', data: initialCedarData });
+            map.addLayer({
+              id: 'cedar-cells-uncleared',
+              type: 'fill',
+              source: 'cedar-cells',
+              filter: ['==', ['get', 'cleared'], false],
+              paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.3 },
+            });
+            map.addLayer({
+              id: 'cedar-cells-cleared',
+              type: 'fill',
+              source: 'cedar-cells',
+              filter: ['==', ['get', 'cleared'], true],
+              paint: { 'fill-color': '#13ff43', 'fill-opacity': 0.5 },
+            });
+          } catch {
+            /* optional — only present if cedar analysis has been run */
+          }
+
           // Mapbox-native 3D trees only (no grid cell blocks — clearing still uses analysis grid in memory).
           try {
             const treeList = extractTreesFromAnalysis(bid.pastures);
@@ -968,9 +1025,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     };
   }, [state.bid]);
 
-  // Process GPS position — check cedar cells for clearing
-  /** Grid cell map layers removed; GPS clearing still uses cedar analysis in memory. */
-  const updateCedarSource = useCallback(() => {}, []);
+  // Process GPS position — check cedar cells for clearing and update map overlay.
+  /** Cedar cells are tracked in memory and visualized via the 'cedar-cells' Mapbox source. */
+  const updateCedarSource = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const bid = stateRef.current.bid;
+    if (!bid) return;
+    const source = map.getSource('cedar-cells') as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+    source.setData(buildClearedCellsGeoJSON(bid.pastures, stateRef.current.clearedCellIds));
+  }, []);
 
   const processPosition = useCallback((lng: number, lat: number) => {
     const cells = cedarCellsRef.current;
@@ -1189,6 +1254,73 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
     };
   }, []);
+
+  // Keep the cedar-cells map source in sync whenever cleared cells change.
+  useEffect(() => {
+    updateCedarSource();
+  }, [state.clearedCellIds, updateCedarSource]);
+
+  // Tap-to-clear: operator can tap an uncleared cedar cell on the map to mark it cleared.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const handleCellClick = (e: mapboxgl.MapLayerMouseEvent) => {
+      const props = e.features?.[0]?.properties;
+      if (!props?.cellId) return;
+      const cellId = props.cellId as string;
+      if (stateRef.current.clearedCellIds.has(cellId)) return;
+      const ts = Date.now();
+      setState(prev => {
+        const nextIds = new Set(prev.clearedCellIds);
+        nextIds.add(cellId);
+        const colonIdx = cellId.indexOf(':');
+        if (colonIdx < 0) return prev; // malformed cellId, skip
+        const pastureId = cellId.slice(0, colonIdx);
+        const cellIndex = parseInt(cellId.slice(colonIdx + 1), 10);
+        if (!pastureId || Number.isNaN(cellIndex)) return prev; // guard against bad data
+        const nextCells = [
+          ...prev.clearedCells,
+          { cellIndex, pastureId, timestamp: ts },
+        ];
+        saveOperatorSession(bidId, Array.from(nextIds), nextCells);
+        return { ...prev, clearedCellIds: nextIds, clearedCells: nextCells };
+      });
+
+      // Best-effort: push clearing event so live monitor / other devices see progress.
+      // Failures are intentionally ignored — field connections are unreliable.
+      if (sharedEnabledRef.current) {
+        const jobId = jobIdFromBidId(bidId);
+        void fetch(`/api/jobs/${jobId}/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'operator_cell_cleared', data: { cellId, timestamp: ts } }),
+        }).then((res) => {
+          if (res.status === 401) {
+            setSharedEnabled(false);
+            setSharedStatus('unauth');
+          }
+        }).catch(() => { /* best-effort — ignore network failures */ });
+      }
+    };
+
+    const handleMouseEnter = () => { map.getCanvas().style.cursor = 'pointer'; };
+    const handleMouseLeave = () => { map.getCanvas().style.cursor = ''; };
+
+    try {
+      map.on('click', 'cedar-cells-uncleared', handleCellClick);
+      map.on('mouseenter', 'cedar-cells-uncleared', handleMouseEnter);
+      map.on('mouseleave', 'cedar-cells-uncleared', handleMouseLeave);
+    } catch { /* ignore */ }
+
+    return () => {
+      try {
+        map.off('click', 'cedar-cells-uncleared', handleCellClick);
+        map.off('mouseenter', 'cedar-cells-uncleared', handleMouseEnter);
+        map.off('mouseleave', 'cedar-cells-uncleared', handleMouseLeave);
+      } catch { /* ignore */ }
+    };
+  }, [mapReady, bidId]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const elapsedMs = Date.now() - state.sessionStart;
