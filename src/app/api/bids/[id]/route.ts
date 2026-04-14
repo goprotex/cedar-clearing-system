@@ -84,10 +84,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     updates.status = body.status;
   }
   if (body.client_name !== undefined) {
-    if (typeof body.client_name === 'string' && body.client_name.trim().length > 200) {
+    if (typeof body.client_name !== 'string') {
+      return NextResponse.json({ error: 'client_name must be a string' }, { status: 400 });
+    }
+    const clientName = body.client_name.trim();
+    if (clientName.length === 0) {
+      return NextResponse.json({ error: 'client_name cannot be empty' }, { status: 400 });
+    }
+    if (clientName.length > 200) {
       return NextResponse.json({ error: 'client_name must be 200 characters or fewer' }, { status: 400 });
     }
-    updates.client_name = typeof body.client_name === 'string' ? body.client_name.trim() || null : null;
+    updates.client_name = clientName;
   }
   if (body.property_name !== undefined) {
     if (typeof body.property_name === 'string' && body.property_name.trim().length > 200) {
