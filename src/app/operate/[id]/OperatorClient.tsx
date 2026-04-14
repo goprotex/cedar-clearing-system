@@ -23,6 +23,8 @@ const OPERATOR_PUBLISH_MS = 2500;
 const TRAIL_MAP_MIN_INTERVAL_MS = 200;
 /** Avoid re-rendering the whole tree on every GPS tick (janks pinch/rotate). */
 const HUD_GPS_STATE_MIN_INTERVAL_MS = 350;
+/** Throttle auto-center easeTo so rapid GPS ticks don't interrupt in-progress animations. */
+const CENTER_MAP_MIN_INTERVAL_MS = 800;
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
 
 const VEGETATION_COLORS: Record<string, string> = {
@@ -238,6 +240,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
   const lastPublishRef = useRef<number>(0);
   const lastTrailMapDrawRef = useRef<number>(0);
   const lastHudGpsEmitRef = useRef<number>(0);
+  const lastCenterMapRef = useRef<number>(0);
   const supabaseSessionRef = useRef(false);
   const [, setSharedStatus] = useState<'idle' | 'syncing' | 'ready' | 'unauth' | 'error'>('idle');
 
@@ -1205,11 +1208,16 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(mapRef.current);
         }
 
-        // Auto-center map on operator position so the field worker is always visible
-        if (mapRef.current && mapRef.current.isStyleLoaded()) {
+        // Auto-center map on operator position (throttled to avoid interrupting in-progress animations)
+        const centerNow = Date.now();
+        if (
+          mapRef.current &&
+          mapRef.current.isStyleLoaded() &&
+          centerNow - lastCenterMapRef.current >= CENTER_MAP_MIN_INTERVAL_MS
+        ) {
+          lastCenterMapRef.current = centerNow;
           mapRef.current.easeTo({
             center: [lng, lat],
-            pitch: 45,
             duration: 600,
           });
         }
