@@ -10,9 +10,9 @@ export type EmployeeHoursSummary = {
   job_count: number;
 };
 
-export async function GET() {
-  const supabase = await createClient();
-  const { data: auth } = await getUserFromRequest(supabase);
+export async function GET(req: Request) {
+  const supabase = await createClient(req);
+  const { data: auth } = await getUserFromRequest(supabase, req);
   const userId = auth.user?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
