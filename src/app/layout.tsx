@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Toaster } from "@/components/ui/sonner";
 import AuthProvider from "@/components/AuthProvider";
 import AuthRequiredGate from "@/components/AuthRequiredGate";
+import PwaManager from "@/components/PwaManager";
 import "./globals.css";
 
 // Self-hosted Space Grotesk variable font — avoids build-time Google Fonts
@@ -24,12 +25,22 @@ export const metadata: Metadata = {
     title: "Cedar Hack",
     statusBarStyle: "black-translucent",
   },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
+      { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icons/icon-96x96.png", sizes: "96x96", type: "image/png" },
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/icons/icon-192x192.png",
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 
@@ -56,6 +67,7 @@ export default function RootLayout({
           <AuthRequiredGate>{children}</AuthRequiredGate>
         </AuthProvider>
         <Toaster position="bottom-right" richColors />
+        <PwaManager />
       </body>
     </html>
   );

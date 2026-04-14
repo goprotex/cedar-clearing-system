@@ -214,3 +214,65 @@
   color: rgba(0, 255, 65, 1);
   box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
 }
+
+/* ─── PWA / Mobile Optimisations ─── */
+
+/* Prevent iOS rubber-band overscroll in standalone mode */
+@supports (display-mode: standalone) {
+  html {
+    overscroll-behavior: none;
+  }
+}
+
+/* Prevent pull-to-refresh when running as a standalone PWA */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Ensure touch targets are at least 44px (WCAG / Apple HIG) */
+@layer base {
+  button,
+  [role="button"],
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Opt out for inline/small utility elements that don't need large targets */
+  .touch-target-auto,
+  nav a,
+  .text-\[10px\] a,
+  .text-\[9px\] a {
+    min-height: unset;
+    min-width: unset;
+  }
+}
+
+/* Disable tap-highlight on mobile (use visible focus states instead) */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS text size adjustment when rotating */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Safe-area padding helpers (for devices with notch/home indicator) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Standalone (home-screen PWA) — add bottom padding for the iOS home indicator */
+@media (display-mode: standalone) {
+  .pwa-bottom-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+}
