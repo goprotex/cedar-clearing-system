@@ -58,6 +58,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     cedar: true, oak: true, mixed: true,
   });
   const [markMode, setMarkMode] = useState<'save' | 'remove' | null>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const autoRotateRef = useRef(autoRotate);
+  autoRotateRef.current = autoRotate;
 
   const {
     currentBid,
@@ -529,16 +532,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         }
       }
 
-      // Start slow auto-rotation
-      if (!rotationFrameRef.current) {
-        const rotate = () => {
-          if (!mapRef.current) return;
-          const bearing = mapRef.current.getBearing() + 0.0375;
-          mapRef.current.setBearing(bearing);
-          rotationFrameRef.current = requestAnimationFrame(rotate);
-        };
-        rotationFrameRef.current = requestAnimationFrame(rotate);
-      }
+      // Rotation is now opt-in via the autoRotate button; don't auto-start it here
     } else {
       // Stop rotation
       if (rotationFrameRef.current) {
@@ -594,42 +588,49 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
   }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
 
-  // Pause rotation on user interaction, resume after 3s idle
+  // Auto-rotation: only spin when autoRotate is enabled; disables zoom/pan when active.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !layers.hologram) return;
+    if (!map) return;
 
-    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const pause = () => {
+    if (!autoRotate) {
       if (rotationFrameRef.current) {
         cancelAnimationFrame(rotationFrameRef.current);
         rotationFrameRef.current = null;
       }
-      if (resumeTimer) clearTimeout(resumeTimer);
-      resumeTimer = setTimeout(() => {
-        if (!mapRef.current || !rotationFrameRef.current) {
-          const rotate = () => {
-            if (!mapRef.current) return;
-            mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
-            rotationFrameRef.current = requestAnimationFrame(rotate);
-          };
-          rotationFrameRef.current = requestAnimationFrame(rotate);
-        }
-      }, 3000);
+      try { map.scrollZoom.enable(); } catch { /* ignore */ }
+      try { map.dragPan.enable(); } catch { /* ignore */ }
+      try { map.touchZoomRotate.enable(); } catch { /* ignore */ }
+      return;
+    }
+
+    // Disable pan/zoom while auto-rotating
+    try { map.scrollZoom.disable(); } catch { /* ignore */ }
+    try { map.dragPan.disable(); } catch { /* ignore */ }
+    try { map.touchZoomRotate.disable(); } catch { /* ignore */ }
+
+    let alive = true;
+
+    const startSpin = () => {
+      if (!alive || rotationFrameRef.current || !autoRotateRef.current) return;
+      const rotate = () => {
+        if (!alive || !mapRef.current || !autoRotateRef.current) return;
+        mapRef.current.setBearing(mapRef.current.getBearing() + 0.0375);
+        rotationFrameRef.current = requestAnimationFrame(rotate);
+      };
+      rotationFrameRef.current = requestAnimationFrame(rotate);
     };
 
-    map.on('mousedown', pause);
-    map.on('touchstart', pause);
-    map.on('wheel', pause);
+    startSpin();
 
     return () => {
-      map.off('mousedown', pause);
-      map.off('touchstart', pause);
-      map.off('wheel', pause);
-      if (resumeTimer) clearTimeout(resumeTimer);
+      alive = false;
+      if (rotationFrameRef.current) {
+        cancelAnimationFrame(rotationFrameRef.current);
+        rotationFrameRef.current = null;
+      }
     };
-  }, [layers.hologram]);
+  }, [autoRotate]);
 
   // Clean up rotation on unmount
   useEffect(() => {
@@ -1005,6 +1006,25 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             Layers
           </button>
         )}
+      </div>
+
+      {/* Auto-rotate button (top-right) */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={() => setAutoRotate(v => !v)}
+          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+            autoRotate
+              ? layers.hologram
+                ? 'bg-orange-500/80 text-white shadow-[0_0_12px_rgba(255,107,0,0.5)]'
+                : 'bg-orange-600 text-white shadow-md'
+              : layers.hologram
+                ? 'holo-button'
+                : 'backdrop-blur bg-slate-900/90 text-slate-300 hover:text-white shadow-lg'
+          }`}
+          title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled) — click to stop' : 'Start auto-rotation (disables zoom/pan)'}
+        >
+          🔄 {autoRotate ? 'Rotate ON' : 'Rotate'}
+        </button>
       </div>
 
       {/* Hologram controls (bottom-right) */}

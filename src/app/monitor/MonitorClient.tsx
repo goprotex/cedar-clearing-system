@@ -109,6 +109,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
   const [membersByJob, setMembersByJob] = useState<Record<string, JobMember[]>>({});
   const [operateMode, setOperateMode] = useState(false);
   const [operateModeUserId, setOperateModeUserId] = useState<string | null>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
 
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     soil: false,
@@ -305,7 +306,17 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
       if (cancelled) return;
       setOperatorsByJob((prev) => mergeOperatorsByJob(prev, next));
-      setTrailsByJob(trails);
+      // Merge trails: only update entries that have fresh data, keep existing trails if poll returns nothing.
+      // Requires at least 2 points since a GeoJSON LineString must have 2+ coordinates.
+      if (Object.keys(trails).length > 0) {
+        setTrailsByJob(prev => {
+          const merged = { ...prev };
+          for (const [jobId, coords] of Object.entries(trails)) {
+            if (coords.length >= 2) merged[jobId] = coords;
+          }
+          return merged;
+        });
+      }
     };
 
     void poll();
@@ -563,6 +574,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               membersByJob={membersByJob}
               operateMode={operateMode}
               operateModeUserId={operateModeUserId}
+              autoRotate={autoRotate}
             />
           ) : (
             <div className="w-full h-full min-h-[min(70vh,720px)] bg-[#0e0e0e] flex items-center justify-center text-[#a98a7d] px-4">
@@ -606,6 +618,19 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
                     </button>
                   </div>
                 ))}
+                <div className="border-t border-slate-700 my-1" />
+                <button
+                  onClick={() => setAutoRotate(v => !v)}
+                  className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
+                    autoRotate
+                      ? 'bg-orange-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled)' : 'Enable auto-rotation (disables zoom/pan)'}
+                >
+                  🔄 Auto-Rotate
+                  {autoRotate && <span className="float-right text-[10px] opacity-75">ON</span>}
+                </button>
               </div>
             ) : (
               <button
