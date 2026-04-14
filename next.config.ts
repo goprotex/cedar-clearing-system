@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
+/** Common cache durations for runtime caching (seconds). */
+const ONE_YEAR = 365 * 24 * 60 * 60;
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
+const SEVEN_DAYS = 7 * 24 * 60 * 60;
+
 const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
@@ -20,7 +25,7 @@ const withPWA = withPWAInit({
         handler: "CacheFirst",
         options: {
           cacheName: "google-fonts",
-          expiration: { maxEntries: 10, maxAgeSeconds: 365 * 24 * 60 * 60 },
+          expiration: { maxEntries: 10, maxAgeSeconds: ONE_YEAR },
         },
       },
       {
@@ -29,7 +34,7 @@ const withPWA = withPWAInit({
         handler: "CacheFirst",
         options: {
           cacheName: "images",
-          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          expiration: { maxEntries: 100, maxAgeSeconds: THIRTY_DAYS },
         },
       },
       {
@@ -38,7 +43,7 @@ const withPWA = withPWAInit({
         handler: "CacheFirst",
         options: {
           cacheName: "static-assets",
-          expiration: { maxEntries: 200, maxAgeSeconds: 365 * 24 * 60 * 60 },
+          expiration: { maxEntries: 200, maxAgeSeconds: ONE_YEAR },
         },
       },
       {
@@ -47,7 +52,7 @@ const withPWA = withPWAInit({
         handler: "NetworkFirst",
         options: {
           cacheName: "mapbox-tiles",
-          expiration: { maxEntries: 300, maxAgeSeconds: 7 * 24 * 60 * 60 },
+          expiration: { maxEntries: 300, maxAgeSeconds: SEVEN_DAYS },
           networkTimeoutSeconds: 10,
         },
       },

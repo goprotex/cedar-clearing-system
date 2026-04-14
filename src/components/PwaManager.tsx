@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 
+/** Delay before showing the iOS install-to-home-screen banner (ms). */
+const IOS_INSTALL_BANNER_DELAY_MS = 6000;
+
 /**
  * Handles PWA lifecycle: service-worker update prompts and iOS "Add to Home Screen" banner.
  *
@@ -17,28 +20,33 @@ export default function PwaManager() {
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used for cleanup ref
-    let reg: ServiceWorkerRegistration | null = null;
+    let cancelled = false;
+    let onUpdateFound: (() => void) | null = null;
+    let registration: ServiceWorkerRegistration | null = null;
 
     navigator.serviceWorker.getRegistration().then((r) => {
-      if (!r) return;
-      reg = r;
-
-      const onStateChange = () => {
-        if (r.waiting) setUpdateReady(true);
-      };
+      if (!r || cancelled) return;
+      registration = r;
 
       if (r.waiting) {
         setUpdateReady(true);
       }
 
-      r.addEventListener('updatefound', () => {
+      onUpdateFound = () => {
         const sw = r.installing;
-        sw?.addEventListener('statechange', onStateChange);
-      });
+        sw?.addEventListener('statechange', () => {
+          if (r.waiting) setUpdateReady(true);
+        });
+      };
+      r.addEventListener('updatefound', onUpdateFound);
     });
 
-    return () => { reg = null; };
+    return () => {
+      cancelled = true;
+      if (registration && onUpdateFound) {
+        registration.removeEventListener('updatefound', onUpdateFound);
+      }
+    };
   }, []);
 
   const applyUpdate = useCallback(() => {
@@ -71,7 +79,7 @@ export default function PwaManager() {
     if (dismissed) return;
 
     // Delay prompt so it doesn't flash immediately on first visit
-    const timer = setTimeout(() => setShowInstall(true), 6000);
+    const timer = setTimeout(() => setShowInstall(true), IOS_INSTALL_BANNER_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 

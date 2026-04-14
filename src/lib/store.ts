@@ -668,10 +668,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
       }
 
       // --- Retry pass: retry failed chunks with increasing backoff ---
-      const MAX_RETRY_ROUNDS = 2;
+      // Two retry rounds strikes a balance between user wait time and recovery
+      // probability for transient NAIP/network issues.
+      const CHUNK_RETRY_ROUNDS = 2;
+      const RETRY_BASE_MS = 3000;       // initial wait before first retry
+      const RETRY_INCREMENT_MS = 3000;  // additional wait per subsequent round
+      const RETRY_JITTER_MS = 2000;     // randomised spread to avoid thundering-herd
       let retryQueue = [...firstPassFailed];
-      for (let round = 0; round < MAX_RETRY_ROUNDS && retryQueue.length > 0; round++) {
-        const backoffMs = 3000 + round * 3000 + Math.random() * 2000;
+      for (let round = 0; round < CHUNK_RETRY_ROUNDS && retryQueue.length > 0; round++) {
+        const backoffMs = RETRY_BASE_MS + round * RETRY_INCREMENT_MS + Math.random() * RETRY_JITTER_MS;
         console.log(`[analyzeCedar] retry round ${round + 1}: ${retryQueue.length} chunks, backoff ${Math.round(backoffMs)}ms`);
 
         set({
@@ -679,7 +684,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
             active: true,
             phase: 'retry',
             step: `Retrying ${retryQueue.length} failed region(s)…`,
-            detail: `Retry round ${round + 1} of ${MAX_RETRY_ROUNDS} — waiting ${Math.round(backoffMs / 1000)}s before retrying`,
+            detail: `Retry round ${round + 1} of ${CHUNK_RETRY_ROUNDS} — waiting ${Math.round(backoffMs / 1000)}s before retrying`,
             pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
             percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
             processLines: spectralProcessLines,
