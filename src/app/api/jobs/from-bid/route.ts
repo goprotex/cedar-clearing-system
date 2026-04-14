@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { Bid } from '@/types';
-import { createClient } from '@/utils/supabase/server';
+import { createClient, getUserFromRequest } from '@/utils/supabase/server';
 import { jobIdFromBidId } from '@/lib/jobs';
 
 function countCedarCells(bid: Bid): number {
@@ -28,8 +28,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing bid payload' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    const supabase = await createClient(req);
+    const { data: userRes, error: userErr } = await getUserFromRequest(supabase, req);
     if (userErr) return NextResponse.json({ error: userErr.message }, { status: 401 });
     const user = userRes.user;
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });

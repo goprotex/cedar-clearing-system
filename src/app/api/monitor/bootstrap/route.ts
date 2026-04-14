@@ -21,10 +21,10 @@ function isCompanySupervisorRole(role: string | null | undefined): boolean {
   return role === 'owner' || role === 'manager';
 }
 
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(req: Request) {
+  const supabase = await createClient(req);
 
-  const { data: auth, error: authErr } = await getUserFromRequest(supabase);
+  const { data: auth, error: authErr } = await getUserFromRequest(supabase, req);
   if (authErr || !auth.user?.id) {
     return NextResponse.json({
       jobs: [],
