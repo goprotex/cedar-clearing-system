@@ -485,7 +485,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           }
         }
       } else {
-        const errData = await res.json().catch(() => ({ error: 'Clock-in failed' })) as { error?: string };
+        const errData = await res.json().catch(() => ({ error: `Clock-in failed (status: ${res.status})` })) as { error?: string };
         // If already clocked in (409), still enter operate mode
         if (res.status === 409) {
           // Find existing time entry for this user

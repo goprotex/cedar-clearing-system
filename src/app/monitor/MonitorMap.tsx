@@ -678,7 +678,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
         if (existing) { existing.setLngLat([op.lng, op.lat]); continue; }
 
         const el = document.createElement('div');
-        el.style.cssText = 'width:18px;height:18px;border-radius:999px;border:2px solid #fff;background:#FF6B00;box-shadow:0 0 16px rgba(255,107,0,0.7);cursor:pointer;animation:pulse 2s infinite;';
+        el.style.cssText = 'width:18px;height:18px;border-radius:999px;border:2px solid #fff;background:#FF6B00;box-shadow:0 0 16px rgba(255,107,0,0.7);cursor:pointer;';
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat([op.lng, op.lat]).addTo(map);
 
         // Capture jobId and user_id for the click handler closure

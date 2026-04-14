@@ -176,9 +176,11 @@ export async function GET() {
       .select('id, display_name, email')
       .in('id', Array.from(allOperatorIds));
     for (const p of profiles ?? []) {
+      const displayName = p.display_name as string | null;
+      const email = p.email as string | null;
       operatorProfiles[p.id as string] = {
-        display_name: (p.display_name as string) || (p.email as string) || 'Unknown',
-        email: (p.email as string) || '',
+        display_name: displayName ?? email ?? 'Unknown',
+        email: email ?? '',
       };
     }
   }
