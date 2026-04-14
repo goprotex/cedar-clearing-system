@@ -306,7 +306,8 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
       if (cancelled) return;
       setOperatorsByJob((prev) => mergeOperatorsByJob(prev, next));
-      // Merge trails: only update entries that have fresh data, keep existing trails if poll returns nothing
+      // Merge trails: only update entries that have fresh data, keep existing trails if poll returns nothing.
+      // Requires at least 2 points since a GeoJSON LineString must have 2+ coordinates.
       if (Object.keys(trails).length > 0) {
         setTrailsByJob(prev => {
           const merged = { ...prev };
