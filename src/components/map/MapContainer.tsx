@@ -20,7 +20,6 @@ import {
 } from '@/lib/map-layers';
 import MapLayerPanel, {
   useOverlayActiveCount,
-  type LegacyCategoryGroup,
 } from '@/components/map/MapLayerPanel';
 
 /** Default property center used in new bids — must match createDefaultBid() in store.ts */
