@@ -51,6 +51,9 @@ DrawPolygonMobile.onTap = function (this: any, state: any, e: any) {
 
 export default DrawPolygonMobile;
 
+/** Minimum coordinates for a valid GeoJSON polygon (3 vertices + closing point) */
+const MIN_POLYGON_COORDS = 4;
+
 /**
  * Programmatically finish the currently drawn polygon.
  * Called by the "Finish Drawing" button.
@@ -63,8 +66,7 @@ export function finishDrawing(draw: MapboxDraw): GeoJSON.Feature<GeoJSON.Polygon
   if (!feature || feature.geometry.type !== 'Polygon') return null;
 
   const coords = feature.geometry.coordinates[0];
-  // Need at least 3 distinct vertices (coords includes closing point, so 4+)
-  if (coords.length < 4) return null;
+  if (coords.length < MIN_POLYGON_COORDS) return null;
 
   // Delete the in-progress drawing and switch back to simple_select
   draw.deleteAll();

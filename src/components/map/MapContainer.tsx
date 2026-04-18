@@ -12,8 +12,12 @@ import DrawPolygonMobile, { finishDrawing } from '@/lib/draw-polygon-mobile';
 import type { PastureWall } from '@/lib/cedar-tree-data';
 import type { MarkedTree } from '@/types';
 
-/** Default property center used in new bids — used to detect "no location set" */
+/** Default property center used in new bids — must match createDefaultBid() in store.ts */
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
+/** ~111 m tolerance at the equator for matching default center */
+const COORDINATE_TOLERANCE = 0.001;
+const GEOLOCATION_TIMEOUT_MS = 8000;
+const GEOLOCATION_MAX_AGE_MS = 60000;
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -397,8 +401,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     // Only geolocate if the bid still has the default center (no pastures drawn yet)
     const [lng, lat] = currentBid.propertyCenter;
     const isDefault =
-      Math.abs(lng - DEFAULT_CENTER[0]) < 0.001 &&
-      Math.abs(lat - DEFAULT_CENTER[1]) < 0.001;
+      Math.abs(lng - DEFAULT_CENTER[0]) < COORDINATE_TOLERANCE &&
+      Math.abs(lat - DEFAULT_CENTER[1]) < COORDINATE_TOLERANCE;
     if (!isDefault || currentBid.pastures.length > 0) return;
 
     if (!navigator.geolocation) return;
@@ -416,7 +420,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       () => {
         // Geolocation denied or unavailable — stay on default center
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: GEOLOCATION_TIMEOUT_MS, maximumAge: GEOLOCATION_MAX_AGE_MS },
     );
     return () => { cancelled = true; };
     // Only run once on mount — don't re-trigger on bid data changes
