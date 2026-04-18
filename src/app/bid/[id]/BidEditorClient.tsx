@@ -232,7 +232,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Map (takes remaining space) */}
-        <div className="h-[min(42vh,320px)] min-h-[200px] md:min-h-0 md:h-auto md:flex-1 relative shrink-0">
+        <div className="h-[55vh] min-h-[250px] md:min-h-0 md:h-auto md:flex-1 relative shrink-0">
           {mapboxToken ? (
             <MapContainer accessToken={mapboxToken} />
           ) : (
