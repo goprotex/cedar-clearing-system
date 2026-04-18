@@ -902,15 +902,17 @@ function MachineDetailPanel({
   const MAX_PHOTOS_PER_MACHINE = 20;
 
   async function onPhotoPick(e: ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
+    // Copy files to a regular array before clearing the input — clearing
+    // e.target.value invalidates the live FileList in most browsers.
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    if (!files?.length) return;
+    if (!picked.length) return;
     if (m.photoUrls.length >= MAX_PHOTOS_PER_MACHINE) {
       toast.error(`Max ${MAX_PHOTOS_PER_MACHINE} photos per unit`);
       return;
     }
     const cap = MAX_PHOTOS_PER_MACHINE - m.photoUrls.length;
-    const toRead = Array.from(files)
+    const toRead = picked
       .filter((f) => f.type.startsWith('image/'))
       .slice(0, cap);
 
