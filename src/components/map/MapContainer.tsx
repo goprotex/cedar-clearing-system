@@ -11,6 +11,17 @@ import { HologramMapboxLayers, extractTreesFromAnalysis } from '@/lib/hologram-m
 import DrawPolygonMobile, { finishDrawing } from '@/lib/draw-polygon-mobile';
 import type { PastureWall } from '@/lib/cedar-tree-data';
 import type { MarkedTree } from '@/types';
+import {
+  type OverlayLayerKey,
+  defaultOverlayState,
+  defaultOverlayOpacities,
+  addOverlaySourcesToMap,
+  syncOverlayVisibility,
+} from '@/lib/map-layers';
+import MapLayerPanel, {
+  useOverlayActiveCount,
+  type LegacyCategoryGroup,
+} from '@/components/map/MapLayerPanel';
 
 /** Default property center used in new bids — must match createDefaultBid() in store.ts */
 const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
@@ -61,6 +72,10 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     cedarAI: 0.7,
     hologram: 1.0,
   });
+
+  const [overlayLayers, setOverlayLayers] = useState<Record<OverlayLayerKey, boolean>>(defaultOverlayState);
+  const [overlayOpacities, setOverlayOpacities] = useState<Record<OverlayLayerKey, number>>(defaultOverlayOpacities);
+  const overlayActiveCount = useOverlayActiveCount(overlayLayers);
 
   const [speciesVisible, setSpeciesVisible] = useState<Record<Species, boolean>>({
     cedar: true, oak: true, mixed: true,
@@ -381,6 +396,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       map.on('mouseleave', 'pastures-fill', () => {
         map.getCanvas().style.cursor = '';
       });
+
+      // ── Add all overlay raster sources & layers ──
+      addOverlaySourcesToMap(map);
     });
 
     mapRef.current = map;
@@ -676,6 +694,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
   }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
 
+  // ── Sync overlay layers visibility + opacity ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    syncOverlayVisibility(map, overlayLayers, overlayOpacities);
+  }, [overlayLayers, overlayOpacities]);
+
   // Auto-rotation: only spin when autoRotate is enabled; disables zoom/pan when active.
   useEffect(() => {
     const map = mapRef.current;
@@ -778,6 +803,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       next[key] = !prev[key];
       return next;
     });
+  }, []);
+
+  const toggleOverlay = useCallback((key: OverlayLayerKey) => {
+    setOverlayLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const setOverlayOpacity = useCallback((key: OverlayLayerKey, value: number) => {
+    setOverlayOpacities((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   // Screenshot capture
@@ -1030,94 +1063,42 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {/* ── Layer control panel ── */}
       <div className="absolute bottom-4 left-4 z-10">
         {layersPanelOpen ? (
-          <div className={`backdrop-blur rounded-lg shadow-lg p-2 min-w-[170px] ${layers.hologram ? 'holo-panel' : 'bg-slate-900/90'}`}>
-            <div className="flex items-center justify-between px-1 pb-1">
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${layers.hologram ? 'text-green-400' : 'text-slate-400'}`}>
-                Layers
-              </span>
-              <button
-                onClick={() => setLayersPanelOpen(false)}
-                className="text-slate-400 hover:text-white text-xs leading-none"
-                title="Collapse"
-              >
-                ✕
-              </button>
-            </div>
-
-            <LayerRow
-              label="🟫 Soil"
-              active={layers.soil}
-              opacity={opacities.soil}
-              onToggle={() => toggleLayer('soil')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, soil: v }))}
-              holoMode={layers.hologram}
-            />
-            <LayerRow
-              label="🛰️ RGB"
-              active={layers.naip}
-              opacity={opacities.naip}
-              onToggle={() => toggleLayer('naip')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, naip: v }))}
-              holoMode={layers.hologram}
-            />
-            <LayerRow
-              label="🔴 CIR"
-              active={layers.naipCIR}
-              opacity={opacities.naipCIR}
-              onToggle={() => toggleLayer('naipCIR')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, naipCIR: v }))}
-              holoMode={layers.hologram}
-            />
-            <LayerRow
-              label="🌿 NDVI"
-              active={layers.naipNDVI}
-              opacity={opacities.naipNDVI}
-              onToggle={() => toggleLayer('naipNDVI')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, naipNDVI: v }))}
-              holoMode={layers.hologram}
-            />
-
-            <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
-
-            <LayerRow
-              label={layers.hologram ? '⛰️ 3D (off in hologram)' : '⛰️ 3D'}
-              active={layers.terrain3d}
-              opacity={opacities.terrain3d}
-              opacityRange={[0.5, 2.5]}
-              opacityStep={0.1}
-              onToggle={() => toggleLayer('terrain3d')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, terrain3d: v }))}
-              disabled={layers.hologram}
-              holoMode={layers.hologram}
-            />
-
-            <div className={`border-t my-1 ${layers.hologram ? 'border-green-800/50' : 'border-slate-700'}`} />
-
-            <LayerRow
-              label="🤖 AI Cedar"
-              active={layers.cedarAI}
-              opacity={opacities.cedarAI}
-              onToggle={() => toggleLayer('cedarAI')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, cedarAI: v }))}
-              holoMode={layers.hologram}
-            />
-
-            <div className={`border-t my-1 ${layers.hologram ? 'border-cyan-800/50' : 'border-slate-700'}`} />
-
-            {/* Hologram toggle */}
-            <LayerRow
-              label="🔮 Hologram"
-              active={layers.hologram}
-              opacity={opacities.hologram}
-              onToggle={() => toggleLayer('hologram')}
-              onOpacity={(v) => setOpacities((p) => ({ ...p, hologram: v }))}
-              holoMode={layers.hologram}
-            />
-
+          <MapLayerPanel
+            open={layersPanelOpen}
+            onClose={() => setLayersPanelOpen(false)}
+            overlayLayers={overlayLayers}
+            overlayOpacities={overlayOpacities}
+            onToggleOverlay={toggleOverlay}
+            onOverlayOpacity={setOverlayOpacity}
+            holoMode={layers.hologram}
+            legacyGroups={[
+              {
+                category: 'imagery',
+                label: 'Imagery',
+                emoji: '📡',
+                layers: [
+                  { key: 'soil', label: 'Soil Map', emoji: '🟫', active: layers.soil, opacity: opacities.soil, onToggle: () => toggleLayer('soil'), onOpacity: (v) => setOpacities((p) => ({ ...p, soil: v })) },
+                  { key: 'naip', label: 'RGB (NAIP)', emoji: '🛰️', active: layers.naip, opacity: opacities.naip, onToggle: () => toggleLayer('naip'), onOpacity: (v) => setOpacities((p) => ({ ...p, naip: v })) },
+                  { key: 'naipCIR', label: 'CIR', emoji: '🔴', active: layers.naipCIR, opacity: opacities.naipCIR, onToggle: () => toggleLayer('naipCIR'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipCIR: v })) },
+                  { key: 'naipNDVI', label: 'NDVI', emoji: '🌿', active: layers.naipNDVI, opacity: opacities.naipNDVI, onToggle: () => toggleLayer('naipNDVI'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipNDVI: v })) },
+                ],
+              },
+              {
+                category: 'analysis',
+                label: 'Analysis',
+                emoji: '🔬',
+                layers: [
+                  { key: 'terrain3d', label: layers.hologram ? '3D Terrain (off in hologram)' : '3D Terrain', emoji: '⛰️', active: layers.terrain3d, opacity: opacities.terrain3d, opacityRange: [0.5, 2.5] as [number, number], opacityStep: 0.1, disabled: layers.hologram, onToggle: () => toggleLayer('terrain3d'), onOpacity: (v) => setOpacities((p) => ({ ...p, terrain3d: v })) },
+                  { key: 'cedarAI', label: 'AI Cedar Detect', emoji: '🤖', active: layers.cedarAI, opacity: opacities.cedarAI, onToggle: () => toggleLayer('cedarAI'), onOpacity: (v) => setOpacities((p) => ({ ...p, cedarAI: v })) },
+                  { key: 'hologram', label: 'Hologram', emoji: '🔮', active: layers.hologram, opacity: opacities.hologram, onToggle: () => toggleLayer('hologram'), onOpacity: (v) => setOpacities((p) => ({ ...p, hologram: v })) },
+                ],
+              },
+            ]}
+          >
             {/* Species filters (only show when hologram is active) */}
             {layers.hologram && (
-              <div className="mt-1 pt-1 border-t border-green-800/50">
-                <span className="text-[9px] text-green-500 uppercase tracking-wider px-2 font-semibold">
+              <div className="px-2 pb-2 pt-1 border-t border-green-800/50">
+                <span className="text-[9px] text-green-500 uppercase tracking-wider px-1 font-semibold">
                   Species
                 </span>
                 <SpeciesToggle label="Cedar" color="#00ff41" active={speciesVisible.cedar} onToggle={() => setSpeciesVisible(v => ({ ...v, cedar: !v.cedar }))} />
@@ -1125,8 +1106,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 <SpeciesToggle label="Mixed" color="#22dd44" active={speciesVisible.mixed} onToggle={() => setSpeciesVisible(v => ({ ...v, mixed: !v.mixed }))} />
               </div>
             )}
-
-          </div>
+          </MapLayerPanel>
         ) : (
           <button
             onClick={() => setLayersPanelOpen(true)}
@@ -1136,7 +1116,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 : 'bg-slate-900/90 text-slate-300 hover:text-white'
             }`}
           >
-            Layers
+            Layers{overlayActiveCount > 0 && ` (${overlayActiveCount})`}
           </button>
         )}
       </div>
@@ -1311,66 +1291,6 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         </div>
         );
       })()}
-    </div>
-  );
-}
-
-function LayerRow({
-  label,
-  active,
-  opacity,
-  opacityRange = [0, 1],
-  opacityStep = 0.05,
-  onToggle,
-  onOpacity,
-  holoMode = false,
-  disabled = false,
-}: {
-  label: string;
-  active: boolean;
-  opacity: number;
-  opacityRange?: [number, number];
-  opacityStep?: number;
-  onToggle: () => void;
-  onOpacity: (v: number) => void;
-  holoMode?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="space-y-0.5">
-      <button
-        onClick={disabled ? undefined : onToggle}
-        className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
-          disabled
-            ? 'text-slate-500 cursor-not-allowed opacity-50'
-            : active
-              ? holoMode
-                ? 'bg-green-700/60 text-green-100 shadow-[0_0_8px_rgba(0,255,65,0.3)]'
-                : 'bg-amber-600 text-white'
-              : holoMode
-                ? 'text-green-300/70 hover:bg-green-900/40 hover:text-green-200'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-        }`}
-      >
-        {label}
-        {active && !disabled && <span className="float-right text-[10px] opacity-75">ON</span>}
-      </button>
-      {active && (
-        <div className="flex items-center gap-1.5 px-2 pb-0.5">
-          <input
-            type="range"
-            min={opacityRange[0]}
-            max={opacityRange[1]}
-            step={opacityStep}
-            value={opacity}
-            onChange={(e) => onOpacity(parseFloat(e.target.value))}
-            className={`w-full h-1 cursor-pointer ${holoMode ? 'accent-green-400' : 'accent-amber-500'}`}
-          />
-          <span className={`text-[9px] w-7 text-right tabular-nums ${holoMode ? 'text-green-500' : 'text-slate-400'}`}>
-            {Math.round((opacity / opacityRange[1]) * 100)}%
-          </span>
-        </div>
-      )}
     </div>
   );
 }
