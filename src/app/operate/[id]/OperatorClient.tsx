@@ -13,6 +13,16 @@ import type { Session } from '@supabase/supabase-js';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
 import { fetchApiAuthed } from '@/lib/auth-client';
 import { loadBidFromSupabase, getAuthUserId } from '@/lib/db';
+import {
+  type OverlayLayerKey,
+  defaultOverlayState,
+  defaultOverlayOpacities,
+  addOverlaySourcesToMap,
+  syncOverlayVisibility,
+} from '@/lib/map-layers';
+import MapLayerPanel, {
+  useOverlayActiveCount,
+} from '@/components/map/MapLayerPanel';
 
 const CLEAR_RADIUS_M = 8;
 const GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 };
@@ -245,6 +255,10 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
     naipNDVI: false,
     hologram: false,
   });
+  const [overlayLayers, setOverlayLayers] = useState<Record<OverlayLayerKey, boolean>>(defaultOverlayState);
+  const [overlayOpacities, setOverlayOpacities] = useState<Record<OverlayLayerKey, number>>(defaultOverlayOpacities);
+  const overlayActiveCount = useOverlayActiveCount(overlayLayers);
+  const [layersPanelOpen, setLayersPanelOpen] = useState(false);
   const preHoloLayersRef = useRef<Pick<Record<OperateLayerKey, boolean>, 'naip' | 'naipCIR' | 'naipNDVI'> | null>(null);
   const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
   const holoRotationRef = useRef<number | null>(null);
@@ -431,6 +445,14 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       next[key] = !prev[key];
       return next;
     });
+  }, []);
+
+  const toggleOverlay = useCallback((key: OverlayLayerKey) => {
+    setOverlayLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const setOverlayOpacity = useCallback((key: OverlayLayerKey, value: number) => {
+    setOverlayOpacities((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   useEffect(() => {
@@ -711,6 +733,9 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             : [];
           map.addSource('trail', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: trailData }, properties: {} } });
           map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#FF6B00', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 14, 2, 17, 4, 18, 7, 19, 14, 22, 80], 'line-opacity': 0.8 } });
+
+          // ── Add all overlay raster sources & layers ──
+          addOverlaySourcesToMap(map);
         } catch (err) {
           setMapError(err instanceof Error ? err.message : 'Failed to build map layers.');
           return;
@@ -969,6 +994,17 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       }
     }
   }, [layers, mapReady, state.bid]);
+
+  // ── Sync overlay layers visibility + opacity ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    try {
+      syncOverlayVisibility(map, overlayLayers, overlayOpacities);
+    } catch {
+      /* ignore */
+    }
+  }, [overlayLayers, overlayOpacities, mapReady]);
 
   // Auto-rotation: only spin when autoRotate is enabled. Disables zoom/pan when active.
   useEffect(() => {
@@ -1477,30 +1513,19 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
           </span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1 max-w-[min(100%,56rem)] pointer-events-auto">
-          {(
-            [
-              { key: 'soil' as const, label: 'SOIL' },
-              { key: 'naip' as const, label: 'RGB' },
-              { key: 'naipCIR' as const, label: 'CIR' },
-              { key: 'naipNDVI' as const, label: 'NDVI' },
-              { key: 'hologram' as const, label: 'HOLO' },
-            ] as const
-          ).map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              disabled={!bid || !mapReady}
-              onClick={() => toggleLayer(key)}
-              className={`text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
-                layers[key]
-                  ? 'text-[#13ff43] border-[#13ff43] bg-[#001a06]/90'
-                  : 'text-[#a98a7d] border-green-900/40 hover:text-white'
-              }`}
-              title={!bid || !mapReady ? 'Wait for map' : `Toggle ${label} layer`}
-            >
-              {layers[key] ? `${label}_ON` : `${label}_OFF`}
-            </button>
-          ))}
+          <button
+            type="button"
+            disabled={!bid || !mapReady}
+            onClick={() => setLayersPanelOpen(v => !v)}
+            className={`text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded border shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+              layersPanelOpen
+                ? 'text-[#13ff43] border-[#13ff43] bg-[#001a06]/90'
+                : 'text-[#a98a7d] border-green-900/40 hover:text-white'
+            }`}
+            title="Open layer panel"
+          >
+            LAYERS{overlayActiveCount > 0 ? `_${overlayActiveCount}` : ''}
+          </button>
           <span className={`w-2 h-2 rounded-full shrink-0 ${state.gpsActive ? 'bg-[#13ff43] animate-pulse' : 'bg-red-500'}`} />
           <span className="text-[9px] sm:text-[10px] font-mono text-[#a98a7d] hidden sm:inline">
             {state.gpsActive ? 'GPS' : 'NO_GPS'}
@@ -1521,6 +1546,43 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
         </div>
       </div>
 
+
+      {/* Layer control panel */}
+      {layersPanelOpen && (
+        <div className="absolute right-3 z-40" style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px) + 0.5rem)` }}>
+          <MapLayerPanel
+            open={layersPanelOpen}
+            onClose={() => setLayersPanelOpen(false)}
+            overlayLayers={overlayLayers}
+            overlayOpacities={overlayOpacities}
+            onToggleOverlay={toggleOverlay}
+            onOverlayOpacity={setOverlayOpacity}
+            holoMode={layers.hologram}
+            legacyGroups={[
+              {
+                category: 'imagery',
+                label: 'Imagery',
+                emoji: '📡',
+                // Opacity is fixed for operator legacy layers (toggle-only)
+                layers: [
+                  { key: 'soil', label: 'Soil Map', emoji: '🟫', active: layers.soil, opacity: 1.0, onToggle: () => toggleLayer('soil'), onOpacity: () => {} },
+                  { key: 'naip', label: 'RGB (NAIP)', emoji: '🛰️', active: layers.naip, opacity: 0.85, onToggle: () => toggleLayer('naip'), onOpacity: () => {} },
+                  { key: 'naipCIR', label: 'CIR', emoji: '🔴', active: layers.naipCIR, opacity: 0.85, onToggle: () => toggleLayer('naipCIR'), onOpacity: () => {} },
+                  { key: 'naipNDVI', label: 'NDVI', emoji: '🌿', active: layers.naipNDVI, opacity: 0.75, onToggle: () => toggleLayer('naipNDVI'), onOpacity: () => {} },
+                ],
+              },
+              {
+                category: 'analysis',
+                label: 'Analysis',
+                emoji: '🔬',
+                layers: [
+                  { key: 'hologram', label: 'Hologram', emoji: '🔮', active: layers.hologram, opacity: 1.0, onToggle: () => toggleLayer('hologram'), onOpacity: () => {} },
+                ],
+              },
+            ]}
+          />
+        </div>
+      )}
       {/* HUD panel — pass-through outside the card so the map isn’t blocked on phones */}
       {bid && hudOpen && (
         <div className="absolute left-3 z-10 pointer-events-none" style={{ top: `calc(${TOP_BAR_HEIGHT} + env(safe-area-inset-top, 0px))` }}>
