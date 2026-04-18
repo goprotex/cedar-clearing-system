@@ -79,7 +79,7 @@ export default function OperationsClient() {
     <AppShell>
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-4 border-l-4 border-[#FF6B00] pl-3 sm:pl-4 mb-8 min-w-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">OPERATIONS</h1>
+          <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter">ACTIVE JOBS</h1>
           <p className="text-[#a98a7d] text-xs font-mono mt-1">ACTIVE_JOBS // CREW // PREFERENCES</p>
         </div>
         <div className="text-left lg:text-right text-[10px] font-mono text-[#a98a7d] flex flex-col items-start lg:items-end gap-1 min-w-0">
