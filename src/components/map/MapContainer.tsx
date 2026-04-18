@@ -8,8 +8,16 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { calculateAcreage, getCentroid, getBBox } from '@/lib/geo';
 import { useBidStore } from '@/lib/store';
 import { HologramMapboxLayers, extractTreesFromAnalysis } from '@/lib/hologram-mapbox';
+import DrawPolygonMobile, { finishDrawing } from '@/lib/draw-polygon-mobile';
 import type { PastureWall } from '@/lib/cedar-tree-data';
 import type { MarkedTree } from '@/types';
+
+/** Default property center used in new bids — must match createDefaultBid() in store.ts */
+const DEFAULT_CENTER: [number, number] = [-99.1403, 30.0469];
+/** ~111 m tolerance at the equator for matching default center */
+const COORDINATE_TOLERANCE = 0.001;
+const GEOLOCATION_TIMEOUT_MS = 8000;
+const GEOLOCATION_MAX_AGE_MS = 60000;
 
 const VEGETATION_COLORS: Record<string, string> = {
   cedar: '#22c55e',
@@ -61,6 +69,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const [autoRotate, setAutoRotate] = useState(false);
   const autoRotateRef = useRef(autoRotate);
   autoRotateRef.current = autoRotate;
+  const [drawVertexCount, setDrawVertexCount] = useState(0);
 
   const {
     currentBid,
@@ -86,6 +95,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       const acreage = calculateAcreage(feature);
       const centroid = getCentroid(feature);
       setPasturePolygon(selectedPastureId, feature, acreage, centroid);
+      setDrawVertexCount(0);
 
       if (drawRef.current) {
         drawRef.current.deleteAll();
@@ -93,6 +103,45 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     },
     [selectedPastureId, setPasturePolygon]
   );
+
+  // Finish drawing via explicit button press (mobile-friendly)
+  const handleFinishDrawing = useCallback(() => {
+    const draw = drawRef.current;
+    if (!draw || !selectedPastureId) return;
+
+    const feature = finishDrawing(draw);
+    if (feature) {
+      const acreage = calculateAcreage(feature);
+      const centroid = getCentroid(feature);
+      setPasturePolygon(selectedPastureId, feature, acreage, centroid);
+    }
+    setDrawVertexCount(0);
+  }, [selectedPastureId, setPasturePolygon]);
+
+  // Undo the last drawn vertex
+  const handleUndoVertex = useCallback(() => {
+    const draw = drawRef.current;
+    if (!draw) return;
+    // MapboxDraw supports Undo via trash for the last vertex in draw_polygon
+    // We can use the internal API: trigger backspace key or use trash
+    try {
+      // The draw_polygon mode listens for "Escape" and "Enter" key events,
+      // and the trash method removes the last vertex when in draw mode
+      draw.trash();
+      // Update vertex count
+      const all = draw.getAll();
+      if (all.features.length > 0) {
+        const feat = all.features[0] as GeoJSON.Feature<GeoJSON.Polygon>;
+        const coords = feat.geometry?.coordinates?.[0] ?? [];
+        // In draw_polygon, coords includes the in-progress closing point
+        setDrawVertexCount(Math.max(0, coords.length - 1));
+      } else {
+        setDrawVertexCount(0);
+      }
+    } catch {
+      // Ignore errors from trash when nothing to undo
+    }
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -113,6 +162,12 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       displayControlsDefault: false,
       controls: {},
       defaultMode: 'simple_select',
+      modes: {
+        ...MapboxDraw.modes,
+        draw_polygon: DrawPolygonMobile as unknown as MapboxDraw.DrawCustomMode,
+      },
+      // Increase touch buffer so taps aren't misinterpreted
+      touchBuffer: 30,
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -338,6 +393,39 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
+
+  // ── Fly to user's GPS location for new bids with default center ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Only geolocate if the bid still has the default center (no pastures drawn yet)
+    const [lng, lat] = currentBid.propertyCenter;
+    const isDefault =
+      Math.abs(lng - DEFAULT_CENTER[0]) < COORDINATE_TOLERANCE &&
+      Math.abs(lat - DEFAULT_CENTER[1]) < COORDINATE_TOLERANCE;
+    if (!isDefault || currentBid.pastures.length > 0) return;
+
+    if (!navigator.geolocation) return;
+
+    let cancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (cancelled || !mapRef.current) return;
+        mapRef.current.flyTo({
+          center: [pos.coords.longitude, pos.coords.latitude],
+          zoom: 14,
+          duration: 1500,
+        });
+      },
+      () => {
+        // Geolocation denied or unavailable — stay on default center
+      },
+      { enableHighAccuracy: true, timeout: GEOLOCATION_TIMEOUT_MS, maximumAge: GEOLOCATION_MAX_AGE_MS },
+    );
+    return () => { cancelled = true; };
+    // Only run once on mount — don't re-trigger on bid data changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Toggle layer visibility + opacity ──
   useEffect(() => {
@@ -710,9 +798,25 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     if (!map) return;
 
     const onDrawCreate = (e: { features: GeoJSON.Feature[] }) => handleDrawCreate(e);
+    // Track vertex count while drawing (for the "Finish" button)
+    const onDrawUpdate = () => {
+      const draw = drawRef.current;
+      if (!draw) return;
+      const all = draw.getAll();
+      if (all.features.length > 0) {
+        const feat = all.features[0] as GeoJSON.Feature<GeoJSON.Polygon>;
+        const coords = feat.geometry?.coordinates?.[0] ?? [];
+        // In draw_polygon mode, coords includes the auto-closing point
+        setDrawVertexCount(Math.max(0, coords.length - 1));
+      }
+    };
     map.on('draw.create', onDrawCreate);
+    map.on('draw.update', onDrawUpdate);
+    map.on('draw.render', onDrawUpdate);
     return () => {
       map.off('draw.create', onDrawCreate);
+      map.off('draw.update', onDrawUpdate);
+      map.off('draw.render', onDrawUpdate);
     };
   }, [handleDrawCreate]);
 
@@ -723,12 +827,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
     if (drawingMode && selectedPastureId) {
       draw.changeMode('draw_polygon');
+      setDrawVertexCount(0);
     } else {
       try {
         draw.changeMode('simple_select');
       } catch {
         // ignore if already in simple_select
       }
+      setDrawVertexCount(0);
     }
   }, [drawingMode, selectedPastureId]);
 
@@ -879,18 +985,45 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       {/* Drawing mode banner */}
       {drawingMode && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium z-10">
-          Click on the map to draw pasture boundary. Double-click to finish.
-          <button
-            onClick={() => {
-              setDrawingMode(false);
-              drawRef.current?.deleteAll();
-              drawRef.current?.changeMode('simple_select');
-            }}
-            className="ml-3 underline hover:no-underline"
-          >
-            Cancel
-          </button>
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white px-3 sm:px-4 py-2 rounded-lg shadow-lg text-sm font-medium z-10 max-w-[95vw]">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left">
+            <span className="text-xs sm:text-sm">
+              Tap to place points.{' '}
+              <span className="hidden sm:inline">Double-click to finish. </span>
+              {drawVertexCount > 0 && (
+                <span className="font-bold">{drawVertexCount} {drawVertexCount === 1 ? 'point' : 'points'}</span>
+              )}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {drawVertexCount > 0 && (
+                <button
+                  onClick={handleUndoVertex}
+                  className="px-2 py-1 bg-amber-700 hover:bg-amber-800 rounded text-xs font-bold uppercase tracking-wide transition-colors touch-manipulation"
+                >
+                  Undo
+                </button>
+              )}
+              {drawVertexCount >= 3 && (
+                <button
+                  onClick={handleFinishDrawing}
+                  className="px-3 py-1 bg-white text-amber-700 hover:bg-amber-100 rounded text-xs font-black uppercase tracking-wide transition-colors touch-manipulation"
+                >
+                  ✓ Finish
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setDrawingMode(false);
+                  setDrawVertexCount(0);
+                  drawRef.current?.deleteAll();
+                  drawRef.current?.changeMode('simple_select');
+                }}
+                className="px-2 py-1 underline hover:no-underline text-xs touch-manipulation"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
