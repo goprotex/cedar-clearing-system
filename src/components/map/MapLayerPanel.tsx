@@ -409,7 +409,7 @@ function LegacyToggleRow({
               holoMode ? 'text-green-500' : 'text-slate-400'
             }`}
           >
-            {Math.round((opacity / opacityRange[1]) * 100)}%
+            {Math.round(opacityRange[1] !== 0 ? (opacity / opacityRange[1]) * 100 : 0)}%
           </span>
         </div>
       )}

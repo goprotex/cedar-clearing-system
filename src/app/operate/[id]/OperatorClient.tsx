@@ -1563,6 +1563,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
                 category: 'imagery',
                 label: 'Imagery',
                 emoji: '📡',
+                // Opacity is fixed for operator legacy layers (toggle-only)
                 layers: [
                   { key: 'soil', label: 'Soil Map', emoji: '🟫', active: layers.soil, opacity: 1.0, onToggle: () => toggleLayer('soil'), onOpacity: () => {} },
                   { key: 'naip', label: 'RGB (NAIP)', emoji: '🛰️', active: layers.naip, opacity: 0.85, onToggle: () => toggleLayer('naip'), onOpacity: () => {} },
