@@ -452,9 +452,12 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
 
   const totals = useMemo(() => {
     const total = jobs.reduce((s, j) => s + (j.cedar_total_cells ?? 0), 0);
-    const cleared = jobs.reduce((s, j) => s + (j.cedar_cleared_cells ?? 0), 0);
+    const cleared = jobs.reduce((s, j) => {
+      const fromMap = clearedByJob[j.id]?.size ?? 0;
+      return s + Math.max(fromMap, j.cedar_cleared_cells ?? 0);
+    }, 0);
     return { total, cleared, pct: pct(cleared, total) };
-  }, [jobs]);
+  }, [jobs, clearedByJob]);
 
   const LAYER_DEFS: Array<{ key: LayerKey; label: string; group?: string }> = [
     { key: 'pastures', label: '🟩 Pastures' },
@@ -718,7 +721,8 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
             ) : (
               <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
                 {jobs.map((j) => {
-                  const p = pct(j.cedar_cleared_cells, j.cedar_total_cells);
+                  const clearedCount = Math.max(clearedByJob[j.id]?.size ?? 0, j.cedar_cleared_cells ?? 0);
+                  const p = pct(clearedCount, j.cedar_total_cells);
                   return (
                     <button
                       key={j.id}
@@ -742,7 +746,7 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
                         <div className="h-full bg-gradient-to-r from-[#13ff43] to-[#00cc33]" style={{ width: `${p}%` }} />
                       </div>
                       <div className="mt-1 flex justify-between text-[10px] font-mono text-[#a98a7d]">
-                        <span>{j.cedar_cleared_cells} cleared</span>
+                        <span>{clearedCount} cleared</span>
                         <span>{j.cedar_total_cells} total</span>
                       </div>
                       {telemetryByJob[j.id]?.length ? (
