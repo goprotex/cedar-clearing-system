@@ -15,6 +15,17 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import type { BidStatus } from '@/types';
 import { createLocalJobFromBid } from '@/lib/jobs';
+import { ChevronUp, ChevronDown, Map, GripHorizontal } from 'lucide-react';
+
+/** Mobile map view state: collapsed (panel-focused), split (default), expanded (map-focused) */
+type MapViewState = 'collapsed' | 'split' | 'expanded';
+
+/** Mobile map height classes for each view state (desktop uses flex-1 regardless) */
+const MAP_HEIGHT_CLASSES: Record<MapViewState, string> = {
+  collapsed: 'h-[8vh] min-h-[3.5rem]',
+  split: 'h-[35vh] min-h-[180px]',
+  expanded: 'h-[65vh] min-h-[250px]',
+};
 
 const STATUS_OPTIONS: { value: BidStatus; label: string }[] = [
   { value: 'draft', label: 'Draft' },
@@ -53,6 +64,7 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
   } = useBidStore();
 
   const [convertBusy, setConvertBusy] = useState(false);
+  const [mapView, setMapView] = useState<MapViewState>('split');
 
   // Prevent hydration mismatch: Zustand generates random IDs/bid numbers
   // on server vs client. Delay rendering until client is mounted.
@@ -231,8 +243,10 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Map (takes remaining space) */}
-        <div className="h-[55vh] min-h-[250px] md:min-h-0 md:h-auto md:flex-1 relative shrink-0">
+        {/* Map — responsive height on mobile, flex-1 on desktop */}
+        <div
+          className={`relative shrink-0 transition-[height] duration-300 ease-in-out md:min-h-0 md:h-auto md:flex-1 ${MAP_HEIGHT_CLASSES[mapView]}`}
+        >
           {mapboxToken ? (
             <MapContainer accessToken={mapboxToken} />
           ) : (
@@ -252,8 +266,45 @@ export default function BidEditorClient({ bidId }: { bidId: string }) {
           )}
         </div>
 
-        {/* Right sidebar */}
-        <div className="w-full md:w-[400px] bg-[#131313] border-t-2 md:border-t-0 md:border-l-2 border-[#353534] flex flex-col shrink-0 overflow-hidden flex-1 md:flex-none">
+        {/* Mobile drag handle / map toggle — hidden on desktop */}
+        <button
+          type="button"
+          onClick={() =>
+            setMapView((prev) =>
+              prev === 'split' ? 'collapsed' : prev === 'collapsed' ? 'expanded' : 'split'
+            )
+          }
+          className="md:hidden flex items-center justify-center gap-2 h-9 bg-[#1c1b1b] border-y-2 border-[#353534] active:bg-[#353534] transition-colors shrink-0 touch-manipulation"
+          aria-label={
+            mapView === 'collapsed'
+              ? 'Expand map'
+              : mapView === 'expanded'
+                ? 'Show split view'
+                : 'Collapse map'
+          }
+        >
+          <GripHorizontal className="w-4 h-4 text-[#5a4136]" />
+          {mapView === 'collapsed' ? (
+            <>
+              <Map className="w-3.5 h-3.5 text-[#FF6B00]" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#FF6B00]">SHOW_MAP</span>
+              <ChevronUp className="w-3.5 h-3.5 text-[#a98a7d]" />
+            </>
+          ) : mapView === 'expanded' ? (
+            <>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#a98a7d]">SPLIT_VIEW</span>
+              <ChevronDown className="w-3.5 h-3.5 text-[#a98a7d]" />
+            </>
+          ) : (
+            <>
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#a98a7d]">HIDE_MAP</span>
+              <ChevronDown className="w-3.5 h-3.5 text-[#a98a7d]" />
+            </>
+          )}
+        </button>
+
+        {/* Right sidebar / bottom panel */}
+        <div className="w-full md:w-[400px] bg-[#131313] md:border-t-0 md:border-l-2 border-[#353534] flex flex-col shrink-0 overflow-hidden flex-1 md:flex-none min-h-0">
           <Tabs defaultValue="pastures" className="flex flex-col h-full min-h-0 overflow-hidden">
             <TabsList className="mx-2 sm:mx-3 mt-3 shrink-0 bg-[#1c1b1b] border border-[#353534] flex w-[calc(100%-1rem)] sm:w-auto max-w-full min-w-0 overflow-x-auto flex-nowrap justify-start gap-0.5 p-0.5">
               <TabsTrigger value="pastures" className="text-[11px] sm:text-xs uppercase tracking-wider font-bold data-[state=active]:bg-[#FF6B00] data-[state=active]:text-black shrink-0 px-2 sm:px-3">Pastures</TabsTrigger>
