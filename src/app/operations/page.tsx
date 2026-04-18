@@ -1,7 +1,7 @@
 import OperationsClient from './OperationsClient';
 
 export const metadata = {
-  title: 'Operations — Cedar Hack',
+  title: 'Active Jobs — Cedar Hack',
 };
 
 export default function OperationsPage() {
