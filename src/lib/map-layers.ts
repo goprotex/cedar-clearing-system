@@ -87,10 +87,12 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     category: 'boundaries',
     sourceId: 'overlay-parcels',
     layerId: 'overlay-parcels-raster',
+    // Census block-level land divisions (free/public). For precise TX parcel lines,
+    // replace with your county CAD ArcGIS service URL (e.g. Kerr CAD GIS server).
     tileUrl:
-      'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Parcels/MapServer/tile/{z}/{y}/{x}',
+      'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&f=image&layers=show:18,22',
     defaultOpacity: 0.6,
-    attribution: 'Esri Community Maps',
+    attribution: 'US Census Bureau TIGER',
   },
 
   /* ── Hazards ──────────────────────────────────────────────────── */
