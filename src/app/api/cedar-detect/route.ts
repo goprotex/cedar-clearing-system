@@ -789,6 +789,7 @@ export async function POST(req: NextRequest) {
     const summerValues = summerSample?.values ?? new Array(results.length).fill(null);
     const hillCountry = isCentralTexasHillCountry(gridBbox);
 
+    // Stage pass 1: run texture + Sentinel fusion across the full cell set first.
     const fusedResults: SampleResult[] = results.map((result, index) => {
       const fused = fuseNaipWithTextureAndSentinel(
         result.classification,
@@ -799,24 +800,27 @@ export async function POST(req: NextRequest) {
         { hillCountry },
       );
 
-      const hiRes = hiResImage
-        ? sampleHiResWindowStats(hiResImage, gridBbox, result.lng, result.lat)
-        : null;
-      const hiResRefined = refineWithHiResImagery(
-        {
-          ...result,
-          classification: fused.classification as VegClass,
-          confidence: fused.confidence,
-        },
-        hiRes,
-      );
+      return {
+        ...result,
+        classification: fused.classification as VegClass,
+        confidence: fused.confidence,
+        trustScore: fused.trustScore,
+        lowTrust: fused.lowTrust,
+      };
+    });
 
+    // Stage pass 2: sample hi-res RGB window stats for the entire grid.
+    const hiResStats = fusedResults.map((result) =>
+      hiResImage ? sampleHiResWindowStats(hiResImage, gridBbox, result.lng, result.lat) : null,
+    );
+
+    // Stage pass 3: apply hi-res refinement across the full fused grid.
+    const hiResRefinedResults: SampleResult[] = fusedResults.map((result, index) => {
+      const hiResRefined = refineWithHiResImagery(result, hiResStats[index]);
       return {
         ...result,
         classification: hiResRefined.classification,
         confidence: hiResRefined.confidence,
-        trustScore: fused.trustScore,
-        lowTrust: fused.lowTrust,
       };
     });
 
@@ -824,7 +828,7 @@ export async function POST(req: NextRequest) {
       refined: consensusResults,
       tileCount,
       consensusImprovedCells,
-    } = applyTileConsensus(fusedResults, spacingKm, gridBbox);
+    } = applyTileConsensus(hiResRefinedResults, spacingKm, gridBbox);
 
     // Build cell polygons for map overlay using the active analyzer cell width.
     // Tile consensus runs here for single-chunk analyses and again after merge for chunked runs.

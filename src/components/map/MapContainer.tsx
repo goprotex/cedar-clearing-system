@@ -44,6 +44,68 @@ interface MapContainerProps {
 type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI' | 'hologram';
 type Species = 'cedar' | 'oak' | 'mixed';
 
+function getAnalysisViewLayers(phase?: string): Record<LayerKey, boolean> {
+  switch (phase) {
+    case 'sampling':
+    case 'grid':
+    case 'indices':
+    case 'classify':
+      return {
+        soil: false,
+        naip: false,
+        naipCIR: true,
+        naipNDVI: false,
+        terrain3d: false,
+        cedarAI: false,
+        hologram: false,
+      };
+    case 'hires':
+    case 'refining':
+      return {
+        soil: false,
+        naip: true,
+        naipCIR: false,
+        naipNDVI: false,
+        terrain3d: false,
+        cedarAI: false,
+        hologram: false,
+      };
+    case 'sentinel':
+    case 'consensus':
+      return {
+        soil: false,
+        naip: false,
+        naipCIR: false,
+        naipNDVI: true,
+        terrain3d: false,
+        cedarAI: false,
+        hologram: false,
+      };
+    case 'building':
+    case 'applying':
+    case 'trees':
+      return {
+        soil: false,
+        naip: true,
+        naipCIR: false,
+        naipNDVI: false,
+        terrain3d: false,
+        cedarAI: true,
+        hologram: false,
+      };
+    default:
+      return {
+        soil: false,
+        naip: true,
+        naipCIR: false,
+        naipNDVI: false,
+        terrain3d: false,
+        cedarAI: false,
+        hologram: false,
+      };
+  }
+}
+
 export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -53,6 +115,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const lastAnalysisFocusRef = useRef<string | null>(null);
   const lastCinematicAnalysisRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
+  const preAnalysisLayersRef = useRef<Record<LayerKey, boolean> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
   const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
@@ -1020,6 +1083,39 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       },
     );
   }, [analysisProgress?.active, analysisProgress?.focusBbox, analysisProgress?.focusKey, analysisProgress?.phase]);
+
+  // ── Temporarily switch imagery while analysis is running so the map matches the active pass ──
+  useEffect(() => {
+    if (!analysisProgress?.active) {
+      if (preAnalysisLayersRef.current) {
+        if (!layers.hologram) {
+          setLayers((prev) => {
+            const saved = preAnalysisLayersRef.current;
+            if (!saved) return prev;
+            const same = (Object.keys(saved) as LayerKey[]).every((key) => prev[key] === saved[key]);
+            return same ? prev : { ...prev, ...saved };
+          });
+        }
+        preAnalysisLayersRef.current = null;
+      }
+      return;
+    }
+
+    if (analysisProgress.phase === 'done' || analysisProgress.phase === 'error') {
+      return;
+    }
+
+    if (!preAnalysisLayersRef.current) {
+      preAnalysisLayersRef.current = { ...layers };
+    }
+
+    const desired = getAnalysisViewLayers(analysisProgress.phase);
+    setLayers((prev) => {
+      if (prev.hologram) return prev;
+      const same = (Object.keys(desired) as LayerKey[]).every((key) => prev[key] === desired[key]);
+      return same ? prev : desired;
+    });
+  }, [analysisProgress?.active, analysisProgress?.phase, layers]);
 
   // ── Auto-enter cinematic terrain/hologram mode after spectral analysis completes ──
   useEffect(() => {
