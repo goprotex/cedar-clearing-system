@@ -27,7 +27,7 @@ const WORLD_IMAGERY_EXPORT =
   'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export';
 
 /** Smaller batches + retries reduce NAIP rate-limit / transient failures vs 50 parallel requests. */
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 25;
 const NAIP_FETCH_TIMEOUT_MS = 15000;
 const NAIP_MAX_ATTEMPTS = 5;
 const HI_RES_FETCH_TIMEOUT_MS = 20000;
@@ -44,15 +44,7 @@ function isRetryableHttpStatus(status: number): boolean {
   return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
-type NaipFetchResult =
-  | { ok: true; payload: { value?: string } }
-  | {
-      ok: false;
-      reason: 'timeout' | 'rate_limited' | 'http_error' | 'parse_error' | 'network_error';
-      status?: number;
-    };
-
-async function fetchNaipIdentifyJson(lng: number, lat: number): Promise<NaipFetchResult> {
+async function fetchNaipIdentifyJson(lng: number, lat: number): Promise<unknown | null> {
   const geom = JSON.stringify({
     x: lng,
     y: lat,
@@ -60,50 +52,37 @@ async function fetchNaipIdentifyJson(lng: number, lat: number): Promise<NaipFetc
   });
   const url = `${NAIP_IDENTIFY}?geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryPoint&returnGeometry=false&returnCatalogItems=false&f=json`;
 
-  let lastFailure: NaipFetchResult = { ok: false, reason: 'network_error' };
+  let lastErr: unknown;
   for (let attempt = 1; attempt <= NAIP_MAX_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(url, {
         signal: AbortSignal.timeout(NAIP_FETCH_TIMEOUT_MS),
       });
       if (!res.ok) {
-        lastFailure = {
-          ok: false,
-          reason: res.status === 429 ? 'rate_limited' : 'http_error',
-          status: res.status,
-        };
         if (isRetryableHttpStatus(res.status) && attempt < NAIP_MAX_ATTEMPTS) {
           await sleep(200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 100));
           continue;
         }
-        return lastFailure;
+        return null;
       }
       const text = await res.text();
       try {
-        return { ok: true, payload: JSON.parse(text) as { value?: string } };
+        return JSON.parse(text) as unknown;
       } catch {
-        lastFailure = { ok: false, reason: 'parse_error' };
         if (attempt < NAIP_MAX_ATTEMPTS) {
           await sleep(200 * 2 ** (attempt - 1));
           continue;
         }
-        return lastFailure;
+        return null;
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message.toLowerCase() : '';
-      lastFailure = {
-        ok: false,
-        reason:
-          message.includes('timeout') || message.includes('timed out') || message.includes('abort')
-            ? 'timeout'
-            : 'network_error',
-      };
+      lastErr = e;
       if (attempt < NAIP_MAX_ATTEMPTS) {
         await sleep(200 * 2 ** (attempt - 1) + Math.floor(Math.random() * 150));
       }
     }
   }
-  return lastFailure;
+  return null;
 }
 
 type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
@@ -143,31 +122,6 @@ interface CalibrationExamplePayload {
   lng: number;
   lat: number;
   species: 'cedar' | 'oak';
-  crownPolygon?: GeoJSON.Polygon;
-}
-
-interface NaipDiagnostics {
-  requestedSamples: number;
-  successfulSamples: number;
-  noDataSamples: number;
-  invalidPixelSamples: number;
-  rateLimitedSamples: number;
-  timeoutSamples: number;
-  httpErrorSamples: number;
-  parseErrorSamples: number;
-  networkErrorSamples: number;
-  degradedFallbackUsed: boolean;
-}
-
-function isGeoJsonPolygon(value: unknown): value is GeoJSON.Polygon {
-  if (!value || typeof value !== 'object') return false;
-  const polygon = value as GeoJSON.Polygon;
-  return (
-    polygon.type === 'Polygon' &&
-    Array.isArray(polygon.coordinates) &&
-    polygon.coordinates.length > 0 &&
-    Array.isArray(polygon.coordinates[0])
-  );
 }
 
 function summarizeLiveCounts(results: SampleResult[], acreage: number) {
@@ -216,56 +170,6 @@ function summarizePreviewAgainstWholeGrid(
     completed: processedPoints,
     estimatedCedarAcres,
   };
-}
-
-function createNaipDiagnostics(totalSamples: number): NaipDiagnostics {
-  return {
-    requestedSamples: totalSamples,
-    successfulSamples: 0,
-    noDataSamples: 0,
-    invalidPixelSamples: 0,
-    rateLimitedSamples: 0,
-    timeoutSamples: 0,
-    httpErrorSamples: 0,
-    parseErrorSamples: 0,
-    networkErrorSamples: 0,
-    degradedFallbackUsed: false,
-  };
-}
-
-function classifyWithoutNaip(
-  hiRes: HiResWindowStats | null,
-  calibration: CrownCalibrationProfile,
-): Pick<SampleResult, 'classification' | 'confidence'> {
-  if (!hiRes) {
-    return { classification: 'bare', confidence: 0.18 };
-  }
-
-  if (
-    hiRes.brightness < calibration.cedarBrightnessCeil &&
-    hiRes.greenBias > Math.max(0.012, calibration.cedarGreenBiasFloor * 0.8) &&
-    hiRes.darkFrac > 0.12
-  ) {
-    return { classification: 'cedar', confidence: 0.34 };
-  }
-
-  if (
-    hiRes.brightness > Math.max(116, calibration.oakBrightnessFloor - 8) &&
-    hiRes.grayFrac > Math.max(0.16, calibration.oakGrayFloor * 0.8) &&
-    hiRes.darkFrac < 0.18
-  ) {
-    return { classification: 'oak', confidence: 0.34 };
-  }
-
-  if (hiRes.brightness > 128 && hiRes.greenBias > 0.015 && hiRes.darkFrac < 0.08) {
-    return { classification: 'grass', confidence: 0.3 };
-  }
-
-  if (hiRes.darkFrac > 0.15 || hiRes.textureVar > 0.007) {
-    return { classification: 'mixed_brush', confidence: 0.24 };
-  }
-
-  return { classification: 'bare', confidence: 0.2 };
 }
 
 function toSpectralSamples(results: SampleResult[]): SpectralSamplePayload[] {
@@ -929,23 +833,6 @@ export async function POST(req: NextRequest) {
         };
 
         try {
-          const profileExamples: CrownCalibrationExample[] = Array.isArray(calibrationExamples)
-            ? (calibrationExamples as CalibrationExamplePayload[])
-                .filter(
-                  (item) =>
-                    item &&
-                    typeof item.lng === 'number' &&
-                    typeof item.lat === 'number' &&
-                    (item.species === 'cedar' || item.species === 'oak'),
-                )
-                .map((item) => ({
-                  lng: item.lng,
-                  lat: item.lat,
-                  species: item.species,
-                  crownPolygon: isGeoJsonPolygon(item.crownPolygon) ? item.crownPolygon : undefined,
-                }))
-            : [];
-
           push('progress', {
             phase: 'grid',
             message: 'Building analyzer grid',
@@ -959,50 +846,40 @@ export async function POST(req: NextRequest) {
           });
 
           const results: SampleResult[] = [];
-          const naipDiagnostics = createNaipDiagnostics(samplePoints.length);
 
           for (let i = 0; i < samplePoints.length; i += BATCH_SIZE) {
             const batch = samplePoints.slice(i, i + BATCH_SIZE);
             const batchResults = await Promise.all(
               batch.map(async (pt): Promise<SampleResult | null> => {
                 const [lng, lat] = pt.geometry.coordinates;
-                const naipResult = await fetchNaipIdentifyJson(lng, lat);
-                if (!naipResult.ok) {
-                  if (naipResult.reason === 'rate_limited') naipDiagnostics.rateLimitedSamples++;
-                  else if (naipResult.reason === 'timeout') naipDiagnostics.timeoutSamples++;
-                  else if (naipResult.reason === 'http_error') naipDiagnostics.httpErrorSamples++;
-                  else if (naipResult.reason === 'parse_error') naipDiagnostics.parseErrorSamples++;
-                  else naipDiagnostics.networkErrorSamples++;
+                try {
+                  const data = (await fetchNaipIdentifyJson(lng, lat)) as { value?: string } | null;
+                  if (!data) return null;
+                  const pixelStr: string = data?.value || '';
+
+                  if (!pixelStr || pixelStr === 'NoData') {
+                    return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
+                  }
+
+                  const vals = pixelStr
+                    .split(/[\s,]+/)
+                    .map(Number)
+                    .filter((n) => !isNaN(n));
+                  if (vals.length < 3) return null;
+
+                  const [r, g, b] = vals;
+                  const nir = vals.length >= 4 ? vals[3] : null;
+
+                  let ndvi = 0;
+                  if (nir !== null && nir + r > 0) {
+                    ndvi = (nir - r) / (nir + r);
+                  }
+
+                  const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
+                  return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
+                } catch {
                   return null;
                 }
-
-                const pixelStr: string = naipResult.payload.value || '';
-                if (!pixelStr || pixelStr === 'NoData') {
-                  naipDiagnostics.noDataSamples++;
-                  naipDiagnostics.successfulSamples++;
-                  return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
-                }
-
-                const vals = pixelStr
-                  .split(/[\s,]+/)
-                  .map(Number)
-                  .filter((n) => !isNaN(n));
-                if (vals.length < 3) {
-                  naipDiagnostics.invalidPixelSamples++;
-                  return null;
-                }
-
-                const [r, g, b] = vals;
-                const nir = vals.length >= 4 ? vals[3] : null;
-
-                let ndvi = 0;
-                if (nir !== null && nir + r > 0) {
-                  ndvi = (nir - r) / (nir + r);
-                }
-
-                naipDiagnostics.successfulSamples++;
-                const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
-                return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
               })
             );
 
@@ -1018,42 +895,10 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          const hiResImage = await fetchHiResWindowImage(gridBbox);
-          const calibrationProfile = buildCalibrationProfile(
-            hiResImage as HiResImageData | null,
-            gridBbox,
-            profileExamples,
-          );
-
           if (results.length === 0) {
-            naipDiagnostics.degradedFallbackUsed = true;
-            const fallbackResults: SampleResult[] = samplePoints.map((pt) => {
-              const [lng, lat] = pt.geometry.coordinates;
-              const hiResStats = hiResImage ? sampleHiResWindowStats(hiResImage, gridBbox, lng, lat) : null;
-              const fallback = classifyWithoutNaip(hiResStats, calibrationProfile);
-              return {
-                lng,
-                lat,
-                ndvi: 0,
-                gndvi: 0,
-                savi: 0,
-                classification: fallback.classification,
-                confidence: fallback.confidence,
-                bandVotes: 0,
-                trustScore: 0.2,
-                lowTrust: true,
-              };
-            });
-            results.push(...fallbackResults);
-
-            push('progress', {
-              phase: 'sampling',
-              message: 'NAIP unavailable — switching to degraded fallback',
-              detail:
-                'No usable NAIP samples were returned. Continuing with hi-res imagery and low-trust baseline classifications.',
-              pct: 38,
-              ...summarizePreviewAgainstWholeGrid(results, ac, samplePoints.length),
-            });
+            push('error', { message: 'No NAIP data available for this area' });
+            controller.close();
+            return;
           }
 
           const textureNdviVar = computeLocalNdviVariance(
@@ -1087,6 +932,24 @@ export async function POST(req: NextRequest) {
             winterScene ? sampleNdviFromSceneItem(winterScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
             summerScene ? sampleNdviFromSceneItem(summerScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
           ]);
+
+          const hiResImage = await fetchHiResWindowImage(gridBbox);
+          const profileExamples: CrownCalibrationExample[] = Array.isArray(calibrationExamples)
+            ? (calibrationExamples as CalibrationExamplePayload[])
+                .filter(
+                  (item) =>
+                    item &&
+                    typeof item.lng === 'number' &&
+                    typeof item.lat === 'number' &&
+                    (item.species === 'cedar' || item.species === 'oak'),
+                )
+                .map((item) => ({ lng: item.lng, lat: item.lat, species: item.species }))
+            : [];
+          const calibrationProfile = buildCalibrationProfile(
+            hiResImage as HiResImageData | null,
+            gridBbox,
+            profileExamples,
+          );
 
           const winterValues = winterSample?.values ?? new Array(results.length).fill(null);
           const summerValues = summerSample?.values ?? new Array(results.length).fill(null);
@@ -1225,7 +1088,6 @@ export async function POST(req: NextRequest) {
               used: Boolean(hiResImage),
               source: 'esri-world-imagery',
             },
-            naipDiagnostics,
             crownSegmentation: {
               used: Boolean(hiResImage),
               source: 'hi_res_connected_components',

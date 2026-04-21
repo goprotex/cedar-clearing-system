@@ -137,19 +137,6 @@ export interface CedarCalibrationStats {
   source: string;
 }
 
-export interface CedarNaipDiagnostics {
-  requestedSamples: number;
-  successfulSamples: number;
-  noDataSamples: number;
-  invalidPixelSamples: number;
-  rateLimitedSamples: number;
-  timeoutSamples: number;
-  httpErrorSamples: number;
-  parseErrorSamples: number;
-  networkErrorSamples: number;
-  degradedFallbackUsed: boolean;
-}
-
 export interface CedarAnalysisSummary {
   totalSamples: number;
   cedar: CedarClassCount;
@@ -176,7 +163,6 @@ export interface CedarAnalysisSummary {
     used: boolean;
     source?: string;
   };
-  naipDiagnostics?: CedarNaipDiagnostics;
   sentinelFusion?: {
     used: boolean;
     pairedSamples: number;
@@ -268,7 +254,6 @@ export interface MarkedTree {
   label: string; // e.g. "Heritage Oak #1", "Customer requested"
   height: number;
   canopyDiameter: number;
-  crownPolygon?: GeoJSON.Polygon;
   source?: 'auto' | 'manual';
 }
 

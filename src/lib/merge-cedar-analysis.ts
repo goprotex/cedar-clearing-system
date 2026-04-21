@@ -356,20 +356,6 @@ export function mergeCedarAnalyses(parts: CedarAnalysis[], pastureAcreage: numbe
     cellHalfLatDeg: base0.cellHalfLatDeg,
     lowTrustCells: lowTrustCount,
     lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
-    naipDiagnostics: parts.some((part) => part.summary.naipDiagnostics)
-      ? {
-          requestedSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.requestedSamples ?? 0), 0),
-          successfulSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.successfulSamples ?? 0), 0),
-          noDataSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.noDataSamples ?? 0), 0),
-          invalidPixelSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.invalidPixelSamples ?? 0), 0),
-          rateLimitedSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.rateLimitedSamples ?? 0), 0),
-          timeoutSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.timeoutSamples ?? 0), 0),
-          httpErrorSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.httpErrorSamples ?? 0), 0),
-          parseErrorSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.parseErrorSamples ?? 0), 0),
-          networkErrorSamples: parts.reduce((sum, part) => sum + (part.summary.naipDiagnostics?.networkErrorSamples ?? 0), 0),
-          degradedFallbackUsed: parts.some((part) => Boolean(part.summary.naipDiagnostics?.degradedFallbackUsed)),
-        }
-      : undefined,
     sentinelFusion: base0.sentinelFusion,
     crownSegmentation: mergedCrowns.length > 0
       ? {

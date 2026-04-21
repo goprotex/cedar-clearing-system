@@ -85,16 +85,13 @@ function activeProcessIndexForPhase(phase: string): number {
   }
 }
 
-function getCalibrationExamplesFromPasture(
-  pasture: Pasture,
-): Array<{ lng: number; lat: number; species: 'cedar' | 'oak'; crownPolygon?: GeoJSON.Polygon }> {
+function getCalibrationExamplesFromPasture(pasture: Pasture): Array<{ lng: number; lat: number; species: 'cedar' | 'oak' }> {
   return (pasture.savedTrees ?? [])
     .filter((tree) => tree.action === 'calibrate_cedar' || tree.action === 'calibrate_oak')
     .map((tree) => ({
       lng: tree.lng,
       lat: tree.lat,
       species: tree.action === 'calibrate_oak' ? 'oak' : 'cedar',
-      crownPolygon: tree.crownPolygon,
     }));
 }
 
