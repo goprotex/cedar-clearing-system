@@ -48,6 +48,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
+  const [mapStyleLoaded, setMapStyleLoaded] = useState(false);
   const lastFlyToPastureRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
@@ -188,6 +189,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     map.addControl(draw, 'top-right');
 
     map.on('load', () => {
+      setMapStyleLoaded(true);
+
       // ── DEM source (for 3D terrain) ──
       map.addSource('mapbox-dem', {
         type: 'raster-dem',
@@ -447,7 +450,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   // ── Toggle layer visibility + opacity ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapStyleLoaded) return;
 
     const layerMap: Record<LayerKey, string> = {
       soil: 'soil-overlay',
@@ -696,9 +699,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   // ── Sync overlay layers visibility + opacity ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapStyleLoaded) return;
     syncOverlayVisibility(map, overlayLayers, overlayOpacities);
-  }, [overlayLayers, overlayOpacities]);
+  }, [overlayLayers, overlayOpacities, mapStyleLoaded]);
 
   // Auto-rotation: only spin when autoRotate is enabled; disables zoom/pan when active.
   useEffect(() => {
@@ -873,7 +876,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   // Update pasture polygons on map
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapStyleLoaded) return;
 
     const source = map.getSource('pastures') as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
@@ -901,7 +904,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   // ── Sync cedar analysis overlay data ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapStyleLoaded) return;
 
     const source = map.getSource('cedar-analysis') as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
