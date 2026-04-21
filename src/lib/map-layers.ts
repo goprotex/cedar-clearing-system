@@ -76,7 +76,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-county',
     layerId: 'overlay-county-raster',
     tileUrl:
-      'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:86',
+      'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&f=image&layers=show:84',
     defaultOpacity: 0.7,
     attribution: 'US Census Bureau TIGER',
   },
@@ -88,9 +88,9 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-parcels',
     layerId: 'overlay-parcels-raster',
     tileUrl:
-      'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:10,12',
+      'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Parcels/MapServer/tile/{z}/{y}/{x}',
     defaultOpacity: 0.6,
-    attribution: 'US Census Bureau TIGER',
+    attribution: 'Esri Community Maps',
   },
 
   /* ── Hazards ──────────────────────────────────────────────────── */
@@ -102,7 +102,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-fema-flood',
     layerId: 'overlay-fema-flood-raster',
     tileUrl:
-      'https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:28',
+      'https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:28',
     defaultOpacity: 0.55,
     attribution: 'FEMA NFHL',
   },
@@ -114,7 +114,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-wildfire-risk',
     layerId: 'overlay-wildfire-risk-raster',
     tileUrl:
-      'https://apps.fs.usda.gov/arcx/rest/services/RDW_Wildfire/ProbabilisticWildfireRisk/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:0',
+      'https://apps.fs.usda.gov/arcx/rest/services/RDW_Wildfire/ProbabilisticWildfireRisk/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
     defaultOpacity: 0.55,
     attribution: 'USFS',
   },
@@ -126,7 +126,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-burn-history',
     layerId: 'overlay-burn-history-raster',
     tileUrl:
-      'https://apps.fs.usda.gov/arcx/rest/services/RDW_Wildfire/MTBS_BurnSeverity/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image',
+      'https://apps.fs.usda.gov/arcx/rest/services/RDW_Wildfire/MTBS_BurnSeverity/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.55,
     attribution: 'USFS MTBS',
   },
@@ -138,9 +138,9 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-burn-ban',
     layerId: 'overlay-burn-ban-raster',
     tileUrl:
-      'https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/USA_Wildfires_v1/FeatureServer/2/query?where=1%3D1&outFields=*&geometry={bbox-epsg-3857}&geometryType=esriGeometryEnvelope&inSR=3857&spatialRel=esriSpatialRelIntersects&outSR=3857&f=geojson',
+      'https://wildfire.usgs.gov/arcgis/rest/services/geomac_dyn/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
     defaultOpacity: 0.5,
-    attribution: 'NIFC',
+    attribution: 'USGS GeoMAC',
   },
 
   /* ── Infrastructure ───────────────────────────────────────────── */
@@ -152,7 +152,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-gas-pipelines',
     layerId: 'overlay-gas-pipelines-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/arcgis/rest/services/Natural_Gas_Liquid_Pipelines/FeatureServer/0/query?where=1%3D1&outFields=*&geometry={bbox-epsg-3857}&geometryType=esriGeometryEnvelope&inSR=3857&spatialRel=esriSpatialRelIntersects&outSR=3857&f=geojson',
+      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Pipelines_Hazardous_Liquids/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.7,
     attribution: 'HIFLD / EIA',
   },
@@ -164,7 +164,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-transmission-lines',
     layerId: 'overlay-transmission-lines-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/arcgis/rest/services/Electric_Power_Transmission_Lines/FeatureServer/0/query?where=1%3D1&outFields=*&geometry={bbox-epsg-3857}&geometryType=esriGeometryEnvelope&inSR=3857&spatialRel=esriSpatialRelIntersects&outSR=3857&f=geojson',
+      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Electric_Power_Transmission_Lines/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.7,
     attribution: 'HIFLD',
   },
@@ -176,7 +176,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-substations',
     layerId: 'overlay-substations-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/arcgis/rest/services/Electric_Substations/FeatureServer/0/query?where=1%3D1&outFields=*&geometry={bbox-epsg-3857}&geometryType=esriGeometryEnvelope&inSR=3857&spatialRel=esriSpatialRelIntersects&outSR=3857&f=geojson',
+      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Electric_Substations/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.7,
     attribution: 'HIFLD',
   },
@@ -188,7 +188,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-cell-coverage',
     layerId: 'overlay-cell-coverage-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/arcgis/rest/services/Cellular_Towers/FeatureServer/0/query?where=1%3D1&outFields=*&geometry={bbox-epsg-3857}&geometryType=esriGeometryEnvelope&inSR=3857&spatialRel=esriSpatialRelIntersects&outSR=3857&f=geojson',
+      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Cellular_Towers/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.7,
     attribution: 'HIFLD / FCC',
   },
@@ -202,7 +202,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-tree-canopy',
     layerId: 'overlay-tree-canopy-raster',
     tileUrl:
-      'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Tree_Canopy_Cover_L48/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=NLCD_2021_Tree_Canopy_Cover_L48&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE',
+      'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Tree_Canopy_L48/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=NLCD_2021_Tree_Canopy_L48&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE',
     defaultOpacity: 0.6,
     attribution: 'USGS NLCD',
   },
@@ -214,7 +214,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-vegetation-type',
     layerId: 'overlay-vegetation-type-raster',
     tileUrl:
-      'https://landfire.cr.usgs.gov/arcgis/rest/services/Landfire/US_230/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:2',
+      'https://landfire.cr.usgs.gov/arcgis/rest/services/Landfire/US_230/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:2',
     defaultOpacity: 0.55,
     attribution: 'USGS LANDFIRE',
   },
