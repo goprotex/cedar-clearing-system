@@ -549,8 +549,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
       'Partition pasture into regions sized for reliable NAIP sampling',
       'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
       'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
+      'Refine every cell with hi-res winter RGB imagery from World Imagery',
       'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
-      'Overlapping-tile consensus to stabilize class boundaries',
+      'Seasonal fusion + overlapping-tile consensus to stabilize class boundaries',
     ];
 
     const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);

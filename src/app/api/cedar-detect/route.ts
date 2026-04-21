@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
+import sharp from 'sharp';
 import { computeLocalNdviVariance } from '@/lib/spectral-texture';
 import { fuseNaipWithTextureAndSentinel } from '@/lib/spectral-fusion';
 import { isCentralTexasHillCountry } from '@/lib/spectral-region';
@@ -13,11 +14,17 @@ export const maxDuration = 300; // 5 min — thorough spectral analysis
 
 const NAIP_IDENTIFY =
   'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/identify';
+const WORLD_IMAGERY_EXPORT =
+  'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export';
 
 /** Smaller batches + retries reduce NAIP rate-limit / transient failures vs 50 parallel requests. */
 const BATCH_SIZE = 25;
 const NAIP_FETCH_TIMEOUT_MS = 15000;
 const NAIP_MAX_ATTEMPTS = 5;
+const HI_RES_FETCH_TIMEOUT_MS = 20000;
+const HI_RES_MIN_DIM = 512;
+const HI_RES_MAX_DIM = 2048;
+const HI_RES_TARGET_METERS_PER_PIXEL = 0.6;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -89,6 +96,16 @@ interface SampleResult {
   bandVotes: number; // how many indices agreed on classification (0-4)
   trustScore?: number;
   lowTrust?: boolean;
+}
+
+interface HiResWindowStats {
+  brightness: number;
+  greenBias: number;
+  redBias: number;
+  chroma: number;
+  darkFrac: number;
+  grayFrac: number;
+  textureVar: number;
 }
 
 // ── Band index computation ──
@@ -283,6 +300,179 @@ function getClassColor(classification: VegClass, ndvi: number): string {
     case 'bare':
       return '#9ca3af';
   }
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function hiResImageDimensions(bbox: number[]): {
+  width: number;
+  height: number;
+  metersPerPixel: number;
+} {
+  const centerLat = (bbox[1] + bbox[3]) / 2;
+  const widthM = Math.max(1, (bbox[2] - bbox[0]) * 111_320 * Math.cos((centerLat * Math.PI) / 180));
+  const heightM = Math.max(1, (bbox[3] - bbox[1]) * 111_320);
+  const width = clamp(Math.round(widthM / HI_RES_TARGET_METERS_PER_PIXEL), HI_RES_MIN_DIM, HI_RES_MAX_DIM);
+  const height = clamp(Math.round(heightM / HI_RES_TARGET_METERS_PER_PIXEL), HI_RES_MIN_DIM, HI_RES_MAX_DIM);
+  return {
+    width,
+    height,
+    metersPerPixel: Math.max(widthM / width, heightM / height),
+  };
+}
+
+async function fetchHiResWindowImage(bbox: number[]): Promise<{
+  data: Uint8Array;
+  width: number;
+  height: number;
+  channels: number;
+  metersPerPixel: number;
+} | null> {
+  const dims = hiResImageDimensions(bbox);
+  const url = `${WORLD_IMAGERY_EXPORT}?bbox=${bbox.join(',')}&bboxSR=4326&imageSR=4326&size=${dims.width},${dims.height}&format=png32&transparent=false&f=image`;
+
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(HI_RES_FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const raw = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    return {
+      data: raw.data,
+      width: raw.info.width,
+      height: raw.info.height,
+      channels: raw.info.channels,
+      metersPerPixel: dims.metersPerPixel,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sampleHiResWindowStats(
+  image: { data: Uint8Array; width: number; height: number; channels: number; metersPerPixel: number },
+  bbox: number[],
+  lng: number,
+  lat: number,
+): HiResWindowStats | null {
+  const xNorm = (lng - bbox[0]) / Math.max(1e-9, bbox[2] - bbox[0]);
+  const yNorm = (bbox[3] - lat) / Math.max(1e-9, bbox[3] - bbox[1]);
+  const cx = clamp(Math.round(xNorm * (image.width - 1)), 0, image.width - 1);
+  const cy = clamp(Math.round(yNorm * (image.height - 1)), 0, image.height - 1);
+  const radiusPx = clamp(Math.round(3 / Math.max(0.25, image.metersPerPixel)), 2, 8);
+
+  let count = 0;
+  let sumR = 0;
+  let sumG = 0;
+  let sumB = 0;
+  let sumBrightness = 0;
+  let sumBrightnessSq = 0;
+  let darkCount = 0;
+  let grayCount = 0;
+
+  for (let y = Math.max(0, cy - radiusPx); y <= Math.min(image.height - 1, cy + radiusPx); y++) {
+    for (let x = Math.max(0, cx - radiusPx); x <= Math.min(image.width - 1, cx + radiusPx); x++) {
+      const idx = (y * image.width + x) * image.channels;
+      const r = image.data[idx];
+      const g = image.data[idx + 1];
+      const b = image.data[idx + 2];
+      const brightness = (r + g + b) / 3;
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+
+      count++;
+      sumR += r;
+      sumG += g;
+      sumB += b;
+      sumBrightness += brightness;
+      sumBrightnessSq += brightness * brightness;
+      if (brightness < 105) darkCount++;
+      if (spread < 18 && brightness > 85 && brightness < 170) grayCount++;
+    }
+  }
+
+  if (count === 0) return null;
+
+  const meanR = sumR / count;
+  const meanG = sumG / count;
+  const meanB = sumB / count;
+  const brightness = sumBrightness / count;
+  const variance = Math.max(0, sumBrightnessSq / count - brightness * brightness);
+  const denom = Math.max(brightness, 1);
+
+  return {
+    brightness,
+    greenBias: (meanG - Math.max(meanR, meanB)) / denom,
+    redBias: (meanR - Math.max(meanG, meanB)) / denom,
+    chroma: (Math.max(meanR, meanG, meanB) - Math.min(meanR, meanG, meanB)) / denom,
+    darkFrac: darkCount / count,
+    grayFrac: grayCount / count,
+    textureVar: variance / (denom * denom),
+  };
+}
+
+function refineWithHiResImagery(
+  original: SampleResult,
+  hiRes: HiResWindowStats | null,
+): Pick<SampleResult, 'classification' | 'confidence'> {
+  if (!hiRes) {
+    return { classification: original.classification, confidence: original.confidence };
+  }
+
+  const strongCedar =
+    hiRes.brightness < 118 &&
+    hiRes.greenBias > 0.018 &&
+    hiRes.darkFrac > 0.16 &&
+    hiRes.chroma > 0.07;
+
+  const strongOak =
+    hiRes.brightness > 122 &&
+    hiRes.grayFrac > 0.34 &&
+    hiRes.darkFrac < 0.12 &&
+    hiRes.greenBias < 0.02;
+
+  const strongGrass =
+    hiRes.brightness > 128 &&
+    hiRes.darkFrac < 0.08 &&
+    hiRes.greenBias > 0.015 &&
+    hiRes.chroma > 0.05;
+
+  if (strongCedar) {
+    return {
+      classification: 'cedar',
+      confidence: Math.min(0.96, Math.max(original.confidence, 0.62) + hiRes.darkFrac * 0.18 + hiRes.greenBias),
+    };
+  }
+
+  if (strongOak && ['cedar', 'oak', 'mixed_brush'].includes(original.classification)) {
+    return {
+      classification: 'oak',
+      confidence: Math.min(0.92, Math.max(original.confidence, 0.58) + hiRes.grayFrac * 0.16),
+    };
+  }
+
+  if (strongGrass && ['grass', 'mixed_brush', 'bare'].includes(original.classification)) {
+    return {
+      classification: 'grass',
+      confidence: Math.min(0.88, Math.max(original.confidence, 0.54) + hiRes.greenBias * 0.5),
+    };
+  }
+
+  if (
+    original.classification === 'cedar' &&
+    hiRes.brightness > 130 &&
+    hiRes.grayFrac > 0.42 &&
+    hiRes.darkFrac < 0.1
+  ) {
+    return {
+      classification: 'oak',
+      confidence: Math.min(0.86, Math.max(0.52, original.confidence)),
+    };
+  }
+
+  return { classification: original.classification, confidence: original.confidence };
 }
 
 // ── Overlapping tile consensus ──
@@ -529,7 +719,7 @@ export async function POST(req: NextRequest) {
 
     const textureNdviVar = computeLocalNdviVariance(
       results.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
-      bbox,
+      gridBbox,
       spacingKm,
     );
 
@@ -542,18 +732,20 @@ export async function POST(req: NextRequest) {
     );
 
     const [winterScene, summerScene] = await Promise.all([
-      findSentinelScene(bbox, winterRange, 30),
-      findSentinelScene(bbox, summerRange, 30),
+      findSentinelScene(gridBbox, winterRange, 30),
+      findSentinelScene(gridBbox, summerRange, 30),
     ]);
 
     const [winterSample, summerSample] = await Promise.all([
-      winterScene ? sampleNdviFromSceneItem(winterScene, samplePointFeatures, bbox) : Promise.resolve(null),
-      summerScene ? sampleNdviFromSceneItem(summerScene, samplePointFeatures, bbox) : Promise.resolve(null),
+      winterScene ? sampleNdviFromSceneItem(winterScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
+      summerScene ? sampleNdviFromSceneItem(summerScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
     ]);
+
+    const hiResImage = await fetchHiResWindowImage(gridBbox);
 
     const winterValues = winterSample?.values ?? new Array(results.length).fill(null);
     const summerValues = summerSample?.values ?? new Array(results.length).fill(null);
-    const hillCountry = isCentralTexasHillCountry(bbox);
+    const hillCountry = isCentralTexasHillCountry(gridBbox);
 
     const fusedResults: SampleResult[] = results.map((result, index) => {
       const fused = fuseNaipWithTextureAndSentinel(
@@ -565,10 +757,22 @@ export async function POST(req: NextRequest) {
         { hillCountry },
       );
 
+      const hiRes = hiResImage
+        ? sampleHiResWindowStats(hiResImage, gridBbox, result.lng, result.lat)
+        : null;
+      const hiResRefined = refineWithHiResImagery(
+        {
+          ...result,
+          classification: fused.classification as VegClass,
+          confidence: fused.confidence,
+        },
+        hiRes,
+      );
+
       return {
         ...result,
-        classification: fused.classification as VegClass,
-        confidence: fused.confidence,
+        classification: hiResRefined.classification,
+        confidence: hiResRefined.confidence,
         trustScore: fused.trustScore,
         lowTrust: fused.lowTrust,
       };
@@ -576,7 +780,7 @@ export async function POST(req: NextRequest) {
 
     // Build cell polygons for map overlay (15m cells = 7.5m half-size)
     // NOTE: Tile consensus is applied AFTER merging chunks for full spatial context
-    const centerLat = (bbox[1] + bbox[3]) / 2;
+    const centerLat = (gridBbox[1] + gridBbox[3]) / 2;
     const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
     const halfLatDeg = spacingKm / 2 / 111.32;
 
@@ -649,6 +853,10 @@ export async function POST(req: NextRequest) {
       gridSpacingM: Math.round(spacingKm * 1000),
       lowTrustCells: lowTrustCount,
       lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
+        hiResImagery: {
+          used: Boolean(hiResImage),
+          source: 'esri-world-imagery',
+        },
       sentinelFusion: {
         used: Boolean(winterSample || summerSample),
         pairedSamples,
