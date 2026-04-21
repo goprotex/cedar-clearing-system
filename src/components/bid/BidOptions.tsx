@@ -27,7 +27,7 @@ export default function BidOptions() {
   return (
     <div className="space-y-3">
       <p className="text-[10px] text-[#a98a7d] uppercase tracking-widest">
-        Compare pricing across clearing methods. Single method applied to all pastures.
+        Compare pricing across clearing methods. Cedar-focused mulching options use cedar-effective acres when spectral analysis is available.
       </p>
 
       {options.map((option) => {
@@ -59,7 +59,7 @@ export default function BidOptions() {
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div className="bg-[#201f1f] border border-[#353534] p-2 text-center">
                 <div className="font-mono font-bold text-[#e5e2e1]">{formatCurrency(option.perAcreCost)}</div>
-                <div className="text-[10px] text-[#a98a7d] uppercase tracking-widest">per acre</div>
+                <div className="text-[10px] text-[#a98a7d] uppercase tracking-widest">per billed acre</div>
               </div>
               <div className="bg-[#201f1f] border border-[#353534] p-2 text-center">
                 <div className="font-mono font-bold text-[#e5e2e1]">{currentBid.totalAcreage} ac</div>

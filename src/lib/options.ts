@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Bid, BidOption, ClearingMethod, DisposalMethod, Pasture, RateCard } from '@/types';
-import { calculatePastureCost, calculateBidTotal, estimateDuration } from './rates';
+import { calculatePastureCost, calculateBidTotal, estimateDuration, getBillableAcreage } from './rates';
 
 interface OptionPreset {
   label: string;
@@ -63,6 +63,10 @@ export function generateBidOptions(
     );
 
     const { low, high } = estimateDuration(modifiedPastures);
+    const totalBillableAcres = modifiedPastures.reduce(
+      (sum, pasture) => sum + getBillableAcreage(pasture).billableAcres,
+      0,
+    );
 
     return {
       id: uuidv4(),
@@ -70,7 +74,7 @@ export function generateBidOptions(
       clearingMethod: preset.clearingMethod,
       disposalMethod: preset.disposalMethod,
       totalAmount,
-      perAcreCost: bid.totalAcreage > 0 ? Math.round(totalAmount / bid.totalAcreage) : 0,
+      perAcreCost: totalBillableAcres > 0 ? Math.round(totalAmount / totalBillableAcres) : 0,
       estimatedDaysLow: low,
       estimatedDaysHigh: high,
       pastureBreakdown: modifiedPastures.map((p) => ({

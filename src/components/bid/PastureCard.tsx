@@ -5,6 +5,7 @@ import type { Pasture, ClearingMethod, DensityClass, DisposalMethod, TerrainClas
 import { useBidStore } from '@/lib/store';
 import {
   formatCurrency,
+  getBillableAcreage,
   VEGETATION_LABELS,
   DENSITY_LABELS,
   TERRAIN_LABELS,
@@ -24,13 +25,17 @@ interface PastureCardProps {
 }
 
 export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
-  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar, analyzeSeasonal, aiPopulate, unmarkTree } = useBidStore();
+  const { updatePasture, removePasture, selectPasture, setDrawingMode, rateCard, analyzeCedar, analyzeSeasonal, aiPopulate, analysisProgress, unmarkTree } = useBidStore();
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzingSeasonal, setAnalyzingSeasonal] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AIRecommendation | null>(null);
 
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
+  const { billableAcres, pricingMode } = getBillableAcreage(pasture);
+  const displayedRate = billableAcres > 0 ? Math.round(pasture.subtotal / billableAcres) : 0;
+  const totalHours = Math.round(billableAcres * pasture.estimatedHrsPerAcre);
+  const globalAnalysisActive = Boolean(analysisProgress?.active);
 
   return (
     <div
@@ -280,7 +285,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
         </div>
 
         {/* Soil multiplier display */}
-        {pasture.acreage > 0 && !pasture.soilData && (
+        {pasture.acreage > 0 && !pasture.soilData && !globalAnalysisActive && (
           <div className="text-xs text-[#a98a7d] bg-[#201f1f] border border-[#353534] p-2 animate-pulse">
             LOADING_SOIL_DATA...
           </div>
@@ -330,7 +335,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
               setAnalyzing(false);
             }}
           >
-            {analyzing ? 'Analyzing imagery with AI...' : '🤖 Analyze Cedar (AI)'}
+            {analyzing && !globalAnalysisActive ? 'Analyzing imagery with AI...' : '🤖 Analyze Cedar (AI)'}
           </Button>
         )}
         {pasture.cedarAnalysis && (
@@ -400,7 +405,7 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                 }}
                 disabled={analyzing}
               >
-                {analyzing ? 'Re-analyzing...' : 'Re-analyze'}
+                {analyzing && !globalAnalysisActive ? 'Re-analyzing...' : 'Re-analyze'}
               </button>
             </div>
           </div>
@@ -479,13 +484,18 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
         {pasture.acreage > 0 && (
           <div className="text-xs text-[#a98a7d] space-y-0.5 bg-[#201f1f] border border-[#353534] p-2">
             <div>
-              <span className="font-medium">Rate:</span> {formatCurrency(Math.round(pasture.subtotal / pasture.acreage))}/acre
+              <span className="font-medium">Rate:</span> {formatCurrency(displayedRate)}/acre
               {' | '}
               <span className="font-medium">Time:</span> {pasture.estimatedHrsPerAcre} hrs/acre
             </div>
             <div>
-              Est. {Math.round(pasture.acreage * pasture.estimatedHrsPerAcre)} total hrs
-              ({Math.ceil(pasture.acreage * pasture.estimatedHrsPerAcre / 8)} work days)
+              Est. {totalHours} total hrs
+              ({Math.ceil(totalHours / 8)} work days)
+            </div>
+            <div>
+              <span className="font-medium">Billed acreage:</span>{' '}
+              {billableAcres.toFixed(1)} ac
+              {pricingMode === 'cedar_effective' ? ' from cedar analysis' : ' total pasture'}
             </div>
           </div>
         )}

@@ -11,6 +11,7 @@ import {
 } from '@/lib/rates';
 import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
 import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
+import { CEDAR_GRID_SPACING_M } from '@/lib/cedar-analysis-chunks';
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
 import { fetchCedarDetectChunkWithRetry, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
@@ -593,11 +594,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
     const bidId = get().currentBid.id;
     const spectralProcessLines = [
       'Partition pasture into regions sized for reliable NAIP sampling',
-      'For each 15 m cell: USGS NAIP identify (red, green, blue, near-infrared)',
+      `For each ${CEDAR_GRID_SPACING_M} m cell: USGS NAIP identify (red, green, blue, near-infrared)`,
       'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
       'Refine every cell with hi-res winter RGB imagery from World Imagery',
       'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
-      'Seasonal fusion + overlapping-tile consensus to stabilize class boundaries',
+      'Seasonal fusion + overlapping-tile consensus smooth class boundaries when enough cells exist',
     ];
 
     const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
@@ -678,8 +679,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
           step: 'Initializing spectral analysis…',
           detail:
             totalChunks > 1
-              ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, 15 m cells). Progress is saved after each region — you can resume if interrupted.`
-              : `Scanning ~${Math.round(pasture.acreage)} acres at 15 m resolution`,
+              ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, ${CEDAR_GRID_SPACING_M} m cells). Progress is saved after each region — you can resume if interrupted.`
+              : `Scanning ~${Math.round(pasture.acreage)} acres at ${CEDAR_GRID_SPACING_M} m resolution`,
           pct: 0,
           percent: 0,
           startedAt: analysisStartedAt,

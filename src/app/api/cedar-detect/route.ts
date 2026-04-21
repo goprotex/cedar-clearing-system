@@ -9,6 +9,7 @@ import {
   sampleNdviFromSceneItem,
   sceneMeta,
 } from '@/lib/sentinel-sample-ndvi';
+import { CEDAR_GRID_SPACING_KM, CEDAR_GRID_SPACING_M } from '@/lib/cedar-analysis-chunks';
 
 export const maxDuration = 300; // 5 min — thorough spectral analysis
 
@@ -650,15 +651,15 @@ export async function POST(req: NextRequest) {
       gridBbox = turf.bbox(clipped);
     }
 
-    // 15m uniform grid — dense wall-to-wall coverage, no gaps
-    const spacingKm = 0.015; // 15m between sample points
+    // 45m uniform grid — coarser wall-to-wall coverage for faster, broader analysis
+    const spacingKm = CEDAR_GRID_SPACING_KM;
 
     const grid = turf.pointGrid(gridBbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
 
-    // Use all points — 15m grid is dense but manageable within 300s timeout
+    // Use all points — 45m grid keeps coverage broad while cutting request volume substantially
     const samplePoints = pointsInPoly;
 
     if (samplePoints.length === 0) {
@@ -778,15 +779,21 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Build cell polygons for map overlay (15m cells = 7.5m half-size)
-    // NOTE: Tile consensus is applied AFTER merging chunks for full spatial context
+    const {
+      refined: consensusResults,
+      tileCount,
+      consensusImprovedCells,
+    } = applyTileConsensus(fusedResults, spacingKm, gridBbox);
+
+    // Build cell polygons for map overlay using the active analyzer cell width.
+    // Tile consensus runs here for single-chunk analyses and again after merge for chunked runs.
     const centerLat = (gridBbox[1] + gridBbox[3]) / 2;
     const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
     const halfLatDeg = spacingKm / 2 / 111.32;
 
     const gridCells: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: fusedResults.map((s) => ({
+      features: consensusResults.map((s) => ({
         type: 'Feature' as const,
         geometry: {
           type: 'Polygon' as const,
@@ -814,25 +821,25 @@ export async function POST(req: NextRequest) {
       })),
     };
 
-    // Summary statistics (raw results — tile consensus applied after merge)
-    const total = fusedResults.length;
-    const cedarCount = fusedResults.filter((r) => r.classification === 'cedar').length;
-    const oakCount = fusedResults.filter((r) => r.classification === 'oak').length;
-    const mixedCount = fusedResults.filter((r) => r.classification === 'mixed_brush').length;
-    const grassCount = fusedResults.filter((r) => r.classification === 'grass').length;
-    const bareCount = fusedResults.filter((r) => r.classification === 'bare').length;
+    // Summary statistics from consensus-refined results
+    const total = consensusResults.length;
+    const cedarCount = consensusResults.filter((r) => r.classification === 'cedar').length;
+    const oakCount = consensusResults.filter((r) => r.classification === 'oak').length;
+    const mixedCount = consensusResults.filter((r) => r.classification === 'mixed_brush').length;
+    const grassCount = consensusResults.filter((r) => r.classification === 'grass').length;
+    const bareCount = consensusResults.filter((r) => r.classification === 'bare').length;
 
     const cedarPct = total > 0 ? cedarCount / total : 0;
-    const avgNdvi = fusedResults.reduce((sum, r) => sum + r.ndvi, 0) / total;
-    const avgConf = fusedResults.reduce((sum, r) => sum + r.confidence, 0) / total;
-    const avgBandVotes = fusedResults.reduce((sum, r) => sum + r.bandVotes, 0) / total;
-    const avgGndvi = fusedResults.reduce((sum, r) => sum + r.gndvi, 0) / total;
-    const avgSavi = fusedResults.reduce((sum, r) => sum + r.savi, 0) / total;
+    const avgNdvi = consensusResults.reduce((sum, r) => sum + r.ndvi, 0) / total;
+    const avgConf = consensusResults.reduce((sum, r) => sum + r.confidence, 0) / total;
+    const avgBandVotes = consensusResults.reduce((sum, r) => sum + r.bandVotes, 0) / total;
+    const avgGndvi = consensusResults.reduce((sum, r) => sum + r.gndvi, 0) / total;
+    const avgSavi = consensusResults.reduce((sum, r) => sum + r.savi, 0) / total;
 
     // High-confidence cedar: cells where ≥3 bands agreed
-    const highConfCedar = fusedResults.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
-    const lowTrustCount = fusedResults.filter((r) => r.lowTrust).length;
-    const pairedSamples = fusedResults.filter(
+    const highConfCedar = consensusResults.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
+    const lowTrustCount = consensusResults.filter((r) => r.lowTrust).length;
+    const pairedSamples = consensusResults.filter(
       (_, index) => winterValues[index] !== null && summerValues[index] !== null,
     ).length;
 
@@ -850,13 +857,23 @@ export async function POST(req: NextRequest) {
       confidence: Math.round(avgConf * 100),
       avgBandVotes: Math.round(avgBandVotes * 10) / 10,
       highConfidenceCedarCells: highConfCedar,
-      gridSpacingM: Math.round(spacingKm * 1000),
+      gridSpacingM: CEDAR_GRID_SPACING_M,
       lowTrustCells: lowTrustCount,
       lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
         hiResImagery: {
           used: Boolean(hiResImage),
           source: 'esri-world-imagery',
         },
+      tileConsensus: {
+        tileCount,
+        tileOverlapPct: 60,
+        tileSizePixels: 5,
+        tileSizeM: Math.round(CEDAR_GRID_SPACING_M * 5),
+        stridePixels: 2,
+        strideM: Math.round(CEDAR_GRID_SPACING_M * 2),
+        consensusImprovedCells,
+        consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
+      },
       sentinelFusion: {
         used: Boolean(winterSample || summerSample),
         pairedSamples,

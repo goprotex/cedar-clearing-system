@@ -80,10 +80,40 @@ export function calculateSoilDifficulty(soil: SoilData): number {
   return Math.round(m * 100) / 100;
 }
 
+type PricingMode = 'full_acreage' | 'cedar_effective';
+
+function usesCedarEffectiveAcreage(
+  pasture: Pick<Pasture, 'vegetationType' | 'clearingMethod' | 'cedarAnalysis'>,
+): boolean {
+  if (!pasture.cedarAnalysis?.summary) return false;
+  if (pasture.clearingMethod === 'cedar_only') return true;
+
+  const cedarFocusedMulchingMethod =
+    pasture.clearingMethod === 'fine_mulch' ||
+    pasture.clearingMethod === 'rough_mulch' ||
+    pasture.clearingMethod === 'selective_thin';
+
+  return cedarFocusedMulchingMethod && (
+    pasture.vegetationType === 'cedar' || pasture.vegetationType === 'mixed'
+  );
+}
+
+export function getBillableAcreage(
+  pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'clearingMethod' | 'cedarAnalysis'>,
+): { billableAcres: number; pricingMode: PricingMode } {
+  if (!usesCedarEffectiveAcreage(pasture)) {
+    return { billableAcres: pasture.acreage, pricingMode: 'full_acreage' };
+  }
+
+  const estimatedCedarAcres = pasture.cedarAnalysis?.summary.estimatedCedarAcres ?? pasture.acreage;
+  const clamped = Math.max(0, Math.min(pasture.acreage, estimatedCedarAcres));
+  return { billableAcres: clamped, pricingMode: 'cedar_effective' };
+}
+
 // ──── Pasture Cost Calculation ────
 
 export function calculatePastureCost(
-  pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'density' | 'terrain' | 'clearingMethod' | 'disposalMethod' | 'soilMultiplier' | 'soilMultiplierOverride' | 'adders'>,
+  pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'density' | 'terrain' | 'clearingMethod' | 'disposalMethod' | 'soilMultiplier' | 'soilMultiplierOverride' | 'cedarAnalysis' | 'adders'>,
   rateCard: RateCard
 ): { subtotal: number; methodMultiplier: number; estimatedHrsPerAcre: number } {
   const baseRate = rateCard.baseRates[pasture.vegetationType];
@@ -99,9 +129,10 @@ export function calculatePastureCost(
 
   // Use the higher of terrain or soil multiplier (they measure similar friction)
   const difficultyMult = Math.max(terrainMult, soilMult);
+  const { billableAcres } = getBillableAcreage(pasture);
 
   const perAcre = baseRate * densityMult * difficultyMult * methodRateMult + disposalAdder;
-  const baseCost = pasture.acreage * perAcre;
+  const baseCost = billableAcres * perAcre;
 
   // Method-specific adders: quantity × costPerUnit
   const adderTotal = (pasture.adders ?? []).reduce((sum, a) => sum + a.quantity * a.costPerUnit, 0);
@@ -159,7 +190,7 @@ export function estimateDuration(
   hoursPerDay: number = 8
 ): { low: number; high: number } {
   const totalHours = pastures.reduce(
-    (sum, p) => sum + p.acreage * p.estimatedHrsPerAcre,
+    (sum, p) => sum + getBillableAcreage(p).billableAcres * p.estimatedHrsPerAcre,
     0
   );
   const baseDays = totalHours / hoursPerDay;

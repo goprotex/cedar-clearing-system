@@ -5,6 +5,19 @@ import type { CedarAnalysis, CedarAnalysisSummary, TileConsensusStats } from '@/
 /** Target max sample points per HTTP request (keeps each chunk under serverless time limits). */
 export const CEDAR_MAX_SAMPLES_PER_CHUNK = 3500;
 
+type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
+
+interface SamplePoint {
+  lng: number;
+  lat: number;
+  classification: VegClass;
+  confidence: number;
+  bandVotes: number;
+  ndvi: number;
+  gndvi: number;
+  savi: number;
+}
+
 function estimateSampleCountFromAcres(acreage: number): number {
   const areaM2 = Math.max(0, acreage) * 4046.8564224;
   const cellM2 = 15 * 15;
@@ -90,7 +103,186 @@ export function buildSpectralChunkBboxes(
   return chunks.length > 0 ? chunks : [];
 }
 
-type VegClass = 'cedar' | 'oak' | 'mixed_brush' | 'grass' | 'bare';
+/**
+ * Overlapping tile consensus: applies spatial context refinement across the entire merged dataset.
+ * Overlays 5×5-pixel tiles (75m) at 2-pixel stride (30m) = 60% overlap.
+ * Each pixel covered by up to 9 tiles; tiles vote on classification via confidence weighting.
+ * Eliminates salt-and-pepper noise and chunk boundary artifacts.
+ */
+function applyTileConsensusToFeatures(
+  features: GeoJSON.Feature[],
+  bbox: [number, number, number, number]
+): { refined: GeoJSON.Feature[]; tileCount: number; consensusImprovedCells: number } {
+  if (features.length < 4) {
+    return { refined: features, tileCount: 0, consensusImprovedCells: 0 };
+  }
+
+  const spacingKm = 0.015; // 15m grid
+  const centerLat = (bbox[1] + bbox[3]) / 2;
+  const kmPerDegLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
+  const kmPerDegLat = 111.32;
+  const spacingLng = spacingKm / kmPerDegLng;
+  const spacingLat = spacingKm / kmPerDegLat;
+
+  const minLng = bbox[0];
+  const minLat = bbox[1];
+
+  interface IndexedFeature {
+    feature: GeoJSON.Feature;
+    sample: SamplePoint;
+    col: number;
+    row: number;
+    originalIdx: number;
+  }
+
+  // Extract sample points from feature properties
+  const indexed: IndexedFeature[] = features.map((f, i) => {
+    const props = f.properties ?? {};
+    const geom = f.geometry as GeoJSON.Polygon;
+    const coords = geom.coordinates[0];
+    
+    // Get cell center
+    let sx = 0, sy = 0;
+    const n = coords.length - 1;
+    for (let j = 0; j < n; j++) {
+      sx += coords[j][0];
+      sy += coords[j][1];
+    }
+    const lng = sx / n;
+    const lat = sy / n;
+
+    return {
+      feature: f,
+      sample: {
+        lng,
+        lat,
+        classification: props.classification as VegClass,
+        confidence: props.confidence as number,
+        bandVotes: props.bandVotes as number,
+        ndvi: props.ndvi as number,
+        gndvi: props.gndvi as number,
+        savi: props.savi as number,
+      },
+      col: Math.round((lng - minLng) / spacingLng),
+      row: Math.round((lat - minLat) / spacingLat),
+      originalIdx: i,
+    };
+  });
+
+  const gridMap = new Map<string, IndexedFeature>();
+  let maxCol = 0;
+  let maxRow = 0;
+  for (const ir of indexed) {
+    gridMap.set(`${ir.col},${ir.row}`, ir);
+    if (ir.col > maxCol) maxCol = ir.col;
+    if (ir.row > maxRow) maxRow = ir.row;
+  }
+
+  const tileRadius = 2; // 5×5 tile: center ± 2
+  const stride = 2;     // 60% overlap
+
+  const pixelVotes: Array<Array<{ classification: VegClass; weight: number }>> =
+    features.map(() => []);
+
+  let tileCount = 0;
+
+  for (let tc = 0; tc <= maxCol; tc += stride) {
+    for (let tr = 0; tr <= maxRow; tr += stride) {
+      const tilePixels: IndexedFeature[] = [];
+      for (let dc = -tileRadius; dc <= tileRadius; dc++) {
+        for (let dr = -tileRadius; dr <= tileRadius; dr++) {
+          const px = gridMap.get(`${tc + dc},${tr + dr}`);
+          if (px) tilePixels.push(px);
+        }
+      }
+
+      if (tilePixels.length < 2) continue;
+      tileCount++;
+
+      const classWeight: Record<VegClass, number> = {
+        cedar: 0, oak: 0, mixed_brush: 0, grass: 0, bare: 0,
+      };
+      for (const px of tilePixels) {
+        const s = px.sample;
+        classWeight[s.classification] += s.confidence * (1 + s.bandVotes * 0.2);
+      }
+
+      let winner: VegClass = 'bare';
+      let maxW = -1;
+      for (const cls of Object.keys(classWeight) as VegClass[]) {
+        if (classWeight[cls] > maxW) {
+          maxW = classWeight[cls];
+          winner = cls;
+        }
+      }
+
+      const agreeing = tilePixels.filter((p) => p.sample.classification === winner).length;
+      const agreement = agreeing / tilePixels.length;
+      const agreeConf =
+        tilePixels
+          .filter((p) => p.sample.classification === winner)
+          .reduce((s, p) => s + p.sample.confidence, 0) / agreeing;
+
+      const voteWeight = agreeConf * agreement;
+      for (const px of tilePixels) {
+        pixelVotes[px.originalIdx].push({ classification: winner, weight: voteWeight });
+      }
+    }
+  }
+
+  let consensusImprovedCells = 0;
+  const refined = features.map((original, idx) => {
+    const votes = pixelVotes[idx];
+    if (votes.length === 0) return original;
+
+    const props = original.properties ?? {};
+    const originalClass = props.classification as VegClass;
+    const originalConf = props.confidence as number;
+
+    const cw: Record<VegClass, number> = {
+      cedar: 0, oak: 0, mixed_brush: 0, grass: 0, bare: 0,
+    };
+    for (const v of votes) {
+      cw[v.classification] += v.weight;
+    }
+
+    let bestClass: VegClass = originalClass;
+    let bestWeight = -1;
+    for (const cls of Object.keys(cw) as VegClass[]) {
+      if (cw[cls] > bestWeight) {
+        bestWeight = cw[cls];
+        bestClass = cls;
+      }
+    }
+
+    const totalWeight = Object.values(cw).reduce((a, b) => a + b, 0);
+    const winFraction = totalWeight > 0 ? bestWeight / totalWeight : 0;
+
+    if (bestClass !== originalClass) {
+      consensusImprovedCells++;
+      const newConf = Math.min(0.95, originalConf * 0.3 + winFraction * 0.7);
+      return {
+        ...original,
+        properties: {
+          ...props,
+          classification: bestClass,
+          confidence: Math.round(newConf * 100) / 100,
+        },
+      };
+    }
+
+    const boostedConf = Math.min(0.95, originalConf + winFraction * 0.15);
+    return {
+      ...original,
+      properties: {
+        ...props,
+        confidence: Math.round(boostedConf * 100) / 100,
+      },
+    };
+  });
+
+  return { refined, tileCount, consensusImprovedCells };
+}
 
 function mergeTileConsensus(parts: CedarAnalysis[], mergedTotal: number): TileConsensusStats | undefined {
   const withTc = parts.filter((p) => p.summary.tileConsensus);
@@ -138,10 +330,7 @@ export function mergeCedarChunkResults(parts: CedarAnalysis[], acreage: number):
     };
   }
 
-  if (parts.length === 1) {
-    return parts[0];
-  }
-
+  // Always apply tile consensus, even for single chunks (ensures consistency)
   const mergedFeatures: GeoJSON.Feature[] = [];
   const seen = new Set<string>();
 
@@ -171,6 +360,30 @@ export function mergeCedarChunkResults(parts: CedarAnalysis[], acreage: number):
     return parts[0];
   }
 
+  // Compute bbox for tile consensus
+  const lngs = mergedFeatures.map(f => {
+    const geom = f.geometry as GeoJSON.Polygon;
+    const coords = geom.coordinates[0];
+    return coords.reduce((sum, c) => sum + c[0], 0) / (coords.length - 1);
+  });
+  const lats = mergedFeatures.map(f => {
+    const geom = f.geometry as GeoJSON.Polygon;
+    const coords = geom.coordinates[0];
+    return coords.reduce((sum, c) => sum + c[1], 0) / (coords.length - 1);
+  });
+
+  const bbox: [number, number, number, number] = [
+    Math.min(...lngs),
+    Math.min(...lats),
+    Math.max(...lngs),
+    Math.max(...lats),
+  ];
+
+  // Apply tile consensus with full spatial context (no chunk boundaries)
+  const { refined: refinedFeatures, tileCount, consensusImprovedCells } =
+    applyTileConsensusToFeatures(mergedFeatures, bbox);
+
+  // Recompute summary from consensus-refined features
   let cedarCount = 0;
   let oakCount = 0;
   let mixedCount = 0;
@@ -183,7 +396,7 @@ export function mergeCedarChunkResults(parts: CedarAnalysis[], acreage: number):
   let sumBandVotes = 0;
   let highConfCedar = 0;
 
-  for (const f of mergedFeatures) {
+  for (const f of refinedFeatures) {
     const p = f.properties ?? {};
     const cls = p.classification as VegClass;
     if (cls === 'cedar') cedarCount++;
@@ -217,15 +430,24 @@ export function mergeCedarChunkResults(parts: CedarAnalysis[], acreage: number):
     avgBandVotes: Math.round((sumBandVotes / total) * 10) / 10,
     highConfidenceCedarCells: highConfCedar,
     gridSpacingM: 15,
-    tileConsensus: mergeTileConsensus(parts, total),
-    chunkedRun: {
+    tileConsensus: {
+      tileCount,
+      tileOverlapPct: 60,
+      tileSizePixels: 5,
+      tileSizeM: 75, // 5 pixels × 15m
+      stridePixels: 2,
+      strideM: 30, // 2 pixels × 15m
+      consensusImprovedCells,
+      consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
+    },
+    chunkedRun: parts.length > 1 ? {
       chunkCount: parts.length,
       maxSamplesPerChunk: CEDAR_MAX_SAMPLES_PER_CHUNK,
-    },
+    } : undefined,
   };
 
   return {
-    gridCells: { type: 'FeatureCollection', features: mergedFeatures },
+    gridCells: { type: 'FeatureCollection', features: refinedFeatures },
     summary,
   };
 }
