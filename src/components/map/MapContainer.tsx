@@ -216,13 +216,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         layout: { visibility: 'none' },
       });
 
-      // ── TNRIS StratMap Natural Color (0.5m TX statewide, sharper than NAIP) ──
+      // ── ESRI World Imagery (sub-meter for TX, sourced from TNRIS StratMap) ──
+      // XYZ tile cache — no CORS issues, no bbox params needed
       map.addSource('naip-rgb', {
         type: 'raster',
         tiles: [
-          'https://imagery.tnris.org/server/rest/services/StratMap/StratMap23_NCRGB/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
+          'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         ],
         tileSize: 256,
+        attribution: 'Esri, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
       });
 
       map.addLayer({
@@ -233,13 +235,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         layout: { visibility: 'none' },
       });
 
-      // ── TNRIS StratMap CIR (Color Infrared — NIR false color, highlights vegetation) ──
+      // ── USGS NAIP CIR (Color Infrared / False Color — highlights live vegetation) ──
       map.addSource('naip-cir', {
         type: 'raster',
         tiles: [
-          'https://imagery.tnris.org/server/rest/services/StratMap/StratMap23_NCCIR/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&bandIds=3,0,1&f=image',
         ],
         tileSize: 256,
+        attribution: 'USDA Farm Service Agency',
       });
 
       map.addLayer({
@@ -1080,8 +1083,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 emoji: '📡',
                 layers: [
                   { key: 'soil', label: 'Soil Map', emoji: '🟫', active: layers.soil, opacity: opacities.soil, onToggle: () => toggleLayer('soil'), onOpacity: (v) => setOpacities((p) => ({ ...p, soil: v })) },
-                  { key: 'naip', label: 'RGB (TNRIS)', emoji: '🛰️', active: layers.naip, opacity: opacities.naip, onToggle: () => toggleLayer('naip'), onOpacity: (v) => setOpacities((p) => ({ ...p, naip: v })) },
-                  { key: 'naipCIR', label: 'CIR (TNRIS)', emoji: '🔴', active: layers.naipCIR, opacity: opacities.naipCIR, onToggle: () => toggleLayer('naipCIR'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipCIR: v })) },
+                  { key: 'naip', label: 'RGB (Hi-Res)', emoji: '🛰️', active: layers.naip, opacity: opacities.naip, onToggle: () => toggleLayer('naip'), onOpacity: (v) => setOpacities((p) => ({ ...p, naip: v })) },
+                  { key: 'naipCIR', label: 'CIR (False Color)', emoji: '🔴', active: layers.naipCIR, opacity: opacities.naipCIR, onToggle: () => toggleLayer('naipCIR'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipCIR: v })) },
                   { key: 'naipNDVI', label: 'NDVI', emoji: '🌿', active: layers.naipNDVI, opacity: opacities.naipNDVI, onToggle: () => toggleLayer('naipNDVI'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipNDVI: v })) },
                 ],
               },
