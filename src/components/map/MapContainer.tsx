@@ -10,7 +10,7 @@ import { useBidStore } from '@/lib/store';
 import { HologramMapboxLayers, extractTreesFromAnalysis } from '@/lib/hologram-mapbox';
 import DrawPolygonMobile, { finishDrawing } from '@/lib/draw-polygon-mobile';
 import type { PastureWall } from '@/lib/cedar-tree-data';
-import type { MarkedTree } from '@/types';
+import type { CrownDetection, CrownMaskFeatureProperties, MarkedTree, Pasture } from '@/types';
 import {
   type OverlayLayerKey,
   defaultOverlayState,
@@ -37,12 +37,70 @@ const VEGETATION_COLORS: Record<string, string> = {
   mesquite: '#a16207',
 };
 
+type CalibrationLabel = MarkedTree & { action: 'calibrate_cedar' | 'calibrate_oak' };
+
+function qaBounds(pasture: Pasture): [number, number, number, number] | null {
+  const ring = pasture.polygon.geometry.coordinates[0];
+  if (!ring?.length) return null;
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+  for (const [lng, lat] of ring) {
+    if (lng < minLng) minLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lng > maxLng) maxLng = lng;
+    if (lat > maxLat) maxLat = lat;
+  }
+  return [minLng, minLat, maxLng, maxLat];
+}
+
+function qaProject(lng: number, lat: number, bounds: [number, number, number, number], size: number): [number, number] {
+  const pad = 10;
+  const width = Math.max(1e-9, bounds[2] - bounds[0]);
+  const height = Math.max(1e-9, bounds[3] - bounds[1]);
+  const x = pad + ((lng - bounds[0]) / width) * (size - pad * 2);
+  const y = size - pad - ((lat - bounds[1]) / height) * (size - pad * 2);
+  return [x, y];
+}
+
+function qaPolygonPath(coords: number[][], bounds: [number, number, number, number], size: number): string {
+  return coords
+    .map(([lng, lat], idx) => {
+      const [x, y] = qaProject(lng, lat, bounds, size);
+      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ') + ' Z';
+}
+
+function qaDotColor(action: CalibrationLabel['action']): string {
+  return action === 'calibrate_cedar' ? '#14b8a6' : '#f59e0b';
+}
+
+function qaCrownColor(species: CrownDetection['species']): string {
+  return species === 'cedar' ? '#22c55e' : species === 'oak' ? '#f59e0b' : '#60a5fa';
+}
+
 interface MapContainerProps {
   accessToken: string;
 }
 
 type LayerKey = 'soil' | 'naip' | 'naipCIR' | 'naipNDVI' | 'terrain3d' | 'cedarAI' | 'hologram';
 type Species = 'cedar' | 'oak' | 'mixed';
+type MarkMode = 'save' | 'remove' | 'calibrate_cedar' | 'calibrate_oak' | null;
+
+function markModeBanner(markMode: Exclude<MarkMode, null>): string {
+  switch (markMode) {
+    case 'save':
+      return '🛡️ Click trees to SAVE';
+    case 'remove':
+      return '✂️ Click trees to REMOVE';
+    case 'calibrate_cedar':
+      return '🌲 Click crowns that are definitely CEDAR';
+    case 'calibrate_oak':
+      return '🌳 Click crowns that are definitely OAK';
+  }
+}
 
 function getAnalysisViewLayers(phase?: string): Record<LayerKey, boolean> {
   switch (phase) {
@@ -145,7 +203,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const [speciesVisible, setSpeciesVisible] = useState<Record<Species, boolean>>({
     cedar: true, oak: true, mixed: true,
   });
-  const [markMode, setMarkMode] = useState<'save' | 'remove' | null>(null);
+  const [qaOpen, setQaOpen] = useState(false);
+  const [markMode, setMarkMode] = useState<MarkMode>(null);
   const [autoRotate, setAutoRotate] = useState(false);
   const autoRotateRef = useRef(autoRotate);
   autoRotateRef.current = autoRotate;
@@ -162,6 +221,18 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     markTree,
     unmarkTree,
   } = useBidStore();
+
+  const selectedPasture = selectedPastureId
+    ? currentBid.pastures.find((pasture) => pasture.id === selectedPastureId) ?? null
+    : null;
+  const selectedCalibrationLabels: CalibrationLabel[] = selectedPasture
+    ? (selectedPasture.savedTrees ?? []).filter(
+        (tree): tree is CalibrationLabel =>
+          tree.action === 'calibrate_cedar' || tree.action === 'calibrate_oak'
+      )
+    : [];
+  const selectedCrownMasks = selectedPasture?.cedarAnalysis?.crownMasks?.features ?? [];
+  const selectedCrowns = selectedPasture?.cedarAnalysis?.crowns ?? [];
 
   // Handle polygon creation from draw
   const handleDrawCreate = useCallback(
@@ -990,6 +1061,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         (t) => Math.abs(t.lng - nearest.lng) < 0.00001 && Math.abs(t.lat - nearest.lat) < 0.00001
       );
 
+      const label =
+        markMode === 'save'
+          ? `Save ${nearest.species}`
+          : markMode === 'remove'
+            ? `Remove ${nearest.species}`
+            : markMode === 'calibrate_cedar'
+              ? 'Calibration: cedar'
+              : 'Calibration: oak';
+
       if (existing) {
         if (existing.action === markMode) {
           unmarkTree(selectedPastureId, existing.id);
@@ -999,8 +1079,9 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             lng: nearest.lng, lat: nearest.lat, species: nearest.species,
             action: markMode,
-            label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
+            label,
             height: nearest.height, canopyDiameter: nearest.canopyDiameter,
+            source: 'manual',
           };
           markTree(selectedPastureId, tree);
         }
@@ -1009,15 +1090,16 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           id: `tree-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           lng: nearest.lng, lat: nearest.lat, species: nearest.species,
           action: markMode,
-          label: markMode === 'save' ? `Save ${nearest.species}` : `Remove ${nearest.species}`,
+          label,
           height: nearest.height, canopyDiameter: nearest.canopyDiameter,
+          source: 'manual',
         };
         markTree(selectedPastureId, tree);
       }
     };
 
     map.on('click', onClick);
-    map.getCanvas().style.cursor = markMode === 'save' ? 'cell' : 'crosshair';
+    map.getCanvas().style.cursor = markMode === 'save' ? 'cell' : markMode === 'remove' ? 'crosshair' : 'copy';
 
     return () => {
       map.off('click', onClick);
@@ -1274,21 +1356,38 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
 
       {/* Auto-rotate button (top-right) */}
       <div className="absolute top-4 right-4 z-10">
-        <button
-          onClick={() => setAutoRotate(v => !v)}
-          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-            autoRotate
-              ? layers.hologram
-                ? 'bg-orange-500/80 text-white shadow-[0_0_12px_rgba(255,107,0,0.5)]'
-                : 'bg-orange-600 text-white shadow-md'
-              : layers.hologram
-                ? 'holo-button'
-                : 'backdrop-blur bg-slate-900/90 text-slate-300 hover:text-white shadow-lg'
-          }`}
-          title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled) — click to stop' : 'Start auto-rotation (disables zoom/pan)'}
-        >
-          🔄 {autoRotate ? 'Rotate ON' : 'Rotate'}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            onClick={() => setAutoRotate(v => !v)}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              autoRotate
+                ? layers.hologram
+                  ? 'bg-orange-500/80 text-white shadow-[0_0_12px_rgba(255,107,0,0.5)]'
+                  : 'bg-orange-600 text-white shadow-md'
+                : layers.hologram
+                  ? 'holo-button'
+                  : 'backdrop-blur bg-slate-900/90 text-slate-300 hover:text-white shadow-lg'
+            }`}
+            title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled) — click to stop' : 'Start auto-rotation (disables zoom/pan)'}
+          >
+            🔄 {autoRotate ? 'Rotate ON' : 'Rotate'}
+          </button>
+          {selectedPasture?.cedarAnalysis && (
+            <button
+              onClick={() => setQaOpen((open) => !open)}
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                qaOpen
+                  ? 'bg-cyan-500/85 text-white shadow-[0_0_12px_rgba(34,211,238,0.35)]'
+                  : layers.hologram
+                    ? 'holo-button'
+                    : 'backdrop-blur bg-slate-900/90 text-slate-300 hover:text-white shadow-lg'
+              }`}
+              title="Open analyzer QA review for the selected pasture"
+            >
+              🧪 {qaOpen ? 'Hide QA' : 'QA Review'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Hologram controls (bottom-right) */}
@@ -1317,6 +1416,28 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             ✂️ Remove
           </button>
           <button
+            onClick={() => setMarkMode(markMode === 'calibrate_cedar' ? null : 'calibrate_cedar')}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              markMode === 'calibrate_cedar'
+                ? 'bg-teal-500/80 text-white shadow-[0_0_12px_rgba(20,184,166,0.45)]'
+                : 'holo-button'
+            }`}
+            title="Label crowns that are definitely cedar for calibration"
+          >
+            🌲 Label Cedar
+          </button>
+          <button
+            onClick={() => setMarkMode(markMode === 'calibrate_oak' ? null : 'calibrate_oak')}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              markMode === 'calibrate_oak'
+                ? 'bg-amber-500/80 text-white shadow-[0_0_12px_rgba(245,158,11,0.45)]'
+                : 'holo-button'
+            }`}
+            title="Label crowns that are definitely oak for calibration"
+          >
+            🌳 Label Oak
+          </button>
+          <button
             onClick={captureScreenshot}
             className="holo-button px-3 py-2 rounded-lg text-xs font-medium"
             title="Capture hologram screenshot"
@@ -1331,9 +1452,13 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-lg shadow-lg text-sm font-medium ${
           markMode === 'save'
             ? 'bg-green-600/90 text-white shadow-[0_0_20px_rgba(0,255,68,0.3)]'
-            : 'bg-red-600/90 text-white shadow-[0_0_20px_rgba(255,34,68,0.3)]'
+            : markMode === 'remove'
+              ? 'bg-red-600/90 text-white shadow-[0_0_20px_rgba(255,34,68,0.3)]'
+              : markMode === 'calibrate_cedar'
+                ? 'bg-teal-600/90 text-white shadow-[0_0_20px_rgba(20,184,166,0.3)]'
+                : 'bg-amber-600/90 text-white shadow-[0_0_20px_rgba(245,158,11,0.3)]'
         }`}>
-          {markMode === 'save' ? '🛡️ Click trees to SAVE' : '✂️ Click trees to REMOVE'}
+          {markModeBanner(markMode)}
           <button
             onClick={() => setMarkMode(null)}
             className="ml-3 underline hover:no-underline"
@@ -1490,6 +1615,138 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         </div>
         );
       })()}
+
+      {qaOpen && selectedPasture && selectedPasture.cedarAnalysis && (
+        <div className="absolute left-1/2 bottom-4 z-20 w-[min(1180px,calc(100vw-32px))] -translate-x-1/2 rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-[0_12px_48px_rgba(0,0,0,0.45)] p-3">
+          <div className="flex items-center justify-between gap-3 px-1 pb-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Analyzer QA</div>
+              <div className="text-sm font-semibold text-white/90">{selectedPasture.name} · labels vs masks vs detections</div>
+            </div>
+            <div className="text-[11px] text-white/45">
+              Labels {selectedCalibrationLabels.length} · Masks {selectedCrownMasks.length} · Detections {selectedCrowns.length}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <QaPreviewCard
+              title="Calibration Labels"
+              accent="#22d3ee"
+              pasture={selectedPasture}
+              labels={selectedCalibrationLabels}
+              masks={[]}
+              crowns={[]}
+              emptyMessage="Add cedar/oak labels in hologram mode to calibrate this pasture."
+            />
+            <QaPreviewCard
+              title="Extracted Masks"
+              accent="#f59e0b"
+              pasture={selectedPasture}
+              labels={[]}
+              masks={selectedCrownMasks}
+              crowns={[]}
+              emptyMessage="No mask footprints were generated for this run."
+            />
+            <QaPreviewCard
+              title="Final Detections"
+              accent="#22c55e"
+              pasture={selectedPasture}
+              labels={[]}
+              masks={[]}
+              crowns={selectedCrowns}
+              emptyMessage="No final crown detections were generated for this run."
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QaPreviewCard({
+  title,
+  accent,
+  pasture,
+  labels,
+  masks,
+  crowns,
+  emptyMessage,
+}: {
+  title: string;
+  accent: string;
+  pasture: Pasture;
+  labels: CalibrationLabel[];
+  masks: GeoJSON.Feature<GeoJSON.Polygon, CrownMaskFeatureProperties>[];
+  crowns: CrownDetection[];
+  emptyMessage: string;
+}) {
+  const size = 248;
+  const bounds = qaBounds(pasture);
+  const pastureRing = pasture.polygon.geometry.coordinates[0] ?? [];
+  const hasContent = labels.length > 0 || masks.length > 0 || crowns.length > 0;
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className="flex items-center justify-between pb-2">
+        <div className="text-xs font-semibold text-white/85">{title}</div>
+        <div className="text-[10px] font-mono" style={{ color: accent }}>
+          {labels.length + masks.length + crowns.length}
+        </div>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-slate-950/80 p-2">
+        {bounds && pastureRing.length > 0 ? (
+          <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto rounded-lg">
+            <rect x="0" y="0" width={size} height={size} fill="#020617" />
+            <path
+              d={qaPolygonPath(pastureRing, bounds, size)}
+              fill="rgba(255,255,255,0.03)"
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="1.5"
+            />
+            {masks.map((feature) => (
+              <path
+                key={feature.properties.id}
+                d={qaPolygonPath(feature.geometry.coordinates[0] as number[][], bounds, size)}
+                fill={feature.properties.species === 'cedar' ? 'rgba(34,197,94,0.28)' : 'rgba(245,158,11,0.28)'}
+                stroke={feature.properties.species === 'cedar' ? '#22c55e' : '#f59e0b'}
+                strokeWidth="1"
+              />
+            ))}
+            {crowns.map((crown) => {
+              const [x, y] = qaProject(crown.lng, crown.lat, bounds, size);
+              return (
+                <g key={crown.id}>
+                  <circle cx={x} cy={y} r={Math.max(2.5, crown.canopyDiameter * 0.45)} fill="none" stroke={qaCrownColor(crown.species)} strokeWidth="1.3" />
+                  <circle cx={x} cy={y} r="1.8" fill={qaCrownColor(crown.species)} />
+                </g>
+              );
+            })}
+            {labels.map((label) => {
+              const [x, y] = qaProject(label.lng, label.lat, bounds, size);
+              return (
+                <g key={label.id}>
+                  <circle cx={x} cy={y} r="4.5" fill={qaDotColor(label.action)} fillOpacity="0.18" />
+                  <circle cx={x} cy={y} r="2.8" fill={qaDotColor(label.action)} stroke="#ffffff" strokeWidth="0.8" />
+                </g>
+              );
+            })}
+          </svg>
+        ) : (
+          <div className="aspect-square rounded-lg bg-slate-950/80" />
+        )}
+      </div>
+      <div className="pt-2 text-[11px] text-white/55 min-h-[34px]">
+        {hasContent ? (
+          <>
+            {labels.length > 0 && `${labels.length} labels`}
+            {labels.length > 0 && (masks.length > 0 || crowns.length > 0) ? ' · ' : ''}
+            {masks.length > 0 && `${masks.length} mask footprints`}
+            {masks.length > 0 && crowns.length > 0 ? ' · ' : ''}
+            {crowns.length > 0 && `${crowns.length} crown detections`}
+          </>
+        ) : (
+          emptyMessage
+        )}
+      </div>
     </div>
   );
 }

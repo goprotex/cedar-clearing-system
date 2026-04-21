@@ -11,6 +11,13 @@ import {
   sceneMeta,
 } from '@/lib/sentinel-sample-ndvi';
 import { CEDAR_GRID_SPACING_KM, CEDAR_GRID_SPACING_M } from '@/lib/cedar-analysis-chunks';
+import {
+  buildCalibrationProfile,
+  segmentCrownsFromCandidates,
+  type CrownCalibrationExample,
+  type CrownCalibrationProfile,
+  type HiResImageData,
+} from '@/lib/crown-segmentation';
 
 export const maxDuration = 300; // 5 min — thorough spectral analysis
 
@@ -111,6 +118,12 @@ interface HiResWindowStats {
   textureVar: number;
 }
 
+interface CalibrationExamplePayload {
+  lng: number;
+  lat: number;
+  species: 'cedar' | 'oak';
+}
+
 function summarizeLiveCounts(results: SampleResult[], acreage: number) {
   const totalPoints = results.length;
   const cedarCount = results.filter((r) => r.classification === 'cedar').length;
@@ -124,6 +137,37 @@ function summarizeLiveCounts(results: SampleResult[], acreage: number) {
     oakCount,
     totalPoints,
     completed: totalPoints,
+    estimatedCedarAcres,
+  };
+}
+
+function summarizePreviewAgainstWholeGrid(
+  results: SampleResult[],
+  acreage: number,
+  totalGridPoints: number,
+) {
+  const processedPoints = results.length;
+  const cedarSeen = results.filter((r) => r.classification === 'cedar').length;
+  const oakSeen = results.filter((r) => r.classification === 'oak').length;
+
+  const cedarCount =
+    processedPoints > 0 && totalGridPoints > 0
+      ? Math.round((cedarSeen / processedPoints) * totalGridPoints)
+      : 0;
+  const oakCount =
+    processedPoints > 0 && totalGridPoints > 0
+      ? Math.round((oakSeen / processedPoints) * totalGridPoints)
+      : 0;
+  const estimatedCedarAcres =
+    processedPoints > 0
+      ? Math.round((cedarSeen / processedPoints) * acreage * 10) / 10
+      : 0;
+
+  return {
+    cedarCount,
+    oakCount,
+    totalPoints: totalGridPoints,
+    completed: processedPoints,
     estimatedCedarAcres,
   };
 }
@@ -487,20 +531,21 @@ function sampleHiResWindowStats(
 function refineWithHiResImagery(
   original: SampleResult,
   hiRes: HiResWindowStats | null,
+  calibration: CrownCalibrationProfile,
 ): Pick<SampleResult, 'classification' | 'confidence'> {
   if (!hiRes) {
     return { classification: original.classification, confidence: original.confidence };
   }
 
   const strongCedar =
-    hiRes.brightness < 118 &&
-    hiRes.greenBias > 0.018 &&
+    hiRes.brightness < calibration.cedarBrightnessCeil &&
+    hiRes.greenBias > Math.max(0.018, calibration.cedarGreenBiasFloor) &&
     hiRes.darkFrac > 0.16 &&
     hiRes.chroma > 0.07;
 
   const strongOak =
-    hiRes.brightness > 122 &&
-    hiRes.grayFrac > 0.34 &&
+    hiRes.brightness > Math.max(122, calibration.oakBrightnessFloor) &&
+    hiRes.grayFrac > Math.max(0.2, calibration.oakGrayFloor) &&
     hiRes.darkFrac < 0.12 &&
     hiRes.greenBias < 0.02;
 
@@ -737,7 +782,7 @@ function isValidClipBbox(b: unknown): b is [number, number, number, number] {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { coordinates, acreage, clipBbox } = body;
+    const { coordinates, acreage, clipBbox, calibrationExamples } = body;
 
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
       return NextResponse.json({ error: 'Polygon coordinates required' }, { status: 400 });
@@ -846,7 +891,7 @@ export async function POST(req: NextRequest) {
               message: 'Sampling CIR cells',
               detail: `Batch ${Math.min(samplePoints.length, i + BATCH_SIZE)}/${samplePoints.length} cells classified`,
               pct: Math.round(8 + (results.length / Math.max(samplePoints.length, 1)) * 32),
-              ...preview,
+              ...summarizePreviewAgainstWholeGrid(results, ac, samplePoints.length),
             });
           }
 
@@ -889,6 +934,22 @@ export async function POST(req: NextRequest) {
           ]);
 
           const hiResImage = await fetchHiResWindowImage(gridBbox);
+          const profileExamples: CrownCalibrationExample[] = Array.isArray(calibrationExamples)
+            ? (calibrationExamples as CalibrationExamplePayload[])
+                .filter(
+                  (item) =>
+                    item &&
+                    typeof item.lng === 'number' &&
+                    typeof item.lat === 'number' &&
+                    (item.species === 'cedar' || item.species === 'oak'),
+                )
+                .map((item) => ({ lng: item.lng, lat: item.lat, species: item.species }))
+            : [];
+          const calibrationProfile = buildCalibrationProfile(
+            hiResImage as HiResImageData | null,
+            gridBbox,
+            profileExamples,
+          );
 
           const winterValues = winterSample?.values ?? new Array(results.length).fill(null);
           const summerValues = summerSample?.values ?? new Array(results.length).fill(null);
@@ -926,7 +987,7 @@ export async function POST(req: NextRequest) {
           );
 
           const hiResRefinedResults: SampleResult[] = fusedResults.map((result, index) => {
-            const hiResRefined = refineWithHiResImagery(result, hiResStats[index]);
+            const hiResRefined = refineWithHiResImagery(result, hiResStats[index], calibrationProfile);
             return {
               ...result,
               classification: hiResRefined.classification,
@@ -947,6 +1008,26 @@ export async function POST(req: NextRequest) {
             tileCount,
             consensusImprovedCells,
           } = applyTileConsensus(hiResRefinedResults, spacingKm, gridBbox);
+
+          const crownSegmentation = segmentCrownsFromCandidates(
+            consensusResults
+              .filter(
+                (result) =>
+                  (result.classification === 'cedar' || result.classification === 'oak') &&
+                  result.confidence >= 0.36,
+              )
+              .map((result) => ({
+                lng: result.lng,
+                lat: result.lat,
+                speciesHint: result.classification === 'oak' ? 'oak' : 'cedar',
+                confidence: result.confidence,
+              })),
+            hiResImage as HiResImageData | null,
+            gridBbox,
+            calibrationProfile,
+          );
+          const crowns = crownSegmentation.crowns;
+          const crownMasks = crownSegmentation.maskFeatures;
 
           const centerLat = (gridBbox[1] + gridBbox[3]) / 2;
           const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
@@ -978,6 +1059,11 @@ export async function POST(req: NextRequest) {
           const pairedSamples = consensusResults.filter(
             (_, index) => winterValues[index] !== null && summerValues[index] !== null,
           ).length;
+          const cedarCrowns = crowns.filter((c) => c.species === 'cedar').length;
+          const oakCrowns = crowns.filter((c) => c.species === 'oak').length;
+          const avgCrownDiameter = crowns.length > 0
+            ? crowns.reduce((sum, crown) => sum + crown.canopyDiameter, 0) / crowns.length
+            : 0;
 
           const summary = {
             totalSamples: total,
@@ -1001,6 +1087,20 @@ export async function POST(req: NextRequest) {
             hiResImagery: {
               used: Boolean(hiResImage),
               source: 'esri-world-imagery',
+            },
+            crownSegmentation: {
+              used: Boolean(hiResImage),
+              source: 'hi_res_connected_components',
+              totalCrowns: crowns.length,
+              cedarCrowns,
+              oakCrowns,
+              averageCanopyDiameter: Math.round(avgCrownDiameter * 10) / 10,
+            },
+            calibration: {
+              exampleCount: profileExamples.length,
+              cedarExamples: calibrationProfile.cedarExamples,
+              oakExamples: calibrationProfile.oakExamples,
+              source: 'manual_tree_labels',
             },
             tileConsensus: {
               tileCount,
@@ -1037,6 +1137,12 @@ export async function POST(req: NextRequest) {
           const compactSamples = toSpectralSamples(consensusResults);
           const totalBatches = Math.max(1, Math.ceil(compactSamples.length / STREAM_SAMPLE_BATCH_SIZE));
           push('result_summary', { summary, totalBatches });
+          if (crowns.length > 0) {
+            push('result_crowns', { crowns });
+          }
+          if (crownMasks.length > 0) {
+            push('result_masks', { crownMasks });
+          }
 
           for (let i = 0; i < compactSamples.length; i += STREAM_SAMPLE_BATCH_SIZE) {
             push('result_samples', {

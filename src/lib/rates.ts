@@ -84,8 +84,9 @@ type PricingMode = 'full_acreage' | 'cedar_effective';
 
 function usesCedarEffectiveAcreage(
   pasture: Pick<Pasture, 'vegetationType' | 'clearingMethod' | 'cedarAnalysis'>,
+  hasLiveOverride: boolean = false,
 ): boolean {
-  if (!pasture.cedarAnalysis?.summary) return false;
+  if (!pasture.cedarAnalysis?.summary && !hasLiveOverride) return false;
   if (pasture.clearingMethod === 'cedar_only') return true;
 
   const cedarFocusedMulchingMethod =
@@ -102,7 +103,7 @@ export function getBillableAcreage(
   pasture: Pick<Pasture, 'acreage' | 'vegetationType' | 'clearingMethod' | 'cedarAnalysis'>,
   cedarAcresOverride?: number,
 ): { billableAcres: number; pricingMode: PricingMode } {
-  if (!usesCedarEffectiveAcreage(pasture)) {
+  if (!usesCedarEffectiveAcreage(pasture, cedarAcresOverride != null)) {
     return { billableAcres: pasture.acreage, pricingMode: 'full_acreage' };
   }
 

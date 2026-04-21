@@ -19,6 +19,32 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 
+function annotationTone(action: Pasture['savedTrees'][number]['action']): string {
+  switch (action) {
+    case 'save':
+      return 'bg-[#13ff43]/5 border border-[#13ff43]/20 text-[#13ff43]';
+    case 'remove':
+      return 'bg-red-500/5 border border-red-500/20 text-red-400';
+    case 'calibrate_cedar':
+      return 'bg-teal-500/5 border border-teal-500/20 text-teal-300';
+    case 'calibrate_oak':
+      return 'bg-amber-500/5 border border-amber-500/20 text-amber-300';
+  }
+}
+
+function annotationIcon(action: Pasture['savedTrees'][number]['action']): string {
+  switch (action) {
+    case 'save':
+      return '🛡️';
+    case 'remove':
+      return '✂️';
+    case 'calibrate_cedar':
+      return '🌲';
+    case 'calibrate_oak':
+      return '🌳';
+  }
+}
+
 interface PastureCardProps {
   pasture: Pasture;
   isSelected: boolean;
@@ -39,6 +65,14 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
   const displayedRate = billableAcres > 0 ? Math.round(pasture.subtotal / billableAcres) : 0;
   const totalHours = Math.round(billableAcres * pasture.estimatedHrsPerAcre);
   const globalAnalysisActive = Boolean(analysisProgress?.active);
+  const calibrationLabels = (pasture.savedTrees ?? []).filter(
+    (tree) => tree.action === 'calibrate_cedar' || tree.action === 'calibrate_oak'
+  );
+  const cedarCalibrationCount = calibrationLabels.filter((tree) => tree.action === 'calibrate_cedar').length;
+  const oakCalibrationCount = calibrationLabels.filter((tree) => tree.action === 'calibrate_oak').length;
+  const operationalMarks = (pasture.savedTrees ?? []).filter(
+    (tree) => tree.action === 'save' || tree.action === 'remove'
+  );
 
   return (
     <div
@@ -396,6 +430,26 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                   Analyzed in {pasture.cedarAnalysis.summary.chunkedRun.chunkCount} regions (≤{pasture.cedarAnalysis.summary.chunkedRun.maxSamplesPerChunk.toLocaleString()} samples each), merged for full pasture
                 </div>
               )}
+              {pasture.cedarAnalysis.summary.crownSegmentation?.used && (
+                <div className="text-[10px] text-muted-foreground">
+                  Crown segmentation: {pasture.cedarAnalysis.summary.crownSegmentation.totalCrowns} crowns
+                  {' · '}
+                  cedar {pasture.cedarAnalysis.summary.crownSegmentation.cedarCrowns}
+                  {' · '}
+                  oak {pasture.cedarAnalysis.summary.crownSegmentation.oakCrowns}
+                  {' · avg canopy '}
+                  {pasture.cedarAnalysis.summary.crownSegmentation.averageCanopyDiameter}m
+                </div>
+              )}
+              {(pasture.cedarAnalysis.summary.calibration?.exampleCount ?? 0) > 0 && (
+                <div className="text-[10px] text-teal-300">
+                  Calibrated from {pasture.cedarAnalysis.summary.calibration?.exampleCount} labeled crowns
+                  {' · cedar '}
+                  {pasture.cedarAnalysis.summary.calibration?.cedarExamples}
+                  {' · oak '}
+                  {pasture.cedarAnalysis.summary.calibration?.oakExamples}
+                </div>
+              )}
             </div>
 
             <div className="text-center">
@@ -569,19 +623,42 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
         {/* Saved Trees */}
         {(pasture.savedTrees?.length ?? 0) > 0 && (
           <div className="space-y-1">
-            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">MARKED_TREES ({pasture.savedTrees.length})</Label>
-            <div className="max-h-32 overflow-y-auto space-y-1">
-              {pasture.savedTrees.map((t) => (
+            <Label className="text-[10px] text-[#ffb693] uppercase font-bold tracking-widest">TREE_ANNOTATIONS ({pasture.savedTrees.length})</Label>
+            {calibrationLabels.length > 0 && (
+              <div className="bg-[#201f1f] border border-[#353534] p-2 text-[10px] space-y-1">
+                <div className="font-bold text-teal-300 uppercase">Calibration Review</div>
+                <div className="text-muted-foreground">
+                  Labeled crowns train the hi-res pass for this pasture. Target at least 5 cedar and 5 oak examples from clean, obvious crowns.
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="text-[10px] border-teal-500/40 text-teal-300">
+                    Cedar labels: {cedarCalibrationCount}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-300">
+                    Oak labels: {oakCalibrationCount}
+                  </Badge>
+                </div>
+                <button
+                  className="text-[10px] underline hover:no-underline text-[#13ff43]"
+                  onClick={async () => {
+                    setAnalyzing(true);
+                    await analyzeCedar(pasture.id);
+                    setAnalyzing(false);
+                  }}
+                  disabled={analyzing || globalAnalysisActive}
+                >
+                  {analyzing && !globalAnalysisActive ? 'Re-training analyzer...' : 'Re-run analyzer with labels'}
+                </button>
+              </div>
+            )}
+            <div className="max-h-40 overflow-y-auto space-y-1">
+              {(operationalMarks.length > 0 ? operationalMarks : []).map((t) => (
                 <div
                   key={t.id}
-                  className={`flex items-center justify-between text-[11px] px-2 py-1 ${
-                    t.action === 'save'
-                      ? 'bg-[#13ff43]/5 border border-[#13ff43]/20 text-[#13ff43]'
-                      : 'bg-red-500/5 border border-red-500/20 text-red-400'
-                  }`}
+                  className={`flex items-center justify-between text-[11px] px-2 py-1 ${annotationTone(t.action)}`}
                 >
                   <span>
-                    {t.action === 'save' ? '🛡️' : '✂️'} {t.label}
+                    {annotationIcon(t.action)} {t.label}
                     <span className="text-muted-foreground ml-1">
                       ({t.height}m, ⌀{t.canopyDiameter}m)
                     </span>
@@ -590,6 +667,26 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
                     className="text-muted-foreground hover:text-destructive ml-1"
                     onClick={() => unmarkTree(pasture.id, t.id)}
                     title="Remove marking"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {calibrationLabels.map((t) => (
+                <div
+                  key={t.id}
+                  className={`flex items-center justify-between text-[11px] px-2 py-1 ${annotationTone(t.action)}`}
+                >
+                  <span>
+                    {annotationIcon(t.action)} {t.label}
+                    <span className="text-muted-foreground ml-1">
+                      ({t.height}m, ⌀{t.canopyDiameter}m)
+                    </span>
+                  </span>
+                  <button
+                    className="text-muted-foreground hover:text-destructive ml-1"
+                    onClick={() => unmarkTree(pasture.id, t.id)}
+                    title="Remove calibration label"
                   >
                     ✕
                   </button>

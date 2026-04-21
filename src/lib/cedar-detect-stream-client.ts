@@ -1,5 +1,5 @@
 import { normalizeCedarAnalysisPayload } from '@/lib/cedar-analysis-grid';
-import type { CedarAnalysis, CedarAnalysisSummary } from '@/types';
+import type { CedarAnalysis, CedarAnalysisSummary, CrownDetection } from '@/types';
 import { samplesToGridCells, type SpectralSamplePayload } from '@/lib/cedar-analysis-grid';
 
 /**
@@ -40,6 +40,8 @@ export async function readCedarDetectSse(
 
   let batchedSummary: CedarAnalysisSummary | null = null;
   const batchedSamples: SpectralSamplePayload[] = [];
+  const batchedCrowns: CrownDetection[] = [];
+  let batchedMasks: CedarAnalysis['crownMasks'] | null = null;
   let batchCount = 0;
 
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,6 +108,16 @@ export async function readCedarDetectSse(
                 batchedSamples.push(...batch);
                 batchCount++;
               }
+            } else if (eventType === 'result_crowns') {
+              const crowns = payload.crowns as CrownDetection[];
+              if (Array.isArray(crowns)) {
+                batchedCrowns.push(...crowns);
+              }
+            } else if (eventType === 'result_masks') {
+              const crownMasks = payload.crownMasks as CedarAnalysis['crownMasks'];
+              if (crownMasks?.type === 'FeatureCollection') {
+                batchedMasks = crownMasks;
+              }
             } else if (eventType === 'result_done') {
               console.log(`[${tag}] result_done: batchCount=${batchCount}, totalSamples=${batchedSamples.length}, expected=${payload.totalSamples}`);
               if (batchedSummary && batchedSamples.length > 0) {
@@ -117,7 +129,12 @@ export async function readCedarDetectSse(
                   halfLng = m / 111_320;
                 }
                 const gridCells = samplesToGridCells(batchedSamples, halfLng, halfLat);
-                resultData = { summary: batchedSummary, gridCells };
+                resultData = {
+                  summary: batchedSummary,
+                  gridCells,
+                  crowns: batchedCrowns.length > 0 ? batchedCrowns : undefined,
+                  crownMasks: batchedMasks ?? undefined,
+                };
                 console.log(`[${tag}] assembled batched result: ${batchedSamples.length} samples, ${gridCells.features.length} grid cells`);
               } else {
                 console.error(`[${tag}] result_done but missing data: summary=${!!batchedSummary}, samples=${batchedSamples.length}`);
@@ -184,6 +201,7 @@ export async function fetchCedarDetectChunkWithRetry(
   acreage: number,
   month: number,
   latitude: number,
+  calibrationExamples: Array<{ lng: number; lat: number; species: 'cedar' | 'oak' }> = [],
   onProgress?: (payload: Record<string, unknown>) => void
 ): Promise<CedarAnalysis> {
   let lastError: Error | null = null;
@@ -202,7 +220,7 @@ export async function fetchCedarDetectChunkWithRetry(
       const res = await fetch('/api/cedar-detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinates: coords, acreage, month, latitude }),
+        body: JSON.stringify({ coordinates: coords, acreage, month, latitude, calibrationExamples }),
         signal: controller.signal,
       });
 

@@ -121,6 +121,22 @@ export interface CedarChunkRunStats {
   maxSamplesPerChunk: number;
 }
 
+export interface CrownSegmentationStats {
+  used: boolean;
+  source: string;
+  totalCrowns: number;
+  cedarCrowns: number;
+  oakCrowns: number;
+  averageCanopyDiameter: number;
+}
+
+export interface CedarCalibrationStats {
+  exampleCount: number;
+  cedarExamples: number;
+  oakExamples: number;
+  source: string;
+}
+
 export interface CedarAnalysisSummary {
   totalSamples: number;
   cedar: CedarClassCount;
@@ -155,13 +171,36 @@ export interface CedarAnalysisSummary {
     winterSceneId?: string;
     summerSceneId?: string;
   };
+  crownSegmentation?: CrownSegmentationStats;
+  calibration?: CedarCalibrationStats;
   /** Present when analysis was split into multiple API requests and merged client-side. */
   chunkedRun?: CedarChunkRunStats;
+}
+
+export interface CrownDetection {
+  id: string;
+  lng: number;
+  lat: number;
+  species: 'cedar' | 'oak' | 'mixed';
+  confidence: number;
+  canopyDiameter: number;
+  height: number;
+  source: 'hi_res_segmentation' | 'hi_res_connected_components';
+}
+
+export interface CrownMaskFeatureProperties {
+  id: string;
+  species: 'cedar' | 'oak';
+  confidence: number;
+  supportCount: number;
+  source: 'hi_res_connected_components';
 }
 
 export interface CedarAnalysis {
   gridCells: GeoJSON.FeatureCollection;
   summary: CedarAnalysisSummary;
+  crowns?: CrownDetection[];
+  crownMasks?: GeoJSON.FeatureCollection<GeoJSON.Polygon, CrownMaskFeatureProperties>;
 }
 
 // ──── Seasonal Analysis ────
@@ -204,15 +243,18 @@ export interface PastureAdder {
 
 // ──── Marked Trees (save/skip) ────
 
+export type MarkedTreeAction = 'save' | 'remove' | 'calibrate_cedar' | 'calibrate_oak';
+
 export interface MarkedTree {
   id: string;
   lng: number;
   lat: number;
   species: 'cedar' | 'oak' | 'mixed';
-  action: 'save' | 'remove';
+  action: MarkedTreeAction;
   label: string; // e.g. "Heritage Oak #1", "Customer requested"
   height: number;
   canopyDiameter: number;
+  source?: 'auto' | 'manual';
 }
 
 // ──── AI Recommendation ────
