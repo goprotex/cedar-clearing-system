@@ -138,6 +138,22 @@ export async function readCedarDetectSse(
     console.error(`[${tag}] throwing server error: ${streamError}`);
     throw new Error(streamError);
   }
+
+  if (!resultData) {
+    const fallbackText = buffer.trim();
+    if (fallbackText.startsWith('{')) {
+      try {
+        const payload = JSON.parse(fallbackText) as Record<string, unknown>;
+        resultData = normalizeCedarAnalysisPayload(payload);
+        if (resultData) {
+          console.log(`[${tag}] parsed non-SSE JSON fallback: ${resultData.summary?.totalSamples ?? '?'} samples`);
+        }
+      } catch (parseErr) {
+        console.warn(`[${tag}] JSON fallback parse failed: ${parseErr instanceof Error ? parseErr.message : parseErr}`);
+      }
+    }
+  }
+
   if (!resultData) {
     const reason = stalled ? 'stream_stall' : 'stream_ended';
     console.error(`[${tag}] no result: reason=${reason}, lastEvent=${lastEventType}, chunks=${chunkCount}, bytes=${totalBytes}, bufferLen=${buffer.length}, batchedSamples=${batchedSamples.length}`);
@@ -200,6 +216,17 @@ export async function fetchCedarDetectChunkWithRetry(
         } catch { /* ignore */ }
         console.error(`[${attemptTag}] non-ok response: ${msg}`);
         throw new Error(msg);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const payload = (await res.json()) as Record<string, unknown>;
+        const normalized = normalizeCedarAnalysisPayload(payload);
+        if (!normalized) {
+          throw new Error('Spectral analysis returned JSON, but the payload was not a valid cedar analysis result.');
+        }
+        console.log(`[${attemptTag}] parsed JSON cedar result: samples=${normalized.summary?.totalSamples ?? '?'} `);
+        return normalized;
       }
 
       const result = await readCedarDetectSse(res, onProgress, attemptTag);
