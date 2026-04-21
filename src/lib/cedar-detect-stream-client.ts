@@ -201,7 +201,12 @@ export async function fetchCedarDetectChunkWithRetry(
   acreage: number,
   month: number,
   latitude: number,
-  calibrationExamples: Array<{ lng: number; lat: number; species: 'cedar' | 'oak' }> = [],
+  calibrationExamples: Array<{
+    lng: number;
+    lat: number;
+    species: 'cedar' | 'oak';
+    crownPolygon?: GeoJSON.Polygon;
+  }> = [],
   onProgress?: (payload: Record<string, unknown>) => void
 ): Promise<CedarAnalysis> {
   let lastError: Error | null = null;

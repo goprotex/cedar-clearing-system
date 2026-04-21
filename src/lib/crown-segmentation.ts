@@ -12,6 +12,7 @@ export interface CrownCalibrationExample {
   lng: number;
   lat: number;
   species: 'cedar' | 'oak';
+  crownPolygon?: GeoJSON.Polygon;
 }
 
 export interface CrownPatchStats {
@@ -138,6 +139,105 @@ function lngLatToPixel(image: HiResImageData, bbox: number[], lng: number, lat: 
     clamp(Math.round(xNorm * (image.width - 1)), 0, image.width - 1),
     clamp(Math.round(yNorm * (image.height - 1)), 0, image.height - 1),
   ];
+}
+
+function pointInPixelRing(x: number, y: number, ring: Array<[number, number]>): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersects =
+      yi > y !== yj > y &&
+      x < ((xj - xi) * (y - yi)) / Math.max(yj - yi, 1e-9) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function sampleCrownPolygon(
+  image: HiResImageData,
+  bbox: number[],
+  polygon: GeoJSON.Polygon,
+  species: 'cedar' | 'oak',
+  profile: CrownCalibrationProfile,
+): CrownPatchStats | null {
+  const ring = polygon.coordinates[0]?.map(
+    ([lng, lat]) => lngLatToPixel(image, bbox, lng, lat) as [number, number],
+  );
+  if (!ring || ring.length < 4) return null;
+
+  let minX = image.width - 1;
+  let minY = image.height - 1;
+  let maxX = 0;
+  let maxY = 0;
+  for (const [x, y] of ring) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+
+  let total = 0;
+  let matched = 0;
+  let sumBrightness = 0;
+  let sumBrightnessSq = 0;
+  let sumGreenBias = 0;
+  let sumRedBias = 0;
+  let sumGray = 0;
+  let sumX = 0;
+  let sumY = 0;
+
+  for (let y = Math.max(0, minY); y <= Math.min(image.height - 1, maxY); y++) {
+    for (let x = Math.max(0, minX); x <= Math.min(image.width - 1, maxX); x++) {
+      if (!pointInPixelRing(x + 0.5, y + 0.5, ring)) continue;
+
+      const idx = (y * image.width + x) * image.channels;
+      const r = image.data[idx];
+      const g = image.data[idx + 1];
+      const b = image.data[idx + 2];
+      const brightness = (r + g + b) / 3;
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+      const greenBias = (g - Math.max(r, b)) / Math.max(brightness, 1);
+      const redBias = (r - Math.max(g, b)) / Math.max(brightness, 1);
+      const grayish = spread < 26 && brightness > 78 && brightness < 190 ? 1 : 0;
+
+      total++;
+      sumBrightness += brightness;
+      sumBrightnessSq += brightness * brightness;
+      sumGreenBias += greenBias;
+      sumRedBias += redBias;
+      sumGray += grayish;
+      sumX += x;
+      sumY += y;
+
+      if (classifyPatchPixel(r, g, b, species, profile)) {
+        matched++;
+      }
+    }
+  }
+
+  if (total === 0) return null;
+
+  const centroidX = sumX / total;
+  const centroidY = sumY / total;
+  const [centroidLng, centroidLat] = pixelToLngLat(image, bbox, centroidX, centroidY);
+  const areaM2 = total * image.metersPerPixel * image.metersPerPixel;
+  const diameterM = clamp(Math.sqrt(Math.max(areaM2, 1) / Math.PI) * 2, 2.2, 18);
+  const meanBrightness = sumBrightness / total;
+
+  return {
+    coverage: matched / total,
+    brightness: meanBrightness,
+    textureVar:
+      Math.max(0, sumBrightnessSq / total - meanBrightness * meanBrightness) /
+      (Math.max(meanBrightness, 1) * Math.max(meanBrightness, 1)),
+    greenBias: sumGreenBias / total,
+    grayFrac: sumGray / total,
+    redBias: sumRedBias / total,
+    diameterM,
+    centroidLng,
+    centroidLat,
+  };
 }
 
 function computePixelFeatures(image: HiResImageData): PixelFeatures {
@@ -596,7 +696,9 @@ export function buildCalibrationProfile(
   const oakStats: CrownPatchStats[] = [];
 
   for (const example of examples) {
-    const stats = sampleCrownPatch(image, bbox, example.lng, example.lat, example.species, base);
+    const stats = example.crownPolygon
+      ? sampleCrownPolygon(image, bbox, example.crownPolygon, example.species, base)
+      : sampleCrownPatch(image, bbox, example.lng, example.lat, example.species, base);
     if (!stats) continue;
     if (example.species === 'cedar') cedarStats.push(stats);
     else oakStats.push(stats);
