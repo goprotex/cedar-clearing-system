@@ -4,7 +4,7 @@ import { useBidStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/rates';
 
 export default function BidSummary() {
-  const { currentBid, rateCard } = useBidStore();
+  const { currentBid, rateCard, analysisProgress } = useBidStore();
 
   const pastureSubtotal = currentBid.pastures.reduce((s, p) => s + p.subtotal, 0);
   const customTotal = currentBid.customLineItems.reduce((s, li) => s + li.amount, 0);
@@ -80,6 +80,11 @@ export default function BidSummary() {
         <div className="text-4xl font-black text-[#FF6B00] tracking-tighter glow-orange">
           {formatCurrency(currentBid.totalAmount)}
         </div>
+        {analysisProgress?.active && analysisProgress.estimatedCedarAcres != null && (
+          <div className="text-[10px] text-[#13ff43] uppercase font-bold mt-1">
+            Live pricing preview · cedar acres {analysisProgress.estimatedCedarAcres.toFixed(1)}
+          </div>
+        )}
       </div>
 
       {/* Duration */}

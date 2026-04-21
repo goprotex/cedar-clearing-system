@@ -7,6 +7,12 @@ export const CEDAR_GRID_SPACING_KM = CEDAR_GRID_SPACING_M / 1000;
 const SAMPLES_PER_CELL_EST = CEDAR_GRID_SPACING_M * CEDAR_GRID_SPACING_M;
 
 /**
+ * Prefer a single whole-pasture staged run whenever the sample count is still
+ * within a range the cedar-detect route can usually complete in one request.
+ */
+export const WHOLE_PASTURE_STAGE_SAMPLE_LIMIT = 4000;
+
+/**
  * Target max samples per /api/cedar-detect invocation so each chunk finishes
  * comfortably within serverless limits while still running every refinement pass
  * on smaller regions when users prefer fidelity over total processing time.
@@ -18,6 +24,10 @@ const MIN_SPLIT_DEG = 1e-7;
 
 function estimateSampleCount(areaM2: number): number {
   return Math.max(1, Math.ceil(areaM2 / SAMPLES_PER_CELL_EST));
+}
+
+export function estimateCedarSampleCount(areaM2: number): number {
+  return estimateSampleCount(areaM2);
 }
 
 function expandToPolygonFeatures(feat: Feature<Polygon | MultiPolygon>): Feature<Polygon>[] {
@@ -85,6 +95,12 @@ export function getCedarAnalysisChunkPolygons(coords: Position[][]): Position[][
   const poly = turf.polygon(coords);
   const areaM2 = turf.area(poly);
   const samples = estimateSampleCount(areaM2);
+
+  // Run stage-by-stage across the whole pasture whenever feasible instead of
+  // finishing the full pipeline chunk-by-chunk.
+  if (samples <= WHOLE_PASTURE_STAGE_SAMPLE_LIMIT) {
+    return [coords];
+  }
 
   // ~One 15 m cell — second chunk would be empty
   if (samples <= 1) {

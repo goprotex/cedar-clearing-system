@@ -10,8 +10,13 @@ import {
   DEFAULT_RATE_CARD,
 } from '@/lib/rates';
 import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
-import { getCedarAnalysisChunkPolygons, polygonAcreage } from '@/lib/cedar-analysis-chunks';
-import { CEDAR_GRID_SPACING_M } from '@/lib/cedar-analysis-chunks';
+import {
+  estimateCedarSampleCount,
+  getCedarAnalysisChunkPolygons,
+  polygonAcreage,
+  CEDAR_GRID_SPACING_M,
+  WHOLE_PASTURE_STAGE_SAMPLE_LIMIT,
+} from '@/lib/cedar-analysis-chunks';
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
 import { fetchCedarDetectChunkWithRetry, scaledChunkProgress } from '@/lib/cedar-detect-stream-client';
 import { createClient as createSupabaseBrowser, isSupabaseConfigured } from '@/utils/supabase/client';
@@ -149,6 +154,7 @@ interface BidStore {
   // Analysis progress (`pct` is canonical; `percent` optional alias for UI that reads `percent`)
   analysisProgress: {
     active: boolean;
+    pastureId?: string;
     step: string;
     detail: string;
     pct: number;
@@ -160,6 +166,7 @@ interface BidStore {
     focusKey?: string;
     cedarCount?: number;
     oakCount?: number;
+    estimatedCedarAcres?: number;
     totalPoints?: number;
     completed?: number;
     /** Extra pipeline description (large pastures / multi-region runs) */
@@ -372,9 +379,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
   recalculate: () => {
     set((state) => {
       const { rateCard, currentBid } = state;
+      const livePricingPastureId = state.analysisProgress?.active ? state.analysisProgress.pastureId : undefined;
+      const livePricingCedarAcres = state.analysisProgress?.active ? state.analysisProgress.estimatedCedarAcres : undefined;
       const updatedPastures = currentBid.pastures.map((p) => {
         if (p.acreage === 0) return p;
-        const { subtotal, methodMultiplier, estimatedHrsPerAcre } = calculatePastureCost(p, rateCard);
+        const cedarAcresOverride = p.id === livePricingPastureId ? livePricingCedarAcres : undefined;
+        const { subtotal, methodMultiplier, estimatedHrsPerAcre } = calculatePastureCost(p, rateCard, cedarAcresOverride);
         return { ...p, subtotal, methodMultiplier, estimatedHrsPerAcre };
       });
 
@@ -598,8 +608,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (pasture.polygon.geometry.coordinates.length === 0) return;
 
     const bidId = get().currentBid.id;
+    const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
+    const chunkKeys = chunkCoords.map((c) => hashChunkPolygonCoords(c[0]));
+    const totalChunks = chunkCoords.length;
+    const estimatedSamples = estimateCedarSampleCount(pasture.acreage * 4047);
+    const runningWholePasture = totalChunks === 1;
     const spectralProcessLines = [
-      'Partition pasture into regions sized for reliable NAIP sampling',
+      runningWholePasture
+        ? `Run stage 1 across the full pasture (${estimatedSamples} estimated ${CEDAR_GRID_SPACING_M} m cells) before moving to the next stage`
+        : `Split only because the pasture exceeds the single-request limit (${WHOLE_PASTURE_STAGE_SAMPLE_LIMIT} cells)` ,
       `For each ${CEDAR_GRID_SPACING_M} m cell: USGS NAIP identify (red, green, blue, near-infrared)`,
       'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
       'Refine every cell with hi-res winter RGB imagery from World Imagery',
@@ -607,10 +624,6 @@ export const useBidStore = create<BidStore>((set, get) => ({
       'Seasonal fusion + overlapping-tile consensus smooth class boundaries when enough cells exist',
       'Build the cedar layer and place 3D tree positions',
     ];
-
-    const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
-    const chunkKeys = chunkCoords.map((c) => hashChunkPolygonCoords(c[0]));
-    const totalChunks = chunkCoords.length;
     const polygonHash = hashPasturePolygon(pasture.polygon.geometry.coordinates);
     const analysisStartedAt = Date.now();
     const pastureBbox = bboxFromCoords(pasture.polygon.geometry.coordinates);
@@ -624,6 +637,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
             progress.activeProcessIndex ?? activeProcessIndexForPhase(progress.phase),
         },
       });
+      get().recalculate();
+    };
+
+    const clearSpectralProgress = () => {
+      set({ analysisProgress: null });
+      get().recalculate();
     };
 
     // Sparse array: null = not yet attempted or failed; CedarAnalysis = success
@@ -658,6 +677,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       if (completedCount > 0 && pendingIndices.length > 0) {
         setSpectralProgress({
           phase: 'init',
+          pastureId,
           step: 'Resuming spectral analysis…',
           detail: `${completedCount} of ${totalChunks} regions restored — continuing where you left off`,
           pct: Math.round((completedCount / totalChunks) * 90),
@@ -679,18 +699,24 @@ export const useBidStore = create<BidStore>((set, get) => ({
       if (completedCount === 0) {
         setSpectralProgress({
           phase: 'init',
+          pastureId,
           step: 'Initializing spectral analysis…',
           detail:
             totalChunks > 1
-              ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, ${CEDAR_GRID_SPACING_M} m cells). Progress is saved after each region — you can resume if interrupted.`
-              : `Scanning ~${Math.round(pasture.acreage)} acres at ${CEDAR_GRID_SPACING_M} m resolution`,
+              ? `${totalChunks} fallback regions (~${Math.round(pasture.acreage)} ac total). This field is large enough that it still has to be processed in multiple requests.`
+              : `Scanning the full pasture in one staged run (~${Math.round(pasture.acreage)} ac, ${estimatedSamples} estimated cells at ${CEDAR_GRID_SPACING_M} m)`,
           pct: 0,
           percent: 0,
           startedAt: analysisStartedAt,
           processLines: spectralProcessLines,
           focusBbox: pastureBbox,
           focusKey: `pasture-${pastureId}`,
-          debugLines: [`${totalChunks} region(s) queued`, `polygon hash ${polygonHash.slice(0, 8)}`],
+          debugLines: [
+            runningWholePasture
+              ? `full-pasture mode (${estimatedSamples} estimated cells)`
+              : `${totalChunks} fallback region(s) queued`,
+            `polygon hash ${polygonHash.slice(0, 8)}`,
+          ],
         });
       }
     }
@@ -707,6 +733,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       setSpectralProgress({
         phase: 'sampling',
+        pastureId,
         step: totalChunks > 1 ? `Scanning region ${i + 1} of ${totalChunks}` : 'Scanning pasture cells',
         detail: `${chunkAcres.toFixed(1)} acres in view — fetching NAIP, hi-res imagery, and seasonal cues`,
         pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
@@ -733,6 +760,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
             const phase = (payload.phase as string) || 'sampling';
             setSpectralProgress({
               phase,
+              pastureId,
               step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
               detail: (payload.detail as string) || '',
               pct,
@@ -740,6 +768,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
               startedAt: analysisStartedAt,
               cedarCount: payload.cedarCount as number | undefined,
               oakCount: payload.oakCount as number | undefined,
+              estimatedCedarAcres: payload.estimatedCedarAcres as number | undefined,
               totalPoints: payload.totalPoints as number | undefined,
               completed: payload.completed as number | undefined,
               processLines: spectralProcessLines,
@@ -767,6 +796,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
         setSpectralProgress({
           phase: 'refining',
+          pastureId,
           phaseLabel: 'REFINEMENT_CONFIRMED',
           step: totalChunks > 1 ? `Region ${i + 1} refinement complete` : 'Refinement steps complete',
           detail:
@@ -786,6 +816,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
             `seasonal fusion ${sentinelUsed ? `used (${pairedSamples} paired)` : 'unavailable'}`,
             `consensus ${consensusImproved} cells / ${consensusTiles} tiles`,
           ],
+          cedarCount: chunkSummary.cedar.count,
+          oakCount: chunkSummary.oak.count,
+          estimatedCedarAcres: chunkSummary.estimatedCedarAcres,
+          totalPoints: chunkSummary.totalSamples,
+          completed: chunkSummary.totalSamples,
         });
 
         // Persist after every successful chunk
@@ -806,6 +841,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
         console.error(`[analyzeCedar] chunk ${i + 1}/${totalChunks} FAILED: ${msg}`);
         setSpectralProgress({
           phase: 'retry',
+          pastureId,
           step: `Region ${i + 1} failed — preparing retry`,
           detail: msg,
           pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
@@ -844,6 +880,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
         setSpectralProgress({
           phase: 'retry',
+          pastureId,
           step: `Retrying ${retryQueue.length} failed region(s)…`,
           detail: `Retry round ${round + 1} of ${CHUNK_RETRY_ROUNDS} — waiting ${Math.round(backoffMs / 1000)}s before retrying`,
           pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
@@ -899,6 +936,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       setSpectralProgress({
         phase: 'applying',
+        pastureId,
         step: 'Applying results to map…',
         detail: failedIndices.length > 0
           ? `${failedIndices.length} of ${totalChunks} regions failed — partial results applied`
@@ -912,11 +950,15 @@ export const useBidStore = create<BidStore>((set, get) => ({
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,
         debugLines: [`successful regions ${successParts.length}/${totalChunks}`],
+        cedarCount: resultData.summary?.cedar.count,
+        oakCount: resultData.summary?.oak.count,
+        estimatedCedarAcres: resultData.summary?.estimatedCedarAcres,
       });
       get().updatePasture(pastureId, { cedarAnalysis: resultData });
 
       setSpectralProgress({
         phase: 'trees',
+        pastureId,
         step: 'Generating 3D tree positions…',
         detail: 'Placing trees from spectral data',
         pct: 98,
@@ -927,6 +969,9 @@ export const useBidStore = create<BidStore>((set, get) => ({
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,
         debugLines: [`total cells ${resultData.summary?.totalSamples ?? 0}`],
+        cedarCount: resultData.summary?.cedar.count,
+        oakCount: resultData.summary?.oak.count,
+        estimatedCedarAcres: resultData.summary?.estimatedCedarAcres,
       });
 
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
@@ -962,6 +1007,12 @@ export const useBidStore = create<BidStore>((set, get) => ({
             focusBbox: pastureBbox,
             focusKey: `pasture-${pastureId}`,
             debugLines: [`marked cedar trees ${cedarTrees.length}`],
+            pastureId,
+            cedarCount: resultData.summary?.cedar.count,
+            oakCount: resultData.summary?.oak.count,
+            estimatedCedarAcres: resultData.summary?.estimatedCedarAcres,
+            totalPoints: resultData.summary?.totalSamples,
+            completed: resultData.summary?.totalSamples,
           });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
@@ -982,6 +1033,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
         processLines: spectralProcessLines,
         activeProcessIndex: 6,
         totalPoints: s.totalSamples,
+        completed: s.totalSamples,
+        pastureId,
+        cedarCount: s.cedar.count,
+        oakCount: s.oak?.count,
+        estimatedCedarAcres: s.estimatedCedarAcres,
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,
         debugLines: failedIndices.length > 0
@@ -997,7 +1053,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
         );
       }
 
-      setTimeout(() => set({ analysisProgress: null }), failedIndices.length > 0 ? 6000 : 3200);
+      setTimeout(clearSpectralProgress, failedIndices.length > 0 ? 6000 : 3200);
     } catch (e) {
       console.error(`[analyzeCedar] top-level error: ${e instanceof Error ? e.message : e}`);
       const msg = e instanceof Error ? e.message : 'Spectral analysis failed';
@@ -1021,13 +1077,14 @@ export const useBidStore = create<BidStore>((set, get) => ({
         detail: msg,
         pct: Math.round((successCount / Math.max(totalChunks, 1)) * 100),
         percent: Math.round((successCount / Math.max(totalChunks, 1)) * 100),
+        pastureId,
         startedAt: analysisStartedAt,
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,
         processLines: spectralProcessLines,
         debugLines: [`successful regions ${successCount}/${totalChunks}`, ...failedRegionDebug],
       });
-      setTimeout(() => set({ analysisProgress: null }), 12000);
+      setTimeout(clearSpectralProgress, 12000);
     }
   },
 

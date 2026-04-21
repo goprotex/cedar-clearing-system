@@ -32,7 +32,10 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
   const [aiResult, setAiResult] = useState<AIRecommendation | null>(null);
 
   const methodConfig = rateCard.methodConfigs.find((m) => m.id === pasture.clearingMethod);
-  const { billableAcres, pricingMode } = getBillableAcreage(pasture);
+  const liveAnalysisForPasture = analysisProgress?.active && analysisProgress.pastureId === pasture.id
+    ? analysisProgress
+    : null;
+  const { billableAcres, pricingMode } = getBillableAcreage(pasture, liveAnalysisForPasture?.estimatedCedarAcres);
   const displayedRate = billableAcres > 0 ? Math.round(pasture.subtotal / billableAcres) : 0;
   const totalHours = Math.round(billableAcres * pasture.estimatedHrsPerAcre);
   const globalAnalysisActive = Boolean(analysisProgress?.active);
@@ -407,6 +410,26 @@ export default function PastureCard({ pasture, isSelected }: PastureCardProps) {
               >
                 {analyzing && !globalAnalysisActive ? 'Re-analyzing...' : 'Re-analyze'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {liveAnalysisForPasture && (
+          <div className="text-xs space-y-1 bg-[#13ff43]/6 border border-[#13ff43]/25 p-2">
+            <div className="font-bold text-[#13ff43] uppercase flex items-center justify-between">
+              <span>LIVE TREE COUNT</span>
+              <Badge variant="outline" className="text-[10px] border-[#13ff43]/40 text-[#13ff43]">
+                preview
+              </Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 text-[11px]">
+              <span className="text-red-400">Cedars: {liveAnalysisForPasture.cedarCount ?? 0}</span>
+              <span className="text-amber-300">Oaks: {liveAnalysisForPasture.oakCount ?? 0}</span>
+              <span>Cells processed: {liveAnalysisForPasture.completed ?? 0}/{liveAnalysisForPasture.totalPoints ?? 0}</span>
+              <span>Live cedar acres: {(liveAnalysisForPasture.estimatedCedarAcres ?? 0).toFixed(1)}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              Bid pricing is updating from the live cedar-acre preview while analysis runs.
             </div>
           </div>
         )}

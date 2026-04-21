@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
 import sharp from 'sharp';
+import type { SpectralSamplePayload } from '@/lib/cedar-analysis-grid';
 import { computeLocalNdviVariance } from '@/lib/spectral-texture';
 import { fuseNaipWithTextureAndSentinel } from '@/lib/spectral-fusion';
 import { isCentralTexasHillCountry } from '@/lib/spectral-region';
@@ -26,6 +27,7 @@ const HI_RES_FETCH_TIMEOUT_MS = 20000;
 const HI_RES_MIN_DIM = 512;
 const HI_RES_MAX_DIM = 2048;
 const HI_RES_TARGET_METERS_PER_PIXEL = 0.6;
+const STREAM_SAMPLE_BATCH_SIZE = 500;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -109,6 +111,65 @@ interface HiResWindowStats {
   textureVar: number;
 }
 
+function summarizeLiveCounts(results: SampleResult[], acreage: number) {
+  const totalPoints = results.length;
+  const cedarCount = results.filter((r) => r.classification === 'cedar').length;
+  const oakCount = results.filter((r) => r.classification === 'oak').length;
+  const estimatedCedarAcres = totalPoints > 0
+    ? Math.round((cedarCount / totalPoints) * acreage * 10) / 10
+    : 0;
+
+  return {
+    cedarCount,
+    oakCount,
+    totalPoints,
+    completed: totalPoints,
+    estimatedCedarAcres,
+  };
+}
+
+function toSpectralSamples(results: SampleResult[]): SpectralSamplePayload[] {
+  return results.map((s) => ({
+    lng: s.lng,
+    lat: s.lat,
+    ndvi: s.ndvi,
+    gndvi: s.gndvi,
+    savi: s.savi,
+    classification: s.classification,
+    confidence: s.confidence,
+    bandVotes: s.bandVotes,
+    trustScore: s.trustScore,
+    lowTrust: s.lowTrust,
+  }));
+}
+
+function oakCirVotes(
+  r: number,
+  g: number,
+  b: number,
+  nir: number,
+  brightness: number,
+  idx: BandIndices,
+): number {
+  let oakVotes = 0;
+  const ndviBase = Math.max(idx.ndvi, 0.01);
+  const deciduousRatio = idx.gndvi / ndviBase;
+  const nirOverRed = nir / Math.max(r, 1);
+  const redOverGreen = r / Math.max(g, 1);
+  const redOverBlue = r / Math.max(b, 1);
+
+  if (nir >= 165) oakVotes++; // bright red channel in CIR
+  if (nir >= 145) oakVotes++;
+  if (r >= 92) oakVotes++; // visible red stays elevated for pink/red oak canopy
+  if (brightness >= 92) oakVotes++;
+  if (deciduousRatio > 0.84) oakVotes++;
+  if (nirOverRed < 1.95) oakVotes++; // oak pink keeps visible red closer to NIR than cedar does
+  if (redOverGreen > 1.12) oakVotes++;
+  if (redOverBlue > 1.02) oakVotes++;
+
+  return oakVotes;
+}
+
 // ── Band index computation ──
 
 function computeIndices(r: number, g: number, b: number, nir: number): BandIndices {
@@ -144,6 +205,23 @@ function classifyVegetation(
   const idx = computeIndices(r, g, b, nir);
   const brightness = (r + g + b) / 3;
   const redGreenRatio = r / Math.max(g, 1);
+  const highConfidenceOakCir =
+    idx.ndvi >= 0.24 &&
+    brightness >= 88 &&
+    nir >= 150 &&
+    r >= 90 &&
+    redGreenRatio > 1.08 &&
+    oakCirVotes(r, g, b, nir, brightness, idx) >= 4;
+
+  if (highConfidenceOakCir) {
+    return {
+      classification: 'oak',
+      confidence: Math.min(0.88, 0.52 + oakCirVotes(r, g, b, nir, brightness, idx) * 0.06),
+      bandVotes: oakCirVotes(r, g, b, nir, brightness, idx),
+      gndvi: idx.gndvi,
+      savi: idx.savi,
+    };
+  }
 
   // ── Pass 1: Bare ground — must be VERY BRIGHT + low NDVI ──
   // Real bare ground (soil, rock, caliche, roads) has brightness > 120 in NAIP.
@@ -207,13 +285,10 @@ function classifyVegetation(
     if (idx.savi > 0.18) cedarVotes++;           // soil-adjusted veg present
 
     // Oak escape hatch FIRST — bright NIR + brightness = oak, not cedar
-    if (nir >= 140 && brightness >= 90) {
-      let oakVotes = 1;
-      if (nir >= 160) oakVotes++;
-      if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.85) oakVotes++; // deciduous signature
-      if (brightness >= 105) oakVotes++;
+    if (nir >= 135 && brightness >= 86) {
+      const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
       if (oakVotes >= 2) {
-        const conf = Math.min(0.75, 0.4 + oakVotes * 0.1);
+        const conf = Math.min(0.82, 0.38 + oakVotes * 0.08);
         return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
       }
     }
@@ -238,16 +313,11 @@ function classifyVegetation(
   //   Oak   = bright red/pink in CIR  → high NIR (140+), higher brightness
 
   // CHECK OAK FIRST — high NIR + bright = deciduous hardwood, not cedar
-  if (nir >= 140 && brightness >= 85) {
-    let oakVotes = 0;
-    if (nir >= 170) oakVotes++;                                     // very bright red in CIR
-    if (nir >= 140) oakVotes++;                                     // bright-ish NIR
-    if (idx.gndvi / Math.max(idx.ndvi, 0.01) > 0.80) oakVotes++;   // GNDVI ≈ NDVI → deciduous
-    if (brightness >= 100) oakVotes++;                               // bright canopy
-    if (r >= 80) oakVotes++;                                         // higher red = not cedar
+  if (nir >= 135 && brightness >= 82) {
+    const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
     // Strong oak signal: 3+ votes with high NIR
     if (oakVotes >= 3) {
-      const conf = Math.min(0.85, 0.4 + oakVotes * 0.08);
+      const conf = Math.min(0.9, 0.42 + oakVotes * 0.07);
       return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
     }
   }
@@ -710,229 +780,291 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Batch identify requests against NAIP ImageServer (small batches + per-request retries)
-    const results: SampleResult[] = [];
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const push = (event: string, payload: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
+        };
 
-    for (let i = 0; i < samplePoints.length; i += BATCH_SIZE) {
-      const batch = samplePoints.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async (pt): Promise<SampleResult | null> => {
-          const [lng, lat] = pt.geometry.coordinates;
-          try {
-            const data = (await fetchNaipIdentifyJson(lng, lat)) as { value?: string } | null;
-            if (!data) return null;
-            const pixelStr: string = data?.value || '';
+        try {
+          push('progress', {
+            phase: 'grid',
+            message: 'Building analyzer grid',
+            detail: `${samplePoints.length} cells queued for this pasture`,
+            pct: 2,
+            completed: 0,
+            totalPoints: samplePoints.length,
+            cedarCount: 0,
+            oakCount: 0,
+            estimatedCedarAcres: 0,
+          });
 
-            if (!pixelStr || pixelStr === 'NoData') {
-              return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
-            }
+          const results: SampleResult[] = [];
 
-            const vals = pixelStr
-              .split(/[\s,]+/)
-              .map(Number)
-              .filter((n) => !isNaN(n));
-            if (vals.length < 3) return null;
+          for (let i = 0; i < samplePoints.length; i += BATCH_SIZE) {
+            const batch = samplePoints.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(
+              batch.map(async (pt): Promise<SampleResult | null> => {
+                const [lng, lat] = pt.geometry.coordinates;
+                try {
+                  const data = (await fetchNaipIdentifyJson(lng, lat)) as { value?: string } | null;
+                  if (!data) return null;
+                  const pixelStr: string = data?.value || '';
 
-            const [r, g, b] = vals;
-            const nir = vals.length >= 4 ? vals[3] : null;
+                  if (!pixelStr || pixelStr === 'NoData') {
+                    return { lng, lat, ndvi: 0, gndvi: 0, savi: 0, classification: 'bare', confidence: 0.3, bandVotes: 0 };
+                  }
 
-            let ndvi = 0;
-            if (nir !== null && nir + r > 0) {
-              ndvi = (nir - r) / (nir + r);
-            }
+                  const vals = pixelStr
+                    .split(/[\s,]+/)
+                    .map(Number)
+                    .filter((n) => !isNaN(n));
+                  if (vals.length < 3) return null;
 
-            const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
-            return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
-          } catch {
-            return null;
+                  const [r, g, b] = vals;
+                  const nir = vals.length >= 4 ? vals[3] : null;
+
+                  let ndvi = 0;
+                  if (nir !== null && nir + r > 0) {
+                    ndvi = (nir - r) / (nir + r);
+                  }
+
+                  const { classification, confidence, bandVotes, gndvi, savi } = classifyVegetation(r, g, b, nir, ndvi);
+                  return { lng, lat, ndvi, gndvi, savi, classification, confidence, bandVotes };
+                } catch {
+                  return null;
+                }
+              })
+            );
+
+            results.push(...batchResults.filter((r): r is SampleResult => r !== null));
+
+            const preview = summarizeLiveCounts(results, ac);
+            push('progress', {
+              phase: 'sampling',
+              message: 'Sampling CIR cells',
+              detail: `Batch ${Math.min(samplePoints.length, i + BATCH_SIZE)}/${samplePoints.length} cells classified`,
+              pct: Math.round(8 + (results.length / Math.max(samplePoints.length, 1)) * 32),
+              ...preview,
+            });
           }
-        })
-      );
 
-      results.push(...batchResults.filter((r): r is SampleResult => r !== null));
-    }
+          if (results.length === 0) {
+            push('error', { message: 'No NAIP data available for this area' });
+            controller.close();
+            return;
+          }
 
-    if (results.length === 0) {
-      return NextResponse.json(
-        { error: 'No NAIP data available for this area' },
-        { status: 404 }
-      );
-    }
+          const textureNdviVar = computeLocalNdviVariance(
+            results.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
+            gridBbox,
+            spacingKm,
+          );
 
-    const textureNdviVar = computeLocalNdviVariance(
-      results.map((r) => ({ lng: r.lng, lat: r.lat, ndvi: r.ndvi })),
-      gridBbox,
-      spacingKm,
-    );
+          const now = new Date();
+          const year = now.getFullYear();
+          const winterRange = `${year - 2}-12-01/${year}-02-28`;
+          const summerRange = `${year - 2}-06-01/${year - 1}-08-31`;
+          const samplePointFeatures = results.map((r) =>
+            turf.point([r.lng, r.lat]) as GeoJSON.Feature<GeoJSON.Point>
+          );
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const winterRange = `${year - 2}-12-01/${year}-02-28`;
-    const summerRange = `${year - 2}-06-01/${year - 1}-08-31`;
-    const samplePointFeatures = results.map((r) =>
-      turf.point([r.lng, r.lat]) as GeoJSON.Feature<GeoJSON.Point>
-    );
+          push('progress', {
+            phase: 'sentinel',
+            message: 'Fetching seasonal scenes',
+            detail: 'Sampling winter and summer Sentinel-2 cues across all cells',
+            pct: 45,
+            ...summarizeLiveCounts(results, ac),
+          });
 
-    const [winterScene, summerScene] = await Promise.all([
-      findSentinelScene(gridBbox, winterRange, 30),
-      findSentinelScene(gridBbox, summerRange, 30),
-    ]);
+          const [winterScene, summerScene] = await Promise.all([
+            findSentinelScene(gridBbox, winterRange, 30),
+            findSentinelScene(gridBbox, summerRange, 30),
+          ]);
 
-    const [winterSample, summerSample] = await Promise.all([
-      winterScene ? sampleNdviFromSceneItem(winterScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
-      summerScene ? sampleNdviFromSceneItem(summerScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
-    ]);
+          const [winterSample, summerSample] = await Promise.all([
+            winterScene ? sampleNdviFromSceneItem(winterScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
+            summerScene ? sampleNdviFromSceneItem(summerScene, samplePointFeatures, gridBbox) : Promise.resolve(null),
+          ]);
 
-    const hiResImage = await fetchHiResWindowImage(gridBbox);
+          const hiResImage = await fetchHiResWindowImage(gridBbox);
 
-    const winterValues = winterSample?.values ?? new Array(results.length).fill(null);
-    const summerValues = summerSample?.values ?? new Array(results.length).fill(null);
-    const hillCountry = isCentralTexasHillCountry(gridBbox);
+          const winterValues = winterSample?.values ?? new Array(results.length).fill(null);
+          const summerValues = summerSample?.values ?? new Array(results.length).fill(null);
+          const hillCountry = isCentralTexasHillCountry(gridBbox);
 
-    // Stage pass 1: run texture + Sentinel fusion across the full cell set first.
-    const fusedResults: SampleResult[] = results.map((result, index) => {
-      const fused = fuseNaipWithTextureAndSentinel(
-        result.classification,
-        result.confidence,
-        textureNdviVar[index] ?? 0,
-        winterValues[index] ?? null,
-        summerValues[index] ?? null,
-        { hillCountry },
-      );
+          const fusedResults: SampleResult[] = results.map((result, index) => {
+            const fused = fuseNaipWithTextureAndSentinel(
+              result.classification,
+              result.confidence,
+              textureNdviVar[index] ?? 0,
+              winterValues[index] ?? null,
+              summerValues[index] ?? null,
+              { hillCountry },
+            );
 
-      return {
-        ...result,
-        classification: fused.classification as VegClass,
-        confidence: fused.confidence,
-        trustScore: fused.trustScore,
-        lowTrust: fused.lowTrust,
-      };
+            return {
+              ...result,
+              classification: fused.classification as VegClass,
+              confidence: fused.confidence,
+              trustScore: fused.trustScore,
+              lowTrust: fused.lowTrust,
+            };
+          });
+
+          push('progress', {
+            phase: 'classify',
+            message: 'Fusing seasonal and texture cues',
+            detail: 'Stage 1 complete across the full cell set',
+            pct: 60,
+            ...summarizeLiveCounts(fusedResults, ac),
+          });
+
+          const hiResStats = fusedResults.map((result) =>
+            hiResImage ? sampleHiResWindowStats(hiResImage, gridBbox, result.lng, result.lat) : null,
+          );
+
+          const hiResRefinedResults: SampleResult[] = fusedResults.map((result, index) => {
+            const hiResRefined = refineWithHiResImagery(result, hiResStats[index]);
+            return {
+              ...result,
+              classification: hiResRefined.classification,
+              confidence: hiResRefined.confidence,
+            };
+          });
+
+          push('progress', {
+            phase: 'refining',
+            message: 'Applying hi-res imagery refinement',
+            detail: 'Stage 2 complete across the full cell set',
+            pct: 75,
+            ...summarizeLiveCounts(hiResRefinedResults, ac),
+          });
+
+          const {
+            refined: consensusResults,
+            tileCount,
+            consensusImprovedCells,
+          } = applyTileConsensus(hiResRefinedResults, spacingKm, gridBbox);
+
+          const centerLat = (gridBbox[1] + gridBbox[3]) / 2;
+          const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
+          const halfLatDeg = spacingKm / 2 / 111.32;
+
+          push('progress', {
+            phase: 'consensus',
+            message: 'Running consensus smoothing',
+            detail: 'Stage 3 complete across the full cell set',
+            pct: 88,
+            ...summarizeLiveCounts(consensusResults, ac),
+          });
+
+          const total = consensusResults.length;
+          const cedarCount = consensusResults.filter((r) => r.classification === 'cedar').length;
+          const oakCount = consensusResults.filter((r) => r.classification === 'oak').length;
+          const mixedCount = consensusResults.filter((r) => r.classification === 'mixed_brush').length;
+          const grassCount = consensusResults.filter((r) => r.classification === 'grass').length;
+          const bareCount = consensusResults.filter((r) => r.classification === 'bare').length;
+
+          const cedarPct = total > 0 ? cedarCount / total : 0;
+          const avgNdvi = consensusResults.reduce((sum, r) => sum + r.ndvi, 0) / total;
+          const avgConf = consensusResults.reduce((sum, r) => sum + r.confidence, 0) / total;
+          const avgBandVotes = consensusResults.reduce((sum, r) => sum + r.bandVotes, 0) / total;
+          const avgGndvi = consensusResults.reduce((sum, r) => sum + r.gndvi, 0) / total;
+          const avgSavi = consensusResults.reduce((sum, r) => sum + r.savi, 0) / total;
+          const highConfCedar = consensusResults.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
+          const lowTrustCount = consensusResults.filter((r) => r.lowTrust).length;
+          const pairedSamples = consensusResults.filter(
+            (_, index) => winterValues[index] !== null && summerValues[index] !== null,
+          ).length;
+
+          const summary = {
+            totalSamples: total,
+            cedar: { count: cedarCount, pct: Math.round(cedarPct * 100) },
+            oak: { count: oakCount, pct: total > 0 ? Math.round((oakCount / total) * 100) : 0 },
+            mixedBrush: { count: mixedCount, pct: total > 0 ? Math.round((mixedCount / total) * 100) : 0 },
+            grass: { count: grassCount, pct: total > 0 ? Math.round((grassCount / total) * 100) : 0 },
+            bare: { count: bareCount, pct: total > 0 ? Math.round((bareCount / total) * 100) : 0 },
+            estimatedCedarAcres: Math.round(cedarPct * ac * 10) / 10,
+            averageNDVI: Math.round(avgNdvi * 1000) / 1000,
+            averageGNDVI: Math.round(avgGndvi * 1000) / 1000,
+            averageSAVI: Math.round(avgSavi * 1000) / 1000,
+            confidence: Math.round(avgConf * 100),
+            avgBandVotes: Math.round(avgBandVotes * 10) / 10,
+            highConfidenceCedarCells: highConfCedar,
+            gridSpacingM: CEDAR_GRID_SPACING_M,
+            cellHalfLngDeg: halfLngDeg,
+            cellHalfLatDeg: halfLatDeg,
+            lowTrustCells: lowTrustCount,
+            lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
+            hiResImagery: {
+              used: Boolean(hiResImage),
+              source: 'esri-world-imagery',
+            },
+            tileConsensus: {
+              tileCount,
+              tileOverlapPct: 60,
+              tileSizePixels: 5,
+              tileSizeM: Math.round(CEDAR_GRID_SPACING_M * 5),
+              stridePixels: 2,
+              strideM: Math.round(CEDAR_GRID_SPACING_M * 2),
+              consensusImprovedCells,
+              consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
+            },
+            sentinelFusion: {
+              used: Boolean(winterSample || summerSample),
+              pairedSamples,
+              winterDate: winterScene ? sceneMeta(winterScene).datetime : undefined,
+              summerDate: summerScene ? sceneMeta(summerScene).datetime : undefined,
+              winterSceneId: winterScene?.id,
+              summerSceneId: summerScene?.id,
+            },
+          };
+
+          push('progress', {
+            phase: 'building',
+            message: 'Packaging final cedar result',
+            detail: 'Streaming analysis result back to the client',
+            pct: 96,
+            cedarCount,
+            oakCount,
+            estimatedCedarAcres: summary.estimatedCedarAcres,
+            totalPoints: total,
+            completed: total,
+          });
+
+          const compactSamples = toSpectralSamples(consensusResults);
+          const totalBatches = Math.max(1, Math.ceil(compactSamples.length / STREAM_SAMPLE_BATCH_SIZE));
+          push('result_summary', { summary, totalBatches });
+
+          for (let i = 0; i < compactSamples.length; i += STREAM_SAMPLE_BATCH_SIZE) {
+            push('result_samples', {
+              samples: compactSamples.slice(i, i + STREAM_SAMPLE_BATCH_SIZE),
+              batchIndex: Math.floor(i / STREAM_SAMPLE_BATCH_SIZE),
+              totalBatches,
+            });
+          }
+
+          push('result_done', { totalSamples: compactSamples.length, totalBatches });
+          controller.close();
+        } catch (err) {
+          push('error', {
+            message: err instanceof Error ? err.message : 'Unknown analysis error',
+          });
+          controller.close();
+        }
+      },
     });
 
-    // Stage pass 2: sample hi-res RGB window stats for the entire grid.
-    const hiResStats = fusedResults.map((result) =>
-      hiResImage ? sampleHiResWindowStats(hiResImage, gridBbox, result.lng, result.lat) : null,
-    );
-
-    // Stage pass 3: apply hi-res refinement across the full fused grid.
-    const hiResRefinedResults: SampleResult[] = fusedResults.map((result, index) => {
-      const hiResRefined = refineWithHiResImagery(result, hiResStats[index]);
-      return {
-        ...result,
-        classification: hiResRefined.classification,
-        confidence: hiResRefined.confidence,
-      };
+    return new NextResponse(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
     });
-
-    const {
-      refined: consensusResults,
-      tileCount,
-      consensusImprovedCells,
-    } = applyTileConsensus(hiResRefinedResults, spacingKm, gridBbox);
-
-    // Build cell polygons for map overlay using the active analyzer cell width.
-    // Tile consensus runs here for single-chunk analyses and again after merge for chunked runs.
-    const centerLat = (gridBbox[1] + gridBbox[3]) / 2;
-    const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
-    const halfLatDeg = spacingKm / 2 / 111.32;
-
-    const gridCells: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: consensusResults.map((s) => ({
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Polygon' as const,
-          coordinates: [
-            [
-              [s.lng - halfLngDeg, s.lat - halfLatDeg],
-              [s.lng + halfLngDeg, s.lat - halfLatDeg],
-              [s.lng + halfLngDeg, s.lat + halfLatDeg],
-              [s.lng - halfLngDeg, s.lat + halfLatDeg],
-              [s.lng - halfLngDeg, s.lat - halfLatDeg],
-            ],
-          ],
-        },
-        properties: {
-          classification: s.classification,
-          ndvi: Math.round(s.ndvi * 1000) / 1000,
-          gndvi: Math.round(s.gndvi * 1000) / 1000,
-          savi: Math.round(s.savi * 1000) / 1000,
-          confidence: Math.round(s.confidence * 100) / 100,
-          bandVotes: s.bandVotes,
-          trustScore: s.trustScore,
-          lowTrust: s.lowTrust ?? false,
-          color: s.lowTrust ? '#ea580c' : getClassColor(s.classification, s.ndvi),
-        },
-      })),
-    };
-
-    // Summary statistics from consensus-refined results
-    const total = consensusResults.length;
-    const cedarCount = consensusResults.filter((r) => r.classification === 'cedar').length;
-    const oakCount = consensusResults.filter((r) => r.classification === 'oak').length;
-    const mixedCount = consensusResults.filter((r) => r.classification === 'mixed_brush').length;
-    const grassCount = consensusResults.filter((r) => r.classification === 'grass').length;
-    const bareCount = consensusResults.filter((r) => r.classification === 'bare').length;
-
-    const cedarPct = total > 0 ? cedarCount / total : 0;
-    const avgNdvi = consensusResults.reduce((sum, r) => sum + r.ndvi, 0) / total;
-    const avgConf = consensusResults.reduce((sum, r) => sum + r.confidence, 0) / total;
-    const avgBandVotes = consensusResults.reduce((sum, r) => sum + r.bandVotes, 0) / total;
-    const avgGndvi = consensusResults.reduce((sum, r) => sum + r.gndvi, 0) / total;
-    const avgSavi = consensusResults.reduce((sum, r) => sum + r.savi, 0) / total;
-
-    // High-confidence cedar: cells where ≥3 bands agreed
-    const highConfCedar = consensusResults.filter((r) => r.classification === 'cedar' && r.bandVotes >= 3).length;
-    const lowTrustCount = consensusResults.filter((r) => r.lowTrust).length;
-    const pairedSamples = consensusResults.filter(
-      (_, index) => winterValues[index] !== null && summerValues[index] !== null,
-    ).length;
-
-    const summary = {
-      totalSamples: total,
-      cedar: { count: cedarCount, pct: Math.round(cedarPct * 100) },
-      oak: { count: oakCount, pct: Math.round((oakCount / total) * 100) },
-      mixedBrush: { count: mixedCount, pct: Math.round((mixedCount / total) * 100) },
-      grass: { count: grassCount, pct: Math.round((grassCount / total) * 100) },
-      bare: { count: bareCount, pct: Math.round((bareCount / total) * 100) },
-      estimatedCedarAcres: Math.round(cedarPct * ac * 10) / 10,
-      averageNDVI: Math.round(avgNdvi * 1000) / 1000,
-      averageGNDVI: Math.round(avgGndvi * 1000) / 1000,
-      averageSAVI: Math.round(avgSavi * 1000) / 1000,
-      confidence: Math.round(avgConf * 100),
-      avgBandVotes: Math.round(avgBandVotes * 10) / 10,
-      highConfidenceCedarCells: highConfCedar,
-      gridSpacingM: CEDAR_GRID_SPACING_M,
-      lowTrustCells: lowTrustCount,
-      lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
-        hiResImagery: {
-          used: Boolean(hiResImage),
-          source: 'esri-world-imagery',
-        },
-      tileConsensus: {
-        tileCount,
-        tileOverlapPct: 60,
-        tileSizePixels: 5,
-        tileSizeM: Math.round(CEDAR_GRID_SPACING_M * 5),
-        stridePixels: 2,
-        strideM: Math.round(CEDAR_GRID_SPACING_M * 2),
-        consensusImprovedCells,
-        consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
-      },
-      sentinelFusion: {
-        used: Boolean(winterSample || summerSample),
-        pairedSamples,
-        winterDate: winterScene ? sceneMeta(winterScene).datetime : undefined,
-        summerDate: summerScene ? sceneMeta(summerScene).datetime : undefined,
-        winterSceneId: winterScene?.id,
-        summerSceneId: summerScene?.id,
-      },
-    };
-
-    return NextResponse.json(
-      { gridCells, summary },
-      { headers: { 'Cache-Control': 'private, max-age=3600' } }
-    );
   } catch (err) {
     return NextResponse.json(
       {
