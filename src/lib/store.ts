@@ -33,6 +33,46 @@ function generateBidNumber(): string {
   return `CCC-${y}${m}-${seq}`;
 }
 
+function bboxFromCoords(coords: number[][][]): [number, number, number, number] {
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+
+  for (const ring of coords) {
+    for (const [lng, lat] of ring) {
+      if (lng < minLng) minLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lng > maxLng) maxLng = lng;
+      if (lat > maxLat) maxLat = lat;
+    }
+  }
+
+  return [minLng, minLat, maxLng, maxLat];
+}
+
+function activeProcessIndexForPhase(phase: string): number {
+  switch (phase) {
+    case 'init':
+      return 0;
+    case 'grid':
+    case 'sampling':
+      return 1;
+    case 'sentinel':
+      return 2;
+    case 'consensus':
+    case 'building':
+      return 3;
+    case 'applying':
+    case 'trees':
+      return 4;
+    case 'done':
+      return 5;
+    default:
+      return 0;
+  }
+}
+
 function createDefaultPasture(sortOrder: number): Pasture {
   return {
     id: uuidv4(),
@@ -107,12 +147,18 @@ interface BidStore {
     pct: number;
     percent?: number;
     phase: string;
+    phaseLabel?: string;
+    startedAt?: number;
+    focusBbox?: [number, number, number, number];
+    focusKey?: string;
     cedarCount?: number;
     oakCount?: number;
     totalPoints?: number;
     completed?: number;
     /** Extra pipeline description (large pastures / multi-region runs) */
     processLines?: string[];
+    activeProcessIndex?: number;
+    debugLines?: string[];
   } | null;
 
   // All saved bids (Supabase primary, localStorage fallback)
@@ -558,6 +604,19 @@ export const useBidStore = create<BidStore>((set, get) => ({
     const chunkKeys = chunkCoords.map((c) => hashChunkPolygonCoords(c[0]));
     const totalChunks = chunkCoords.length;
     const polygonHash = hashPasturePolygon(pasture.polygon.geometry.coordinates);
+    const analysisStartedAt = Date.now();
+    const pastureBbox = bboxFromCoords(pasture.polygon.geometry.coordinates);
+
+    const setSpectralProgress = (progress: Omit<NonNullable<BidStore['analysisProgress']>, 'active'>) => {
+      set({
+        analysisProgress: {
+          active: true,
+          ...progress,
+          activeProcessIndex:
+            progress.activeProcessIndex ?? activeProcessIndexForPhase(progress.phase),
+        },
+      });
+    };
 
     // Sparse array: null = not yet attempted or failed; CedarAnalysis = success
     const parts: (CedarAnalysis | null)[] = new Array(totalChunks).fill(null);
@@ -593,16 +652,17 @@ export const useBidStore = create<BidStore>((set, get) => ({
           `Resuming spectral analysis: ${completedCount} of ${totalChunks} regions already complete, ${pendingIndices.length} remaining.`,
           { duration: 6000 }
         );
-        set({
-          analysisProgress: {
-            active: true,
-            phase: 'init',
-            step: 'Resuming spectral analysis…',
-            detail: `${completedCount} of ${totalChunks} regions restored — continuing where you left off`,
-            pct: Math.round((completedCount / totalChunks) * 90),
-            percent: Math.round((completedCount / totalChunks) * 90),
-            processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-          },
+        setSpectralProgress({
+          phase: 'init',
+          step: 'Resuming spectral analysis…',
+          detail: `${completedCount} of ${totalChunks} regions restored — continuing where you left off`,
+          pct: Math.round((completedCount / totalChunks) * 90),
+          percent: Math.round((completedCount / totalChunks) * 90),
+          startedAt: analysisStartedAt,
+          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+          focusBbox: pastureBbox,
+          focusKey: `pasture-${pastureId}`,
+          debugLines: [`resume restored ${completedCount}/${totalChunks} completed regions`],
         });
       } else if (completedCount === totalChunks) {
         // All chunks already done — re-apply (edge case: user re-ran after complete)
@@ -613,19 +673,20 @@ export const useBidStore = create<BidStore>((set, get) => ({
     if (pendingIndices.length > 0) {
       const completedCount = totalChunks - pendingIndices.length;
       if (completedCount === 0) {
-        set({
-          analysisProgress: {
-            active: true,
-            phase: 'init',
-            step: 'Initializing spectral analysis…',
-            detail:
-              totalChunks > 1
-                ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, 15 m cells). Progress is saved after each region — you can resume if interrupted.`
-                : `Scanning ~${Math.round(pasture.acreage)} acres at 15 m resolution`,
-            pct: 0,
-            percent: 0,
-            processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-          },
+        setSpectralProgress({
+          phase: 'init',
+          step: 'Initializing spectral analysis…',
+          detail:
+            totalChunks > 1
+              ? `${totalChunks} regions (~${Math.round(pasture.acreage)} ac total, 15 m cells). Progress is saved after each region — you can resume if interrupted.`
+              : `Scanning ~${Math.round(pasture.acreage)} acres at 15 m resolution`,
+          pct: 0,
+          percent: 0,
+          startedAt: analysisStartedAt,
+          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+          focusBbox: pastureBbox,
+          focusKey: `pasture-${pastureId}`,
+          debugLines: [`${totalChunks} region(s) queued`, `polygon hash ${polygonHash.slice(0, 8)}`],
         });
       }
     }
@@ -637,7 +698,21 @@ export const useBidStore = create<BidStore>((set, get) => ({
     const processChunk = async (i: number): Promise<boolean> => {
       const coords = chunkCoords[i];
       const chunkAcres = polygonAcreage(coords);
+      const chunkBbox = bboxFromCoords(coords);
       console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks}: ${chunkAcres.toFixed(1)} ac`);
+
+      setSpectralProgress({
+        phase: 'sampling',
+        step: totalChunks > 1 ? `Scanning region ${i + 1} of ${totalChunks}` : 'Scanning pasture cells',
+        detail: `${chunkAcres.toFixed(1)} acres in view — fetching NAIP, hi-res imagery, and seasonal cues`,
+        pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+        percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+        startedAt: analysisStartedAt,
+        processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+        focusBbox: chunkBbox,
+        focusKey: `chunk-${i}`,
+        debugLines: [`region ${i + 1}/${totalChunks}`, `${chunkAcres.toFixed(1)} ac`],
+      });
 
       try {
         const chunkData = await fetchCedarDetectChunkWithRetry(
@@ -651,20 +726,26 @@ export const useBidStore = create<BidStore>((set, get) => ({
             const effectiveIndex = completedSoFar;
             const pct = scaledChunkProgress(effectiveIndex, totalChunks, innerPct);
             const msg = (payload.message as string) || 'Processing…';
-            set({
-              analysisProgress: {
-                active: true,
-                phase: (payload.phase as string) || 'sampling',
-                step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
-                detail: (payload.detail as string) || '',
-                pct,
-                percent: pct,
-                cedarCount: payload.cedarCount as number | undefined,
-                oakCount: payload.oakCount as number | undefined,
-                totalPoints: payload.totalPoints as number | undefined,
-                completed: payload.completed as number | undefined,
-                processLines: totalChunks > 1 ? spectralProcessLines : undefined,
-              },
+            const phase = (payload.phase as string) || 'sampling';
+            setSpectralProgress({
+              phase,
+              step: totalChunks > 1 ? `[Region ${i + 1}/${totalChunks}] ${msg}` : msg,
+              detail: (payload.detail as string) || '',
+              pct,
+              percent: pct,
+              startedAt: analysisStartedAt,
+              cedarCount: payload.cedarCount as number | undefined,
+              oakCount: payload.oakCount as number | undefined,
+              totalPoints: payload.totalPoints as number | undefined,
+              completed: payload.completed as number | undefined,
+              processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+              focusBbox: chunkBbox,
+              focusKey: `chunk-${i}`,
+              debugLines: [
+                `region ${i + 1}/${totalChunks}`,
+                `phase ${phase}`,
+                `progress ${Math.round(innerPct)}%`,
+              ],
             });
           }
         );
@@ -687,6 +768,18 @@ export const useBidStore = create<BidStore>((set, get) => ({
       } catch (chunkErr) {
         const msg = chunkErr instanceof Error ? chunkErr.message : 'Spectral analysis failed';
         console.error(`[analyzeCedar] chunk ${i + 1}/${totalChunks} FAILED: ${msg}`);
+        setSpectralProgress({
+          phase: 'retry',
+          step: `Region ${i + 1} failed — preparing retry`,
+          detail: msg,
+          pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+          percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+          startedAt: analysisStartedAt,
+          processLines: spectralProcessLines,
+          focusBbox: chunkBbox,
+          focusKey: `chunk-${i}`,
+          debugLines: [`region ${i + 1}/${totalChunks}`, msg],
+        });
         return false;
       }
     };
@@ -713,16 +806,17 @@ export const useBidStore = create<BidStore>((set, get) => ({
         const backoffMs = RETRY_BASE_MS + round * RETRY_INCREMENT_MS + Math.random() * RETRY_JITTER_MS;
         console.log(`[analyzeCedar] retry round ${round + 1}: ${retryQueue.length} chunks, backoff ${Math.round(backoffMs)}ms`);
 
-        set({
-          analysisProgress: {
-            active: true,
-            phase: 'retry',
-            step: `Retrying ${retryQueue.length} failed region(s)…`,
-            detail: `Retry round ${round + 1} of ${CHUNK_RETRY_ROUNDS} — waiting ${Math.round(backoffMs / 1000)}s before retrying`,
-            pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
-            percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
-            processLines: spectralProcessLines,
-          },
+        setSpectralProgress({
+          phase: 'retry',
+          step: `Retrying ${retryQueue.length} failed region(s)…`,
+          detail: `Retry round ${round + 1} of ${CHUNK_RETRY_ROUNDS} — waiting ${Math.round(backoffMs / 1000)}s before retrying`,
+          pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+          percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
+          startedAt: analysisStartedAt,
+          processLines: spectralProcessLines,
+          focusBbox: pastureBbox,
+          focusKey: `pasture-${pastureId}`,
+          debugLines: retryQueue.map((idx) => `retry pending region ${idx + 1}/${totalChunks}`),
         });
 
         await new Promise((r) => setTimeout(r, backoffMs));
@@ -767,30 +861,32 @@ export const useBidStore = create<BidStore>((set, get) => ({
         await clearCedarChunkResumeHybrid(bidId, pastureId);
       }
 
-      set({
-        analysisProgress: {
-          active: true,
-          phase: 'applying',
-          step: 'Applying results to map…',
-          detail: failedIndices.length > 0
-            ? `${failedIndices.length} of ${totalChunks} regions failed — partial results applied`
-            : '',
-          pct: 96,
-          percent: 96,
-          totalPoints: resultData.summary?.totalSamples,
-        },
+      setSpectralProgress({
+        phase: 'applying',
+        step: 'Applying results to map…',
+        detail: failedIndices.length > 0
+          ? `${failedIndices.length} of ${totalChunks} regions failed — partial results applied`
+          : 'Building cedar grid and painting results on the map',
+        pct: 96,
+        percent: 96,
+        startedAt: analysisStartedAt,
+        totalPoints: resultData.summary?.totalSamples,
+        focusBbox: pastureBbox,
+        focusKey: `pasture-${pastureId}`,
+        debugLines: [`successful regions ${successParts.length}/${totalChunks}`],
       });
       get().updatePasture(pastureId, { cedarAnalysis: resultData });
 
-      set({
-        analysisProgress: {
-          active: true,
-          phase: 'trees',
-          step: 'Generating 3D tree positions…',
-          detail: 'Placing trees from spectral data',
-          pct: 98,
-          percent: 98,
-        },
+      setSpectralProgress({
+        phase: 'trees',
+        step: 'Generating 3D tree positions…',
+        detail: 'Placing trees from spectral data',
+        pct: 98,
+        percent: 98,
+        startedAt: analysisStartedAt,
+        focusBbox: pastureBbox,
+        focusKey: `pasture-${pastureId}`,
+        debugLines: [`total cells ${resultData.summary?.totalSamples ?? 0}`],
       });
 
       const updatedPasture = get().currentBid.pastures.find((p) => p.id === pastureId);
@@ -814,15 +910,16 @@ export const useBidStore = create<BidStore>((set, get) => ({
             canopyDiameter: t.canopyDiameter,
           }));
         if (cedarTrees.length > 0) {
-          set({
-            analysisProgress: {
-              active: true,
-              phase: 'trees',
-              step: 'Auto-marking cedars',
-              detail: `Marking ${cedarTrees.length} cedar trees for removal (adjust on the map if needed)`,
-              pct: 99,
-              percent: 99,
-            },
+          setSpectralProgress({
+            phase: 'trees',
+            step: 'Auto-marking cedars',
+            detail: `Marking ${cedarTrees.length} cedar trees for removal (adjust on the map if needed)`,
+            pct: 99,
+            percent: 99,
+            startedAt: analysisStartedAt,
+            focusBbox: pastureBbox,
+            focusKey: `pasture-${pastureId}`,
+            debugLines: [`marked cedar trees ${cedarTrees.length}`],
           });
           get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
@@ -833,16 +930,19 @@ export const useBidStore = create<BidStore>((set, get) => ({
         ? `${s.cedar.pct}% cedar · ~${s.estimatedCedarAcres} cedar ac · ${s.totalSamples} cells — ⚠ ${failedIndices.length} region(s) failed. Run again to retry.`
         : `${s.cedar.pct}% cedar · ${s.oak?.pct ?? 0}% oak · ~${s.estimatedCedarAcres} cedar ac (mulch) of ${Math.round(pasture.acreage)} ac · ${s.totalSamples} cells`;
 
-      set({
-        analysisProgress: {
-          active: true,
-          phase: 'done',
-          step: failedIndices.length > 0 ? 'Analysis complete (partial)' : 'Analysis complete',
-          detail: doneDetail,
-          pct: 100,
-          percent: 100,
-          totalPoints: s.totalSamples,
-        },
+      setSpectralProgress({
+        phase: 'done',
+        step: failedIndices.length > 0 ? 'Analysis complete (partial)' : 'Analysis complete',
+        detail: doneDetail,
+        pct: 100,
+        percent: 100,
+        startedAt: analysisStartedAt,
+        totalPoints: s.totalSamples,
+        focusBbox: pastureBbox,
+        focusKey: `pasture-${pastureId}`,
+        debugLines: failedIndices.length > 0
+          ? failedIndices.map((idx) => `failed region ${idx + 1}/${totalChunks}`)
+          : [`cedar ${s.cedar.pct}%`, `oak ${s.oak?.pct ?? 0}%`, `cells ${s.totalSamples}`],
       });
       console.log(`[analyzeCedar] complete — displayed to user`);
 
@@ -868,7 +968,22 @@ export const useBidStore = create<BidStore>((set, get) => ({
           duration: 9000,
         });
       }
-      set({ analysisProgress: null });
+      const failedRegionDebug = failedIndices.length > 0
+        ? failedIndices.map((idx) => `failed region ${idx + 1}/${totalChunks}`)
+        : ['no chunk completed successfully'];
+      setSpectralProgress({
+        phase: 'error',
+        step: 'Analysis failed',
+        detail: msg,
+        pct: Math.round((successCount / Math.max(totalChunks, 1)) * 100),
+        percent: Math.round((successCount / Math.max(totalChunks, 1)) * 100),
+        startedAt: analysisStartedAt,
+        focusBbox: pastureBbox,
+        focusKey: `pasture-${pastureId}`,
+        processLines: spectralProcessLines,
+        debugLines: [`successful regions ${successCount}/${totalChunks}`, ...failedRegionDebug],
+      });
+      setTimeout(() => set({ analysisProgress: null }), 12000);
     }
   },
 

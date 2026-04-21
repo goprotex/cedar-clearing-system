@@ -50,6 +50,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const drawRef = useRef<MapboxDraw | null>(null);
   const [mapStyleLoaded, setMapStyleLoaded] = useState(false);
   const lastFlyToPastureRef = useRef<string | null>(null);
+  const lastAnalysisFocusRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
   const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
@@ -1014,6 +1015,29 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     );
   }, [selectedPastureId, currentBid.pastures]);
 
+  // ── Follow the region currently being processed during spectral analysis ──
+  useEffect(() => {
+    const map = mapRef.current;
+    const focusBbox = analysisProgress?.focusBbox;
+    const focusKey = analysisProgress?.focusKey;
+    if (!map || !focusBbox || !focusKey || !analysisProgress?.active) return;
+    if (lastAnalysisFocusRef.current === focusKey) return;
+
+    lastAnalysisFocusRef.current = focusKey;
+    map.fitBounds(
+      [
+        [focusBbox[0], focusBbox[1]],
+        [focusBbox[2], focusBbox[3]],
+      ],
+      {
+        padding: { top: 110, right: 80, bottom: 110, left: 80 },
+        maxZoom: analysisProgress.phase === 'sampling' ? 18 : 17,
+        duration: 900,
+        essential: true,
+      },
+    );
+  }, [analysisProgress?.active, analysisProgress?.focusBbox, analysisProgress?.focusKey, analysisProgress?.phase]);
+
   return (
     <div className={`relative w-full h-full ${layers.hologram ? 'hologram-mode' : ''}`}>
       <div ref={mapContainerRef} className="w-full h-full" />
@@ -1207,6 +1231,23 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       {/* Apple Glass–style analysis progress overlay */}
       {analysisProgress?.active && (() => {
         const progressPct = analysisProgress.percent ?? analysisProgress.pct;
+        const elapsedSec = analysisProgress.startedAt
+          ? Math.max(0, Math.round((Date.now() - analysisProgress.startedAt) / 1000))
+          : null;
+        const phaseCode =
+          analysisProgress.phase === 'soil' ? 'SOIL_DATA' :
+          analysisProgress.phase === 'elevation' ? 'ELEVATION' :
+          analysisProgress.phase === 'grid' ? 'GRID' :
+          analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
+          analysisProgress.phase === 'consensus' ? 'TILE_CONSENSUS' :
+          analysisProgress.phase === 'sentinel' ? 'S2_FUSION' :
+          analysisProgress.phase === 'building' ? 'BUILD_GRID' :
+          analysisProgress.phase === 'applying' ? 'APPLY_MAP' :
+          analysisProgress.phase === 'trees' ? 'TREES_3D' :
+          analysisProgress.phase === 'retry' ? 'RETRY' :
+          analysisProgress.phase === 'error' ? 'ERROR' :
+          analysisProgress.phase === 'done' ? 'COMPLETE' :
+          analysisProgress.phase === 'init' ? 'START' : 'INITIALIZING';
         return (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="w-[340px] backdrop-blur-xl bg-black/60 border border-white/10 rounded-3xl shadow-[0_8px_60px_rgba(0,255,65,0.15)] px-7 py-6 space-y-4 pointer-events-auto">
@@ -1224,23 +1265,16 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-green-400">
                   {progressPct}%
                 </span>
+                {analysisProgress.phase !== 'done' && analysisProgress.phase !== 'error' && (
+                  <span className="absolute inset-2 rounded-full border border-green-400/30 animate-ping" />
+                )}
               </div>
               <div className="min-w-0">
                 <div className="text-white/90 font-semibold text-sm truncate">
                   {analysisProgress.step}
                 </div>
                 <div className="text-white/40 text-[11px] font-medium">
-                  {analysisProgress.phase === 'soil' ? 'SOIL_DATA' :
-                   analysisProgress.phase === 'elevation' ? 'ELEVATION' :
-                   analysisProgress.phase === 'grid' ? 'GRID' :
-                   analysisProgress.phase === 'sampling' ? 'SPECTRAL_SCAN' :
-                   analysisProgress.phase === 'consensus' ? 'TILE_CONSENSUS' :
-                   analysisProgress.phase === 'sentinel' ? 'S2_FUSION' :
-                   analysisProgress.phase === 'building' ? 'BUILD_GRID' :
-                   analysisProgress.phase === 'applying' ? 'APPLY_MAP' :
-                   analysisProgress.phase === 'trees' ? 'TREES_3D' :
-                   analysisProgress.phase === 'done' ? 'COMPLETE' :
-                   analysisProgress.phase === 'init' ? 'START' : 'INITIALIZING'}
+                  {phaseCode}
                 </div>
               </div>
             </div>
@@ -1253,14 +1287,21 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                   width: `${progressPct}%`,
                   background: analysisProgress.phase === 'done'
                     ? 'linear-gradient(90deg, #00ff41, #33ff66)'
+                    : analysisProgress.phase === 'error'
+                    ? 'linear-gradient(90deg, #ef4444, #f97316)'
                     : 'linear-gradient(90deg, #00ff41, #00cc33)',
                   boxShadow: '0 0 12px rgba(0,255,65,0.4)',
                 }}
               />
             </div>
 
+            <div className="flex items-center justify-between text-[10px] text-white/35 font-mono">
+              <span>{analysisProgress.phaseLabel ?? phaseCode}</span>
+              {elapsedSec !== null && <span>T+{elapsedSec}s</span>}
+            </div>
+
             {/* Stats row */}
-            {analysisProgress.phase === 'sampling' && (
+            {(analysisProgress.phase === 'sampling' || analysisProgress.phase === 'retry') && (
               <div className="flex justify-between text-[11px]">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_#00ff41]" />
@@ -1278,6 +1319,15 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
               </div>
             )}
 
+            {analysisProgress.phase === 'sampling' && (
+              <div className="relative h-8 overflow-hidden rounded-xl border border-green-400/10 bg-green-950/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-400/10 to-transparent animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-[0.25em] text-green-300/70">
+                  Centering active region and sampling live imagery
+                </div>
+              </div>
+            )}
+
             {/* Detail text */}
             {analysisProgress.detail && (
               <div className="text-white/30 text-[10px] text-center font-mono tracking-wide">
@@ -1286,11 +1336,33 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
             )}
 
             {analysisProgress.processLines && analysisProgress.processLines.length > 0 && (
-              <ul className="text-white/25 text-[10px] leading-snug space-y-1 border-t border-white/5 pt-3 list-disc pl-4 text-left">
+              <ul className="text-[10px] leading-snug space-y-1 border-t border-white/5 pt-3 list-disc pl-4 text-left">
                 {analysisProgress.processLines.map((line, idx) => (
-                  <li key={idx}>{line}</li>
+                  <li
+                    key={idx}
+                    className={
+                      idx === analysisProgress.activeProcessIndex
+                        ? 'text-green-300'
+                        : idx < (analysisProgress.activeProcessIndex ?? 0)
+                        ? 'text-white/45'
+                        : 'text-white/20'
+                    }
+                  >
+                    {line}
+                  </li>
                 ))}
               </ul>
+            )}
+
+            {analysisProgress.debugLines && analysisProgress.debugLines.length > 0 && (
+              <div className="border-t border-white/5 pt-3 space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.25em] text-white/25">Debug</div>
+                {analysisProgress.debugLines.map((line, idx) => (
+                  <div key={idx} className="text-[10px] text-white/35 font-mono leading-snug">
+                    {line}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
