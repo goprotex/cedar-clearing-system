@@ -234,6 +234,24 @@ function applyTileConsensusToFeatures(
     const winFraction = totalWeight > 0 ? bestWeight / totalWeight : 0;
     const originalClass = (props.classification as VegClass | undefined) ?? 'bare';
     const originalConfidence = Number(props.confidence ?? 0);
+    const originalBandVotes = Number(props.bandVotes ?? 0);
+    const originalWoody =
+      originalClass === 'cedar' ||
+      originalClass === 'oak' ||
+      originalClass === 'mixed_brush';
+    const preserveIsolatedWoody =
+      originalWoody &&
+      (originalBandVotes >= 3 || originalConfidence >= 0.62);
+
+    if (preserveIsolatedWoody && (bestClass === 'grass' || bestClass === 'bare')) {
+      return {
+        ...feature,
+        properties: {
+          ...props,
+          confidence: Math.round(Math.min(0.95, originalConfidence + winFraction * 0.05) * 100) / 100,
+        },
+      };
+    }
 
     if (bestClass !== originalClass) {
       consensusImprovedCells++;

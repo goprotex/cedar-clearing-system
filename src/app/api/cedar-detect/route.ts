@@ -440,6 +440,18 @@ function refineWithHiResImagery(
     hiRes.greenBias > 0.015 &&
     hiRes.chroma > 0.05;
 
+  const sparseCedar =
+    hiRes.brightness < 136 &&
+    hiRes.darkFrac > 0.09 &&
+    hiRes.textureVar > 0.006 &&
+    hiRes.greenBias > 0.006;
+
+  const sparseOak =
+    hiRes.brightness > 108 &&
+    hiRes.grayFrac > 0.18 &&
+    hiRes.textureVar > 0.005 &&
+    hiRes.darkFrac < 0.22;
+
   if (strongCedar) {
     return {
       classification: 'cedar',
@@ -447,10 +459,24 @@ function refineWithHiResImagery(
     };
   }
 
+  if (sparseCedar && ['grass', 'mixed_brush', 'bare'].includes(original.classification)) {
+    return {
+      classification: 'cedar',
+      confidence: Math.min(0.82, Math.max(original.confidence, 0.46) + hiRes.darkFrac * 0.16 + hiRes.textureVar * 4),
+    };
+  }
+
   if (strongOak && ['cedar', 'oak', 'mixed_brush'].includes(original.classification)) {
     return {
       classification: 'oak',
       confidence: Math.min(0.92, Math.max(original.confidence, 0.58) + hiRes.grayFrac * 0.16),
+    };
+  }
+
+  if (sparseOak && ['grass', 'mixed_brush', 'bare', 'cedar'].includes(original.classification)) {
+    return {
+      classification: 'oak',
+      confidence: Math.min(0.78, Math.max(original.confidence, 0.44) + hiRes.grayFrac * 0.12 + hiRes.textureVar * 3),
     };
   }
 
@@ -597,6 +623,21 @@ function applyTileConsensus(
 
     const totalWeight = Object.values(cw).reduce((a, b) => a + b, 0);
     const winFraction = totalWeight > 0 ? bestWeight / totalWeight : 0;
+
+    const originalWoody =
+      original.classification === 'cedar' ||
+      original.classification === 'oak' ||
+      original.classification === 'mixed_brush';
+    const preserveIsolatedWoody =
+      originalWoody &&
+      (original.bandVotes >= 3 || original.confidence >= 0.62);
+
+    if (preserveIsolatedWoody && (bestClass === 'grass' || bestClass === 'bare')) {
+      return {
+        ...original,
+        confidence: Math.round(Math.min(0.95, original.confidence + winFraction * 0.05) * 100) / 100,
+      };
+    }
 
     if (bestClass !== original.classification) {
       consensusImprovedCells++;

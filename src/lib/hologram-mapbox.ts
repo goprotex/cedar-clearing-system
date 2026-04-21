@@ -1,4 +1,4 @@
-// Native Mapbox GL layers for hologram mode — trees as fill-extrusion on terrain (no Three.js).
+// Native Mapbox GL layers for hologram mode — rounded tree shells via fill-extrusions aligned to terrain.
 
 import mapboxgl from 'mapbox-gl';
 import type { MarkedTree } from '@/types';
@@ -22,33 +22,79 @@ const TREE_SOURCE = 'holo-trees';
 const WALL_SOURCE = 'holo-walls';
 const MARK_SOURCE = 'holo-marks';
 
-function squareRingMeters(lng: number, lat: number, radiusM: number): GeoJSON.Position[] {
+function circleRingMeters(
+  lng: number,
+  lat: number,
+  radiusM: number,
+  segments = 14,
+): GeoJSON.Position[] {
   const metersPerDegLat = 111320;
   const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
-  const dx = radiusM / metersPerDegLng;
-  const dy = radiusM / metersPerDegLat;
-  return [
-    [lng - dx, lat - dy],
-    [lng + dx, lat - dy],
-    [lng + dx, lat + dy],
-    [lng - dx, lat + dy],
-    [lng - dx, lat - dy],
-  ];
+  const points: GeoJSON.Position[] = [];
+
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i / segments) * Math.PI * 2;
+    const dx = (Math.cos(theta) * radiusM) / metersPerDegLng;
+    const dy = (Math.sin(theta) * radiusM) / metersPerDegLat;
+    points.push([lng + dx, lat + dy]);
+  }
+
+  return points;
 }
 
 function treesToFeatureCollection(trees: TreePosition[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   for (const t of trees) {
-    const r = Math.max(t.canopyDiameter / 2, 1.5);
-    const ring = squareRingMeters(t.lng, t.lat, r);
+    const canopyRadius = Math.max(t.canopyDiameter / 2, 1.8);
+    const trunkRadius = Math.max(canopyRadius * 0.16, 0.45);
+    const totalHeight = Math.max(t.height, 2.5);
+    const trunkHeight = Math.max(totalHeight * 0.22, 1.2);
+    const shellColor = HOLO_COLORS[t.species];
+    const trunkColor = t.species === 'oak' ? '#7c4a18' : '#5a3312';
+
     features.push({
       type: 'Feature',
       properties: {
         species: t.species,
-        h: Math.max(t.height, 2),
+        color: trunkColor,
+        base: 0,
+        top: trunkHeight,
       },
-      geometry: { type: 'Polygon', coordinates: [ring] },
+      geometry: { type: 'Polygon', coordinates: [circleRingMeters(t.lng, t.lat, trunkRadius, 10)] },
     });
+
+    const shellProfile =
+      t.species === 'cedar'
+        ? [
+            { base: 0.16, top: 0.42, radius: 0.58 },
+            { base: 0.34, top: 0.7, radius: 0.92 },
+            { base: 0.6, top: 0.92, radius: 0.74 },
+            { base: 0.82, top: 1.06, radius: 0.42 },
+          ]
+        : [
+            { base: 0.18, top: 0.4, radius: 0.52 },
+            { base: 0.34, top: 0.68, radius: 0.86 },
+            { base: 0.56, top: 0.9, radius: 1.0 },
+            { base: 0.76, top: 1.04, radius: 0.7 },
+          ];
+
+    for (const shell of shellProfile) {
+      const base = trunkHeight + totalHeight * shell.base;
+      const top = trunkHeight + totalHeight * shell.top;
+      features.push({
+        type: 'Feature',
+        properties: {
+          species: t.species,
+          color: shellColor,
+          base,
+          top,
+        },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [circleRingMeters(t.lng, t.lat, canopyRadius * shell.radius)],
+        },
+      });
+    }
   }
   return { type: 'FeatureCollection', features };
 }
@@ -119,18 +165,10 @@ export class HologramMapboxLayers {
         type: 'fill-extrusion',
         source: TREE_SOURCE,
         paint: {
-          'fill-extrusion-height': ['get', 'h'],
-          'fill-extrusion-base': 0,
-          'fill-extrusion-color': [
-            'match',
-            ['get', 'species'],
-            'cedar',
-            HOLO_COLORS.cedar,
-            'oak',
-            HOLO_COLORS.oak,
-            HOLO_COLORS.mixed,
-          ],
-          'fill-extrusion-opacity': 0.88,
+          'fill-extrusion-height': ['get', 'top'],
+          'fill-extrusion-base': ['get', 'base'],
+          'fill-extrusion-color': ['get', 'color'],
+          'fill-extrusion-opacity': 0.92,
           'fill-extrusion-height-alignment': 'terrain',
           'fill-extrusion-base-alignment': 'terrain',
         },

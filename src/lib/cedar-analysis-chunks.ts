@@ -1,16 +1,17 @@
 import * as turf from '@turf/turf';
 import type { Feature, Polygon, MultiPolygon, Position } from 'geojson';
 
-/** Matches cedar-detect route: 45 m point grid → ~2025 m² per sample cell */
-export const CEDAR_GRID_SPACING_M = 45;
+/** Matches cedar-detect route: 15 m point grid → ~225 m² per sample cell */
+export const CEDAR_GRID_SPACING_M = 15;
 export const CEDAR_GRID_SPACING_KM = CEDAR_GRID_SPACING_M / 1000;
 const SAMPLES_PER_CELL_EST = CEDAR_GRID_SPACING_M * CEDAR_GRID_SPACING_M;
 
 /**
  * Target max samples per /api/cedar-detect invocation so each chunk finishes
- * comfortably within serverless limits (many sequential NAIP HTTP calls per chunk).
+ * comfortably within serverless limits while still running every refinement pass
+ * on smaller regions when users prefer fidelity over total processing time.
  */
-export const TARGET_SAMPLES_PER_CHUNK = 420;
+export const TARGET_SAMPLES_PER_CHUNK = 240;
 
 const MAX_SPLIT_DEPTH = 24;
 const MIN_SPLIT_DEG = 1e-7;
@@ -37,7 +38,7 @@ function intersectPair(a: Feature<Polygon>, b: Feature<Polygon>): Feature<Polygo
 
 /**
  * Recursively splits a pasture polygon until each piece is small enough that the
- * 45 m grid in cedar-detect will stay under TARGET_SAMPLES_PER_CHUNK.
+ * 15 m grid in cedar-detect will stay under TARGET_SAMPLES_PER_CHUNK.
  */
 /** Pasture area in acres (matches cedar-detect `turf.area / 4047`). */
 export function polygonAcreage(coords: Position[][]): number {
@@ -85,7 +86,7 @@ export function getCedarAnalysisChunkPolygons(coords: Position[][]): Position[][
   const areaM2 = turf.area(poly);
   const samples = estimateSampleCount(areaM2);
 
-  // ~One 45 m cell — second chunk would be empty
+  // ~One 15 m cell — second chunk would be empty
   if (samples <= 1) {
     return [coords];
   }

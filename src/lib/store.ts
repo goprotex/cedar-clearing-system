@@ -649,10 +649,6 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
       const completedCount = totalChunks - pendingIndices.length;
       if (completedCount > 0 && pendingIndices.length > 0) {
-        toast.info(
-          `Resuming spectral analysis: ${completedCount} of ${totalChunks} regions already complete, ${pendingIndices.length} remaining.`,
-          { duration: 6000 }
-        );
         setSpectralProgress({
           phase: 'init',
           step: 'Resuming spectral analysis…',

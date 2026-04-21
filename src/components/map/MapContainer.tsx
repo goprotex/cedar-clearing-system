@@ -51,6 +51,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
   const [mapStyleLoaded, setMapStyleLoaded] = useState(false);
   const lastFlyToPastureRef = useRef<string | null>(null);
   const lastAnalysisFocusRef = useRef<string | null>(null);
+  const lastCinematicAnalysisRef = useRef<string | null>(null);
   const preHoloLayersRef = useRef<Record<string, boolean> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
   const treeLayerRef = useRef<HologramMapboxLayers | null>(null);
@@ -481,7 +482,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     }
 
     // Toggle cedar AI overlay (flat fill + extrusion + border)
-    const cedarVisible = layers.cedarAI || layers.hologram;
+    const cedarVisible = layers.cedarAI;
     for (const cedarLayerId of ['cedar-flat', 'cedar-fill', 'cedar-border']) {
       const layer = map.getLayer(cedarLayerId);
       if (layer) {
@@ -489,49 +490,23 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-    // Hologram: bright green flat fill + optional extrusion + thick borders
-    if (layers.hologram) {
-      const holoColorExpr = [
-        'match', ['get', 'classification'],
-        'cedar', '#00ff41',
-        'oak', '#ffaa00',
-        'mixed_brush', '#22dd44',
-        '#00ff41',
-      ] as mapboxgl.Expression;
-
-      if (map.getLayer('cedar-flat')) {
-        map.setPaintProperty('cedar-flat', 'fill-color', holoColorExpr);
-        map.setPaintProperty('cedar-flat', 'fill-opacity', 0.7);
-      }
-      if (map.getLayer('cedar-fill')) {
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-color', holoColorExpr);
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', 0.6);
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 6);
-      }
-      if (map.getLayer('cedar-border')) {
-        map.setPaintProperty('cedar-border', 'line-color', holoColorExpr);
-        map.setPaintProperty('cedar-border', 'line-opacity', 0.9);
-        map.setPaintProperty('cedar-border', 'line-width', 1.5);
-      }
-    } else {
-      if (map.getLayer('cedar-flat')) {
-        map.setPaintProperty('cedar-flat', 'fill-color', ['get', 'color']);
-        map.setPaintProperty('cedar-flat', 'fill-opacity', opacities.cedarAI * 0.8);
-      }
-      if (map.getLayer('cedar-fill')) {
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-color', ['get', 'color']);
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', opacities.cedarAI);
-        map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 2);
-      }
-      if (map.getLayer('cedar-border')) {
-        map.setPaintProperty('cedar-border', 'line-color', ['get', 'color']);
-        map.setPaintProperty('cedar-border', 'line-opacity', 0.5);
-        map.setPaintProperty('cedar-border', 'line-width', 0.5);
-      }
+    if (map.getLayer('cedar-flat')) {
+      map.setPaintProperty('cedar-flat', 'fill-color', ['get', 'color']);
+      map.setPaintProperty('cedar-flat', 'fill-opacity', opacities.cedarAI * 0.8);
+    }
+    if (map.getLayer('cedar-fill')) {
+      map.setPaintProperty('cedar-fill', 'fill-extrusion-color', ['get', 'color']);
+      map.setPaintProperty('cedar-fill', 'fill-extrusion-opacity', opacities.cedarAI);
+      map.setPaintProperty('cedar-fill', 'fill-extrusion-height', 2);
+    }
+    if (map.getLayer('cedar-border')) {
+      map.setPaintProperty('cedar-border', 'line-color', ['get', 'color']);
+      map.setPaintProperty('cedar-border', 'line-opacity', 0.5);
+      map.setPaintProperty('cedar-border', 'line-width', 0.5);
     }
 
-    // Toggle 3D terrain (disabled when hologram is on)
-    if (layers.terrain3d && !layers.hologram) {
+    // Toggle 3D terrain. Hologram trees use terrain-aligned Mapbox extrusions, so terrain stays on.
+    if (layers.terrain3d || layers.hologram) {
       map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
       if (!map.getLayer('sky')) {
         map.addLayer({
@@ -637,8 +612,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         tl.setSpeciesVisible(sp, speciesVisible[sp]);
       }
 
-      // Move 2D hologram layers above the 3D tree layer so they render on top
-      for (const layerId of ['cedar-flat', 'cedar-fill', 'cedar-border', 'holo-mask-fill', 'pastures-fill', 'pastures-border', 'pastures-labels']) {
+      // Keep the hologram framing layers above the terrain-aligned tree shells.
+      for (const layerId of ['holo-mask-fill', 'pastures-fill', 'pastures-border', 'pastures-labels']) {
         if (map.getLayer(layerId)) {
           map.moveLayer(layerId);
         }
@@ -698,7 +673,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
       }
     }
 
-  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter]);
+  }, [layers, opacities, speciesVisible, currentBid.pastures, currentBid.propertyCenter, mapStyleLoaded]);
 
   // ── Sync overlay layers visibility + opacity ──
   useEffect(() => {
@@ -773,27 +748,32 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.naipNDVI = false;
         }
       }
-      // Hologram: disable 3D terrain, switch to NDVI base map, keep cedar AI visible
+      // Hologram: switch to the terrain + NDVI cinematic state and hide the AI grid.
       if (key === 'hologram' && !prev.hologram) {
-        preHoloLayersRef.current = { naip: prev.naip, naipCIR: prev.naipCIR, naipNDVI: prev.naipNDVI, terrain3d: prev.terrain3d, cedarAI: prev.cedarAI };
-        next.terrain3d = false;
+        preHoloLayersRef.current = {
+          soil: prev.soil,
+          naip: prev.naip,
+          naipCIR: prev.naipCIR,
+          naipNDVI: prev.naipNDVI,
+          terrain3d: prev.terrain3d,
+          cedarAI: prev.cedarAI,
+        };
+        next.soil = true;
+        next.terrain3d = true;
         next.naip = false;
         next.naipCIR = false;
         next.naipNDVI = true;
-        next.cedarAI = true;
+        next.cedarAI = false;
         const map = mapRef.current;
         if (map) {
-          map.easeTo({ pitch: 60, bearing: map.getBearing() || -20, duration: 1200 });
+          map.easeTo({ pitch: 45, bearing: map.getBearing() || -20, duration: 1200 });
         }
-      }
-      // Block 3D terrain while hologram is active
-      if (key === 'terrain3d' && prev.hologram) {
-        return prev;
       }
       // Restore previous state when hologram turns off
       if (key === 'hologram' && prev.hologram) {
         const saved = preHoloLayersRef.current;
         if (saved) {
+          next.soil = saved.soil;
           next.naip = saved.naip;
           next.naipCIR = saved.naipCIR;
           next.naipNDVI = saved.naipNDVI;
@@ -801,6 +781,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
           next.cedarAI = saved.cedarAI;
           preHoloLayersRef.current = null;
         }
+        setAutoRotate(false);
         const map = mapRef.current;
         if (map) {
           map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
@@ -1038,6 +1019,50 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     );
   }, [analysisProgress?.active, analysisProgress?.focusBbox, analysisProgress?.focusKey, analysisProgress?.phase]);
 
+  // ── Auto-enter cinematic terrain/hologram mode after spectral analysis completes ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || analysisProgress?.phase !== 'done' || !analysisProgress.active) return;
+
+    const cinematicKey = `${analysisProgress.startedAt ?? 0}-${analysisProgress.focusKey ?? 'pasture'}`;
+    if (lastCinematicAnalysisRef.current === cinematicKey) return;
+    lastCinematicAnalysisRef.current = cinematicKey;
+
+    setLayers((prev) => {
+      if (prev.hologram && prev.terrain3d && prev.soil && prev.naipNDVI && !prev.cedarAI) {
+        return prev;
+      }
+
+      if (!prev.hologram) {
+        preHoloLayersRef.current = {
+          soil: prev.soil,
+          naip: prev.naip,
+          naipCIR: prev.naipCIR,
+          naipNDVI: prev.naipNDVI,
+          terrain3d: prev.terrain3d,
+          cedarAI: prev.cedarAI,
+        };
+      }
+
+      return {
+        ...prev,
+        soil: true,
+        terrain3d: true,
+        naip: false,
+        naipCIR: false,
+        naipNDVI: true,
+        cedarAI: false,
+        hologram: true,
+      };
+    });
+
+    setAutoRotate(true);
+    window.setTimeout(() => {
+      if (!mapRef.current) return;
+      mapRef.current.easeTo({ pitch: 45, bearing: mapRef.current.getBearing() || -20, duration: 1600 });
+    }, 60);
+  }, [analysisProgress?.active, analysisProgress?.phase, analysisProgress?.startedAt, analysisProgress?.focusKey]);
+
   return (
     <div className={`relative w-full h-full ${layers.hologram ? 'hologram-mode' : ''}`}>
       <div ref={mapContainerRef} className="w-full h-full" />
@@ -1117,8 +1142,7 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 label: 'Analysis',
                 emoji: '🔬',
                 layers: [
-                  { key: 'terrain3d', label: layers.hologram ? '3D Terrain (off in hologram)' : '3D Terrain', emoji: '⛰️', active: layers.terrain3d, opacity: opacities.terrain3d, opacityRange: [0.5, 2.5] as [number, number], opacityStep: 0.1, disabled: layers.hologram, onToggle: () => toggleLayer('terrain3d'), onOpacity: (v) => setOpacities((p) => ({ ...p, terrain3d: v })) },
-                  { key: 'cedarAI', label: 'AI Cedar Detect', emoji: '🤖', active: layers.cedarAI, opacity: opacities.cedarAI, onToggle: () => toggleLayer('cedarAI'), onOpacity: (v) => setOpacities((p) => ({ ...p, cedarAI: v })) },
+                  { key: 'terrain3d', label: '3D Terrain', emoji: '⛰️', active: layers.terrain3d, opacity: opacities.terrain3d, opacityRange: [0.5, 2.5] as [number, number], opacityStep: 0.1, onToggle: () => toggleLayer('terrain3d'), onOpacity: (v) => setOpacities((p) => ({ ...p, terrain3d: v })) },
                   { key: 'hologram', label: 'Hologram', emoji: '🔮', active: layers.hologram, opacity: opacities.hologram, onToggle: () => toggleLayer('hologram'), onOpacity: (v) => setOpacities((p) => ({ ...p, hologram: v })) },
                 ],
               },
