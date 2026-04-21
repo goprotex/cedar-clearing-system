@@ -116,7 +116,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-wildfire-risk',
     layerId: 'overlay-wildfire-risk-raster',
     tileUrl:
-      'https://apps.fs.usda.gov/arcx/rest/services/RDW_Wildfire/ProbabilisticWildfireRisk/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
+      'https://apps.fs.usda.gov/arcgis/rest/services/RDW_Wildfire/ProbabilisticWildfireRisk/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
     defaultOpacity: 0.55,
     attribution: 'USFS',
   },
@@ -128,7 +128,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-burn-history',
     layerId: 'overlay-burn-history-raster',
     tileUrl:
-      'https://apps.fs.usda.gov/arcx/rest/services/RDW_Wildfire/MTBS_BurnSeverity/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
+      'https://apps.fs.usda.gov/arcgis/rest/services/RDW_Wildfire/MTBS_BurnSeverity/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
     defaultOpacity: 0.55,
     attribution: 'USFS MTBS',
   },
@@ -139,10 +139,12 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     category: 'hazards',
     sourceId: 'overlay-burn-ban',
     layerId: 'overlay-burn-ban-raster',
+    // NIFC (National Interagency Fire Center) active fire perimeters — replaces
+    // retired USGS GeoMAC service (shut down 2020)
     tileUrl:
-      'https://wildfire.usgs.gov/arcgis/rest/services/geomac_dyn/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
+      'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Current_WildlandFire_Perimeters/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.5,
-    attribution: 'USGS GeoMAC',
+    attribution: 'NIFC',
   },
 
   /* ── Infrastructure ───────────────────────────────────────────── */
@@ -153,8 +155,9 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     category: 'infrastructure',
     sourceId: 'overlay-gas-pipelines',
     layerId: 'overlay-gas-pipelines-raster',
+    // HIFLD tile cache — more reliable than MapServer/export for ArcGIS Online hosted services
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Pipelines_Hazardous_Liquids/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
+      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om6HgA/arcgis/rest/services/Pipelines_Hazardous_Liquids/MapServer/tile/{z}/{y}/{x}',
     defaultOpacity: 0.7,
     attribution: 'HIFLD / EIA',
   },
@@ -166,7 +169,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-transmission-lines',
     layerId: 'overlay-transmission-lines-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Electric_Power_Transmission_Lines/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
+      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om6HgA/arcgis/rest/services/Electric_Power_Transmission_Lines/MapServer/tile/{z}/{y}/{x}',
     defaultOpacity: 0.7,
     attribution: 'HIFLD',
   },
@@ -178,7 +181,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-substations',
     layerId: 'overlay-substations-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Electric_Substations/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
+      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om6HgA/arcgis/rest/services/Electric_Substations/MapServer/tile/{z}/{y}/{x}',
     defaultOpacity: 0.7,
     attribution: 'HIFLD',
   },
@@ -190,7 +193,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceId: 'overlay-cell-coverage',
     layerId: 'overlay-cell-coverage-raster',
     tileUrl:
-      'https://services1.arcgis.com/Hp6G80Pky0om6HgA/ArcGIS/rest/services/Cellular_Towers/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
+      'https://tiles.arcgis.com/tiles/Hp6G80Pky0om6HgA/arcgis/rest/services/Cellular_Towers/MapServer/tile/{z}/{y}/{x}',
     defaultOpacity: 0.7,
     attribution: 'HIFLD / FCC',
   },
