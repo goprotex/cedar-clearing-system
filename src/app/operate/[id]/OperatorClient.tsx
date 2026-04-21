@@ -18,6 +18,7 @@ import {
   defaultOverlayState,
   defaultOverlayOpacities,
   addOverlaySourcesToMap,
+  refreshDynamicOverlaySources,
   syncOverlayVisibility,
 } from '@/lib/map-layers';
 import MapLayerPanel, {
@@ -1005,6 +1006,21 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
       /* ignore */
     }
   }, [overlayLayers, overlayOpacities, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    void refreshDynamicOverlaySources(map, overlayLayers);
+    const handleMoveEnd = () => {
+      void refreshDynamicOverlaySources(map, overlayLayers);
+    };
+
+    map.on('moveend', handleMoveEnd);
+    return () => {
+      map.off('moveend', handleMoveEnd);
+    };
+  }, [overlayLayers, mapReady]);
 
   // Auto-rotation: only spin when autoRotate is enabled. Disables zoom/pan when active.
   useEffect(() => {
