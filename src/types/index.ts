@@ -143,6 +143,10 @@ export interface CedarAnalysisSummary {
   /** Cells where NAIP + texture + Sentinel fusion scored trust below threshold */
   lowTrustCells?: number;
   lowTrustPct?: number;
+  hiResImagery?: {
+    used: boolean;
+    source?: string;
+  };
   sentinelFusion?: {
     used: boolean;
     pairedSamples: number;

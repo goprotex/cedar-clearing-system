@@ -59,16 +59,22 @@ function activeProcessIndexForPhase(phase: string): number {
     case 'grid':
     case 'sampling':
       return 1;
-    case 'sentinel':
+    case 'indices':
       return 2;
-    case 'consensus':
-    case 'building':
+    case 'hires':
       return 3;
+    case 'classify':
+      return 4;
+    case 'sentinel':
+    case 'refining':
+    case 'consensus':
+      return 5;
+    case 'building':
     case 'applying':
     case 'trees':
-      return 4;
+      return 6;
     case 'done':
-      return 5;
+      return 6;
     default:
       return 0;
   }
@@ -599,6 +605,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
       'Refine every cell with hi-res winter RGB imagery from World Imagery',
       'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
       'Seasonal fusion + overlapping-tile consensus smooth class boundaries when enough cells exist',
+      'Build the cedar layer and place 3D tree positions',
     ];
 
     const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
@@ -656,7 +663,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
           pct: Math.round((completedCount / totalChunks) * 90),
           percent: Math.round((completedCount / totalChunks) * 90),
           startedAt: analysisStartedAt,
-          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+          processLines: spectralProcessLines,
           focusBbox: pastureBbox,
           focusKey: `pasture-${pastureId}`,
           debugLines: [`resume restored ${completedCount}/${totalChunks} completed regions`],
@@ -680,7 +687,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
           pct: 0,
           percent: 0,
           startedAt: analysisStartedAt,
-          processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+          processLines: spectralProcessLines,
           focusBbox: pastureBbox,
           focusKey: `pasture-${pastureId}`,
           debugLines: [`${totalChunks} region(s) queued`, `polygon hash ${polygonHash.slice(0, 8)}`],
@@ -705,7 +712,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
         pct: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
         percent: Math.round((parts.filter((p) => p !== null).length / totalChunks) * 90),
         startedAt: analysisStartedAt,
-        processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+        processLines: spectralProcessLines,
         focusBbox: chunkBbox,
         focusKey: `chunk-${i}`,
         debugLines: [`region ${i + 1}/${totalChunks}`, `${chunkAcres.toFixed(1)} ac`],
@@ -735,7 +742,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
               oakCount: payload.oakCount as number | undefined,
               totalPoints: payload.totalPoints as number | undefined,
               completed: payload.completed as number | undefined,
-              processLines: totalChunks > 1 ? spectralProcessLines : undefined,
+              processLines: spectralProcessLines,
               focusBbox: chunkBbox,
               focusKey: `chunk-${i}`,
               debugLines: [
@@ -748,6 +755,38 @@ export const useBidStore = create<BidStore>((set, get) => ({
         );
         console.log(`[analyzeCedar] chunk ${i + 1}/${totalChunks} complete: ${chunkData.summary?.totalSamples ?? '?'} samples, cedar=${chunkData.summary?.cedar?.pct ?? '?'}%`);
         parts[i] = chunkData;
+
+        const chunkSummary = chunkData.summary;
+        const completedCount = parts.filter((p) => p !== null).length;
+        const completedPct = Math.round((completedCount / totalChunks) * 90);
+        const sentinelUsed = Boolean(chunkSummary.sentinelFusion?.used);
+        const hiResUsed = Boolean(chunkSummary.hiResImagery?.used);
+        const consensusTiles = chunkSummary.tileConsensus?.tileCount ?? 0;
+        const consensusImproved = chunkSummary.tileConsensus?.consensusImprovedCells ?? 0;
+        const pairedSamples = chunkSummary.sentinelFusion?.pairedSamples ?? 0;
+
+        setSpectralProgress({
+          phase: 'refining',
+          phaseLabel: 'REFINEMENT_CONFIRMED',
+          step: totalChunks > 1 ? `Region ${i + 1} refinement complete` : 'Refinement steps complete',
+          detail:
+            `Applied spectral indices, hi-res RGB refinement, multi-rule classification, ` +
+            `${sentinelUsed ? 'seasonal fusion' : 'seasonal fallback'} and ` +
+            `${consensusTiles > 0 ? 'tile consensus' : 'consensus fallback'} for this region`,
+          pct: Math.min(95, Math.max(completedPct, scaledChunkProgress(completedCount - 1, totalChunks, 92))),
+          percent: Math.min(95, Math.max(completedPct, scaledChunkProgress(completedCount - 1, totalChunks, 92))),
+          startedAt: analysisStartedAt,
+          processLines: spectralProcessLines,
+          activeProcessIndex: 5,
+          focusBbox: chunkBbox,
+          focusKey: `chunk-${i}`,
+          debugLines: [
+            'indices NDVI/GNDVI/SAVI active',
+            `hi-res imagery ${hiResUsed ? 'used' : 'unavailable'}`,
+            `seasonal fusion ${sentinelUsed ? `used (${pairedSamples} paired)` : 'unavailable'}`,
+            `consensus ${consensusImproved} cells / ${consensusTiles} tiles`,
+          ],
+        });
 
         // Persist after every successful chunk
         await saveCedarChunkResumeHybrid({
@@ -867,6 +906,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
         pct: 96,
         percent: 96,
         startedAt: analysisStartedAt,
+        processLines: spectralProcessLines,
+        activeProcessIndex: 6,
         totalPoints: resultData.summary?.totalSamples,
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,
@@ -881,6 +922,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
         pct: 98,
         percent: 98,
         startedAt: analysisStartedAt,
+        processLines: spectralProcessLines,
+        activeProcessIndex: 6,
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,
         debugLines: [`total cells ${resultData.summary?.totalSamples ?? 0}`],
@@ -914,6 +957,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
             pct: 99,
             percent: 99,
             startedAt: analysisStartedAt,
+            processLines: spectralProcessLines,
+            activeProcessIndex: 6,
             focusBbox: pastureBbox,
             focusKey: `pasture-${pastureId}`,
             debugLines: [`marked cedar trees ${cedarTrees.length}`],
@@ -934,6 +979,8 @@ export const useBidStore = create<BidStore>((set, get) => ({
         pct: 100,
         percent: 100,
         startedAt: analysisStartedAt,
+        processLines: spectralProcessLines,
+        activeProcessIndex: 6,
         totalPoints: s.totalSamples,
         focusBbox: pastureBbox,
         focusKey: `pasture-${pastureId}`,

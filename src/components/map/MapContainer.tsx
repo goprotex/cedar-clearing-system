@@ -967,9 +967,11 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
     const tl = treeLayerRef.current;
     if (!tl || !layers.hologram) return;
 
-    const allMarked = currentBid.pastures.flatMap((p) => p.savedTrees ?? []);
+    const allMarked = markMode
+      ? currentBid.pastures.flatMap((p) => p.savedTrees ?? [])
+      : [];
     tl.updateMarkedTrees(allMarked);
-  }, [currentBid.pastures, layers.hologram]);
+  }, [currentBid.pastures, layers.hologram, markMode]);
 
   // ── Fly to selected pasture when selection changes ──
   useEffect(() => {
