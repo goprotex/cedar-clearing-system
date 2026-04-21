@@ -609,6 +609,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
     const bidId = get().currentBid.id;
     const chunkCoords = getCedarAnalysisChunkPolygons(pasture.polygon.geometry.coordinates);
+    const chunkAcresByIndex = chunkCoords.map((coords) => polygonAcreage(coords));
     const chunkKeys = chunkCoords.map((c) => hashChunkPolygonCoords(c[0]));
     const totalChunks = chunkCoords.length;
     const estimatedSamples = estimateCedarSampleCount(pasture.acreage * 4047);
@@ -643,6 +644,87 @@ export const useBidStore = create<BidStore>((set, get) => ({
     const clearSpectralProgress = () => {
       set({ analysisProgress: null });
       get().recalculate();
+    };
+
+    const buildPastureWidePreview = (
+      activeChunkIndex?: number,
+      live?: {
+        cedarCount?: number;
+        oakCount?: number;
+        estimatedCedarAcres?: number;
+        totalPoints?: number;
+        completed?: number;
+      },
+    ) => {
+      let analyzedAcres = 0;
+      let analyzedPoints = 0;
+      let processedPoints = 0;
+      let cedarAcres = 0;
+      let cedarPoints = 0;
+      let oakPoints = 0;
+
+      for (let idx = 0; idx < parts.length; idx++) {
+        const part = parts[idx];
+        if (!part) continue;
+        analyzedAcres += chunkAcresByIndex[idx] ?? 0;
+        analyzedPoints += part.summary.totalSamples;
+        processedPoints += part.summary.totalSamples;
+        cedarAcres += part.summary.estimatedCedarAcres;
+        cedarPoints += part.summary.cedar.count;
+        oakPoints += part.summary.oak.count;
+      }
+
+      if (activeChunkIndex != null && live) {
+        const liveCompleted = Math.max(0, Number(live.completed ?? 0));
+        const liveTotalPoints = Math.max(0, Number(live.totalPoints ?? 0));
+        const liveCedarSeen = Math.max(0, Number(live.cedarCount ?? 0));
+        const liveOakSeen = Math.max(0, Number(live.oakCount ?? 0));
+        const estimatedChunkCedarPoints =
+          liveCompleted > 0 && liveTotalPoints > 0
+            ? Math.round((liveCedarSeen / liveCompleted) * liveTotalPoints)
+            : liveCedarSeen;
+        const estimatedChunkOakPoints =
+          liveCompleted > 0 && liveTotalPoints > 0
+            ? Math.round((liveOakSeen / liveCompleted) * liveTotalPoints)
+            : liveOakSeen;
+        const estimatedChunkCedarAcres =
+          live.estimatedCedarAcres ??
+          (liveCompleted > 0
+            ? Math.round((liveCedarSeen / liveCompleted) * (chunkAcresByIndex[activeChunkIndex] ?? 0) * 10) / 10
+            : 0);
+
+        analyzedAcres += chunkAcresByIndex[activeChunkIndex] ?? 0;
+        analyzedPoints += liveTotalPoints;
+        processedPoints += liveCompleted;
+        cedarAcres += estimatedChunkCedarAcres;
+        cedarPoints += estimatedChunkCedarPoints;
+        oakPoints += estimatedChunkOakPoints;
+      }
+
+      if (analyzedAcres <= 0 || analyzedPoints <= 0) {
+        return {
+          cedarCount: 0,
+          oakCount: 0,
+          estimatedCedarAcres: 0,
+          totalPoints: estimatedSamples,
+          completed: processedPoints,
+        };
+      }
+
+      const pastureWideCedarAcres = Math.max(
+        0,
+        Math.min(pasture.acreage, Math.round((cedarAcres / analyzedAcres) * pasture.acreage * 10) / 10),
+      );
+      const pastureWideCedarCount = Math.max(0, Math.round((cedarPoints / analyzedPoints) * estimatedSamples));
+      const pastureWideOakCount = Math.max(0, Math.round((oakPoints / analyzedPoints) * estimatedSamples));
+
+      return {
+        cedarCount: pastureWideCedarCount,
+        oakCount: pastureWideOakCount,
+        estimatedCedarAcres: pastureWideCedarAcres,
+        totalPoints: estimatedSamples,
+        completed: processedPoints,
+      };
     };
 
     // Sparse array: null = not yet attempted or failed; CedarAnalysis = success
@@ -758,6 +840,13 @@ export const useBidStore = create<BidStore>((set, get) => ({
             const pct = scaledChunkProgress(effectiveIndex, totalChunks, innerPct);
             const msg = (payload.message as string) || 'Processing…';
             const phase = (payload.phase as string) || 'sampling';
+            const livePreview = buildPastureWidePreview(i, {
+              cedarCount: payload.cedarCount as number | undefined,
+              oakCount: payload.oakCount as number | undefined,
+              estimatedCedarAcres: payload.estimatedCedarAcres as number | undefined,
+              totalPoints: payload.totalPoints as number | undefined,
+              completed: payload.completed as number | undefined,
+            });
             setSpectralProgress({
               phase,
               pastureId,
@@ -766,11 +855,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
               pct,
               percent: pct,
               startedAt: analysisStartedAt,
-              cedarCount: payload.cedarCount as number | undefined,
-              oakCount: payload.oakCount as number | undefined,
-              estimatedCedarAcres: payload.estimatedCedarAcres as number | undefined,
-              totalPoints: payload.totalPoints as number | undefined,
-              completed: payload.completed as number | undefined,
+              cedarCount: livePreview.cedarCount,
+              oakCount: livePreview.oakCount,
+              estimatedCedarAcres: livePreview.estimatedCedarAcres,
+              totalPoints: livePreview.totalPoints,
+              completed: livePreview.completed,
               processLines: spectralProcessLines,
               focusBbox: chunkBbox,
               focusKey: `chunk-${i}`,
@@ -793,6 +882,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
         const consensusTiles = chunkSummary.tileConsensus?.tileCount ?? 0;
         const consensusImproved = chunkSummary.tileConsensus?.consensusImprovedCells ?? 0;
         const pairedSamples = chunkSummary.sentinelFusion?.pairedSamples ?? 0;
+        const refinedPreview = buildPastureWidePreview();
 
         setSpectralProgress({
           phase: 'refining',
@@ -816,11 +906,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
             `seasonal fusion ${sentinelUsed ? `used (${pairedSamples} paired)` : 'unavailable'}`,
             `consensus ${consensusImproved} cells / ${consensusTiles} tiles`,
           ],
-          cedarCount: chunkSummary.cedar.count,
-          oakCount: chunkSummary.oak.count,
-          estimatedCedarAcres: chunkSummary.estimatedCedarAcres,
-          totalPoints: chunkSummary.totalSamples,
-          completed: chunkSummary.totalSamples,
+          cedarCount: refinedPreview.cedarCount,
+          oakCount: refinedPreview.oakCount,
+          estimatedCedarAcres: refinedPreview.estimatedCedarAcres,
+          totalPoints: refinedPreview.totalPoints,
+          completed: refinedPreview.completed,
         });
 
         // Persist after every successful chunk
