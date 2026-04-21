@@ -216,11 +216,11 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         layout: { visibility: 'none' },
       });
 
-      // ── NAIP Natural Color overlay (USGS ImageServer) ──
+      // ── TNRIS StratMap Natural Color (0.5m TX statewide, sharper than NAIP) ──
       map.addSource('naip-rgb', {
         type: 'raster',
         tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
+          'https://imagery.tnris.org/server/rest/services/StratMap/StratMap23_NCRGB/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
         ],
         tileSize: 256,
       });
@@ -233,11 +233,11 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         layout: { visibility: 'none' },
       });
 
-      // ── NAIP CIR (False Color Composite: NIR, Red, Green) ──
+      // ── TNRIS StratMap CIR (Color Infrared — NIR false color, highlights vegetation) ──
       map.addSource('naip-cir', {
         type: 'raster',
         tiles: [
-          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&bandIds=3,0,1&f=image',
+          'https://imagery.tnris.org/server/rest/services/StratMap/StratMap23_NCCIR/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
         ],
         tileSize: 256,
       });
@@ -1080,8 +1080,8 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
                 emoji: '📡',
                 layers: [
                   { key: 'soil', label: 'Soil Map', emoji: '🟫', active: layers.soil, opacity: opacities.soil, onToggle: () => toggleLayer('soil'), onOpacity: (v) => setOpacities((p) => ({ ...p, soil: v })) },
-                  { key: 'naip', label: 'RGB (NAIP)', emoji: '🛰️', active: layers.naip, opacity: opacities.naip, onToggle: () => toggleLayer('naip'), onOpacity: (v) => setOpacities((p) => ({ ...p, naip: v })) },
-                  { key: 'naipCIR', label: 'CIR', emoji: '🔴', active: layers.naipCIR, opacity: opacities.naipCIR, onToggle: () => toggleLayer('naipCIR'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipCIR: v })) },
+                  { key: 'naip', label: 'RGB (TNRIS)', emoji: '🛰️', active: layers.naip, opacity: opacities.naip, onToggle: () => toggleLayer('naip'), onOpacity: (v) => setOpacities((p) => ({ ...p, naip: v })) },
+                  { key: 'naipCIR', label: 'CIR (TNRIS)', emoji: '🔴', active: layers.naipCIR, opacity: opacities.naipCIR, onToggle: () => toggleLayer('naipCIR'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipCIR: v })) },
                   { key: 'naipNDVI', label: 'NDVI', emoji: '🌿', active: layers.naipNDVI, opacity: opacities.naipNDVI, onToggle: () => toggleLayer('naipNDVI'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipNDVI: v })) },
                 ],
               },
