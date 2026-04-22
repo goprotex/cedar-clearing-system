@@ -498,33 +498,65 @@ function buildCrownSegmentationCandidates(results: SampleResult[], gridSpacingM:
     .map((candidate) => {
       let supportCount = 0;
       let supportConfidence = 0;
+      let sumDx = 0;
+      let sumDy = 0;
+      let sumDxDx = 0;
+      let sumDyDy = 0;
+      let sumDxDy = 0;
 
       for (const neighbor of filtered) {
         if (neighbor === candidate || neighbor.speciesHint !== candidate.speciesHint) continue;
-        const dist = haversineM(candidate.lng, candidate.lat, neighbor.lng, neighbor.lat);
+        const dx = (neighbor.lng - candidate.lng) * 111_320 * Math.cos((candidate.lat * Math.PI) / 180);
+        const dy = (neighbor.lat - candidate.lat) * 111_320;
+        const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > supportRadiusM) continue;
         supportCount++;
         supportConfidence += neighbor.confidence;
+        sumDx += dx;
+        sumDy += dy;
+        sumDxDx += dx * dx;
+        sumDyDy += dy * dy;
+        sumDxDy += dx * dy;
       }
 
       const supportMean = supportCount > 0 ? supportConfidence / supportCount : 0;
+      const meanDx = supportCount > 0 ? sumDx / supportCount : 0;
+      const meanDy = supportCount > 0 ? sumDy / supportCount : 0;
+      const varX = supportCount > 0 ? Math.max(0, sumDxDx / supportCount - meanDx * meanDx) : 0;
+      const varY = supportCount > 0 ? Math.max(0, sumDyDy / supportCount - meanDy * meanDy) : 0;
+      const covXY = supportCount > 0 ? sumDxDy / supportCount - meanDx * meanDy : 0;
+      const trace = varX + varY;
+      const det = Math.max(0, varX * varY - covXY * covXY);
+      const root = Math.sqrt(Math.max(0, trace * trace - 4 * det));
+      const majorAxis = Math.max((trace + root) / 2, 0.01);
+      const minorAxis = Math.max((trace - root) / 2, 0.01);
+      const neighborhoodAspectRatio = Math.sqrt(majorAxis / minorAxis);
+      const linearPenalty =
+        supportCount >= 3
+          ? Math.max(0, neighborhoodAspectRatio - (candidate.speciesHint === 'oak' ? 3.8 : 3.2)) * 0.08
+          : 0;
       const score =
         candidate.confidence +
         candidate.bandVotes * 0.06 +
-        supportCount * 0.05 +
-        supportMean * 0.12;
+        Math.min(supportCount, 5) * 0.035 +
+        supportMean * 0.1 -
+        linearPenalty;
 
       return {
         ...candidate,
         supportCount,
+        neighborhoodAspectRatio,
         score,
       };
     })
     .filter((candidate) => {
-      if (candidate.speciesHint === 'oak') {
-        return candidate.supportCount >= 1 || candidate.confidence >= 0.62;
+      const minConfidence = candidate.speciesHint === 'oak' ? 0.5 : 0.54;
+      if (candidate.confidence < minConfidence && candidate.supportCount === 0) return false;
+      const maxAspectRatio = candidate.speciesHint === 'oak' ? 5.2 : 4.4;
+      if (candidate.supportCount >= 4 && candidate.neighborhoodAspectRatio > maxAspectRatio && candidate.confidence < 0.72) {
+        return false;
       }
-      return candidate.supportCount >= 2 || candidate.confidence >= 0.68;
+      return true;
     })
     .sort((a, b) => b.score - a.score);
 
@@ -538,8 +570,8 @@ function buildCrownSegmentationCandidates(results: SampleResult[], gridSpacingM:
   for (const candidate of ranked) {
     const suppressRadiusM =
       candidate.speciesHint === 'oak'
-        ? Math.max(9, Math.min(16, gridSpacingM * 1.35))
-        : Math.max(7, Math.min(13, gridSpacingM * 1.15));
+        ? Math.max(4.5, Math.min(7, gridSpacingM * 0.55))
+        : Math.max(3.8, Math.min(6, gridSpacingM * 0.45));
     const overlaps = kept.some((existing) => {
       return (
         existing.speciesHint === candidate.speciesHint &&
