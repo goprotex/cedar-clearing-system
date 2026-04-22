@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as turf from '@turf/turf';
 import sharp from 'sharp';
 import type { SpectralSamplePayload } from '@/lib/cedar-analysis-grid';
+import { buildCalibrationProfile, segmentCrownsFromCandidates, type HiResImageData } from '@/lib/crown-segmentation';
 import { computeLocalNdviVariance } from '@/lib/spectral-texture';
 import { fuseNaipWithTextureAndSentinel } from '@/lib/spectral-fusion';
 import { isCentralTexasHillCountry } from '@/lib/spectral-region';
@@ -10,7 +11,7 @@ import {
   sampleNdviFromSceneItem,
   sceneMeta,
 } from '@/lib/sentinel-sample-ndvi';
-import { CEDAR_GRID_SPACING_KM, CEDAR_GRID_SPACING_M } from '@/lib/cedar-analysis-chunks';
+import { getCedarGridSpacingKmForAcreage, getCedarGridSpacingMForAcreage } from '@/lib/cedar-analysis-chunks';
 
 export const maxDuration = 300; // 5 min — thorough spectral analysis
 
@@ -461,6 +462,44 @@ async function fetchHiResWindowImage(bbox: number[]): Promise<{
   }
 }
 
+function buildCrownSegmentationCandidates(results: SampleResult[]): Array<{
+  lng: number;
+  lat: number;
+  speciesHint: 'cedar' | 'oak';
+  confidence: number;
+}> {
+  return results
+    .filter((result) => {
+      if (result.classification === 'cedar') return result.bandVotes >= 2 || result.confidence >= 0.5;
+      if (result.classification === 'oak') return result.bandVotes >= 2 || result.confidence >= 0.45;
+      return false;
+    })
+    .map((result) => ({
+      lng: result.lng,
+      lat: result.lat,
+      speciesHint: result.classification as 'cedar' | 'oak',
+      confidence: result.confidence,
+    }));
+}
+
+function buildCrownCalibrationExamples(results: SampleResult[]): Array<{
+  lng: number;
+  lat: number;
+  species: 'cedar' | 'oak';
+}> {
+  return results
+    .filter((result) => {
+      if (result.classification === 'cedar') return result.bandVotes >= 3 || result.confidence >= 0.62;
+      if (result.classification === 'oak') return result.bandVotes >= 3 || result.confidence >= 0.58;
+      return false;
+    })
+    .map((result) => ({
+      lng: result.lng,
+      lat: result.lat,
+      species: result.classification as 'cedar' | 'oak',
+    }));
+}
+
 function sampleHiResWindowStats(
   image: { data: Uint8Array; width: number; height: number; channels: number; metersPerPixel: number },
   bbox: number[],
@@ -809,15 +848,15 @@ export async function POST(req: NextRequest) {
       gridBbox = turf.bbox(clipped);
     }
 
-    // 45m uniform grid — coarser wall-to-wall coverage for faster, broader analysis
-    const spacingKm = CEDAR_GRID_SPACING_KM;
+    const gridSpacingM = getCedarGridSpacingMForAcreage(ac);
+    const spacingKm = getCedarGridSpacingKmForAcreage(ac);
 
     const grid = turf.pointGrid(gridBbox, spacingKm, { units: 'kilometers' });
     const pointsInPoly = grid.features.filter((pt) =>
       turf.booleanPointInPolygon(pt, polygon)
     );
 
-    // Use all points — 45m grid keeps coverage broad while cutting request volume substantially
+    // Use all points — smaller pastures can afford a tighter grid for better edge fidelity.
     const samplePoints = pointsInPoly;
 
     if (samplePoints.length === 0) {
@@ -995,6 +1034,20 @@ export async function POST(req: NextRequest) {
             consensusImprovedCells,
           } = applyTileConsensus(hiResRefinedResults, spacingKm, gridBbox);
 
+          const crownCandidates = buildCrownSegmentationCandidates(consensusResults);
+          const crownCalibrationExamples = buildCrownCalibrationExamples(consensusResults);
+          const crownProfile = buildCalibrationProfile(
+            hiResImage as HiResImageData | null,
+            gridBbox,
+            crownCalibrationExamples,
+          );
+          const crownSegmentation = segmentCrownsFromCandidates(
+            crownCandidates,
+            hiResImage as HiResImageData | null,
+            gridBbox,
+            crownProfile,
+          );
+
           const centerLat = (gridBbox[1] + gridBbox[3]) / 2;
           const halfLngDeg = spacingKm / 2 / (111.32 * Math.cos((centerLat * Math.PI) / 180));
           const halfLatDeg = spacingKm / 2 / 111.32;
@@ -1040,7 +1093,7 @@ export async function POST(req: NextRequest) {
             confidence: Math.round(avgConf * 100),
             avgBandVotes: Math.round(avgBandVotes * 10) / 10,
             highConfidenceCedarCells: highConfCedar,
-            gridSpacingM: CEDAR_GRID_SPACING_M,
+            gridSpacingM,
             cellHalfLngDeg: halfLngDeg,
             cellHalfLatDeg: halfLatDeg,
             lowTrustCells: lowTrustCount,
@@ -1053,9 +1106,9 @@ export async function POST(req: NextRequest) {
               tileCount,
               tileOverlapPct: 60,
               tileSizePixels: 5,
-              tileSizeM: Math.round(CEDAR_GRID_SPACING_M * 5),
+              tileSizeM: Math.round(gridSpacingM * 5),
               stridePixels: 2,
-              strideM: Math.round(CEDAR_GRID_SPACING_M * 2),
+              strideM: Math.round(gridSpacingM * 2),
               consensusImprovedCells,
               consensusImprovedPct: total > 0 ? Math.round((consensusImprovedCells / total) * 100) : 0,
             },
@@ -1086,6 +1139,21 @@ export async function POST(req: NextRequest) {
           push('result_summary', { summary, totalBatches });
           await sleep(0);
 
+          if (crownSegmentation.crowns.length > 0) {
+            push('result_crowns', { crowns: crownSegmentation.crowns });
+            await sleep(0);
+          }
+
+          if (crownSegmentation.maskFeatures.length > 0) {
+            push('result_masks', {
+              crownMasks: {
+                type: 'FeatureCollection',
+                features: crownSegmentation.maskFeatures,
+              },
+            });
+            await sleep(0);
+          }
+
           for (let i = 0; i < compactSamples.length; i += STREAM_SAMPLE_BATCH_SIZE) {
             const batchIndex = Math.floor(i / STREAM_SAMPLE_BATCH_SIZE);
             push('result_samples', {
@@ -1098,7 +1166,12 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          push('result_done', { totalSamples: compactSamples.length, totalBatches });
+          push('result_done', {
+            totalSamples: compactSamples.length,
+            totalBatches,
+            crownCount: crownSegmentation.crowns.length,
+            maskCount: crownSegmentation.maskFeatures.length,
+          });
           await sleep(0);
           controller.close();
         } catch (err) {

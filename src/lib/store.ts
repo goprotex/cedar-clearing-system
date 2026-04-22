@@ -13,8 +13,8 @@ import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
 import {
   estimateCedarSampleCount,
   getCedarAnalysisChunkPolygons,
+  getCedarGridSpacingMForAcreage,
   polygonAcreage,
-  CEDAR_GRID_SPACING_M,
   WHOLE_PASTURE_STAGE_SAMPLE_LIMIT,
 } from '@/lib/cedar-analysis-chunks';
 import { mergeCedarAnalyses } from '@/lib/merge-cedar-analysis';
@@ -612,13 +612,14 @@ export const useBidStore = create<BidStore>((set, get) => ({
     const chunkAcresByIndex = chunkCoords.map((coords) => polygonAcreage(coords));
     const chunkKeys = chunkCoords.map((c) => hashChunkPolygonCoords(c[0]));
     const totalChunks = chunkCoords.length;
+    const gridSpacingM = getCedarGridSpacingMForAcreage(pasture.acreage);
     const estimatedSamples = estimateCedarSampleCount(pasture.acreage * 4047);
     const runningWholePasture = totalChunks === 1;
     const spectralProcessLines = [
       runningWholePasture
-        ? `Run stage 1 across the full pasture (${estimatedSamples} estimated ${CEDAR_GRID_SPACING_M} m cells) before moving to the next stage`
+        ? `Run stage 1 across the full pasture (${estimatedSamples} estimated ${gridSpacingM} m cells) before moving to the next stage`
         : `Split only because the pasture exceeds the single-request limit (${WHOLE_PASTURE_STAGE_SAMPLE_LIMIT} cells)` ,
-      `For each ${CEDAR_GRID_SPACING_M} m cell: USGS NAIP identify (red, green, blue, near-infrared)`,
+      `For each ${gridSpacingM} m cell: USGS NAIP identify (red, green, blue, near-infrared)`,
       'Spectral indices: NDVI, GNDVI, SAVI, excess green, NIR ratio',
       'Refine every cell with hi-res winter RGB imagery from World Imagery',
       'Multi-rule classification: cedar vs oak vs mixed brush vs grass vs bare',
@@ -786,7 +787,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
           detail:
             totalChunks > 1
               ? `${totalChunks} fallback regions (~${Math.round(pasture.acreage)} ac total). This field is large enough that it still has to be processed in multiple requests.`
-              : `Scanning the full pasture in one staged run (~${Math.round(pasture.acreage)} ac, ${estimatedSamples} estimated cells at ${CEDAR_GRID_SPACING_M} m)`,
+              : `Scanning the full pasture in one staged run (~${Math.round(pasture.acreage)} ac, ${estimatedSamples} estimated cells at ${gridSpacingM} m)`,
           pct: 0,
           percent: 0,
           startedAt: analysisStartedAt,

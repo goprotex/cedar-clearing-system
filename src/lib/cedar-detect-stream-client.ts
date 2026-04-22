@@ -1,5 +1,5 @@
 import { normalizeCedarAnalysisPayload } from '@/lib/cedar-analysis-grid';
-import type { CedarAnalysis, CedarAnalysisSummary } from '@/types';
+import type { CedarAnalysis, CedarAnalysisSummary, CrownDetection, CrownMaskFeatureProperties } from '@/types';
 import { samplesToGridCells, type SpectralSamplePayload } from '@/lib/cedar-analysis-grid';
 
 /**
@@ -40,6 +40,8 @@ export async function readCedarDetectSse(
 
   let batchedSummary: CedarAnalysisSummary | null = null;
   const batchedSamples: SpectralSamplePayload[] = [];
+  let batchedCrowns: CrownDetection[] | undefined;
+  let batchedCrownMasks: GeoJSON.FeatureCollection<GeoJSON.Polygon, CrownMaskFeatureProperties> | undefined;
   let batchCount = 0;
 
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,6 +108,16 @@ export async function readCedarDetectSse(
                 batchedSamples.push(...batch);
                 batchCount++;
               }
+            } else if (eventType === 'result_crowns') {
+              const crowns = payload.crowns as CrownDetection[];
+              if (Array.isArray(crowns)) {
+                batchedCrowns = crowns;
+              }
+            } else if (eventType === 'result_masks') {
+              const crownMasks = payload.crownMasks as GeoJSON.FeatureCollection<GeoJSON.Polygon, CrownMaskFeatureProperties>;
+              if (crownMasks?.type === 'FeatureCollection') {
+                batchedCrownMasks = crownMasks;
+              }
             } else if (eventType === 'result_done') {
               console.log(`[${tag}] result_done: batchCount=${batchCount}, totalSamples=${batchedSamples.length}, expected=${payload.totalSamples}`);
               if (batchedSummary && batchedSamples.length > 0) {
@@ -117,7 +129,7 @@ export async function readCedarDetectSse(
                   halfLng = m / 111_320;
                 }
                 const gridCells = samplesToGridCells(batchedSamples, halfLng, halfLat);
-                resultData = { summary: batchedSummary, gridCells };
+                resultData = { summary: batchedSummary, gridCells, crowns: batchedCrowns, crownMasks: batchedCrownMasks };
                 console.log(`[${tag}] assembled batched result: ${batchedSamples.length} samples, ${gridCells.features.length} grid cells`);
               } else {
                 console.error(`[${tag}] result_done but missing data: summary=${!!batchedSummary}, samples=${batchedSamples.length}`);

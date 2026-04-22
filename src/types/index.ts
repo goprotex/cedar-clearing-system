@@ -121,6 +121,25 @@ export interface CedarChunkRunStats {
   maxSamplesPerChunk: number;
 }
 
+export interface CrownDetection {
+  id: string;
+  lng: number;
+  lat: number;
+  species: 'cedar' | 'oak';
+  confidence: number;
+  canopyDiameter: number;
+  height: number;
+  source: string;
+}
+
+export interface CrownMaskFeatureProperties {
+  id: string;
+  species: 'cedar' | 'oak';
+  confidence: number;
+  supportCount: number;
+  source: string;
+}
+
 export interface CedarAnalysisSummary {
   totalSamples: number;
   cedar: CedarClassCount;
@@ -162,6 +181,8 @@ export interface CedarAnalysisSummary {
 export interface CedarAnalysis {
   gridCells: GeoJSON.FeatureCollection;
   summary: CedarAnalysisSummary;
+  crowns?: CrownDetection[];
+  crownMasks?: GeoJSON.FeatureCollection<GeoJSON.Polygon, CrownMaskFeatureProperties>;
 }
 
 // ──── Seasonal Analysis ────

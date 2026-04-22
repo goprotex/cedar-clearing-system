@@ -1,8 +1,45 @@
-import type { CedarAnalysis, CedarAnalysisSummary, CedarVegClass, TileConsensusStats } from '@/types';
+import type { CedarAnalysis, CedarAnalysisSummary, CedarVegClass, CrownDetection, CrownMaskFeatureProperties, TileConsensusStats } from '@/types';
 import { CEDAR_GRID_SPACING_M, TARGET_SAMPLES_PER_CHUNK } from '@/lib/cedar-analysis-chunks';
 
 function roundCoord(n: number): number {
   return Math.round(n * 1e5) / 1e5;
+}
+
+function haversineM(lng1: number, lat1: number, lng2: number, lat2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function mergeCrowns(parts: CedarAnalysis[]): CrownDetection[] | undefined {
+  const all = parts.flatMap((part) => part.crowns ?? []);
+  if (all.length === 0) return undefined;
+
+  const kept: CrownDetection[] = [];
+  for (const crown of [...all].sort((a, b) => b.confidence - a.confidence)) {
+    const overlaps = kept.some((existing) => {
+      const mergeDist = Math.max(2.2, Math.min(crown.canopyDiameter, existing.canopyDiameter) * 0.58);
+      return haversineM(crown.lng, crown.lat, existing.lng, existing.lat) <= mergeDist;
+    });
+    if (!overlaps) kept.push(crown);
+  }
+  return kept;
+}
+
+function mergeCrownMasks(
+  parts: CedarAnalysis[],
+): GeoJSON.FeatureCollection<GeoJSON.Polygon, CrownMaskFeatureProperties> | undefined {
+  const features = parts.flatMap((part) => part.crownMasks?.features ?? []);
+  if (features.length === 0) return undefined;
+  return {
+    type: 'FeatureCollection',
+    features,
+  };
 }
 
 /** Remove duplicate analyzer grid cells that can appear on chunk boundaries. */
@@ -369,5 +406,7 @@ export function mergeCedarAnalyses(parts: CedarAnalysis[], pastureAcreage: numbe
   return {
     gridCells: { type: 'FeatureCollection', features: consensusFeatures },
     summary,
+    crowns: mergeCrowns(parts),
+    crownMasks: mergeCrownMasks(parts),
   };
 }

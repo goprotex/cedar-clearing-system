@@ -4,7 +4,22 @@ import type { Feature, Polygon, MultiPolygon, Position } from 'geojson';
 /** Matches cedar-detect route: 15 m point grid → ~225 m² per sample cell */
 export const CEDAR_GRID_SPACING_M = 15;
 export const CEDAR_GRID_SPACING_KM = CEDAR_GRID_SPACING_M / 1000;
-const SAMPLES_PER_CELL_EST = CEDAR_GRID_SPACING_M * CEDAR_GRID_SPACING_M;
+export const SMALL_PASTURE_CEDAR_GRID_SPACING_M = 10;
+export const SMALL_PASTURE_ACREAGE_THRESHOLD = 100;
+
+function acreageFromAreaM2(areaM2: number): number {
+  return areaM2 / 4047;
+}
+
+export function getCedarGridSpacingMForAcreage(acreage: number): number {
+  return acreage > 0 && acreage < SMALL_PASTURE_ACREAGE_THRESHOLD
+    ? SMALL_PASTURE_CEDAR_GRID_SPACING_M
+    : CEDAR_GRID_SPACING_M;
+}
+
+export function getCedarGridSpacingKmForAcreage(acreage: number): number {
+  return getCedarGridSpacingMForAcreage(acreage) / 1000;
+}
 
 /**
  * Prefer a single whole-pasture staged run whenever the sample count is still
@@ -22,12 +37,13 @@ export const TARGET_SAMPLES_PER_CHUNK = 240;
 const MAX_SPLIT_DEPTH = 24;
 const MIN_SPLIT_DEG = 1e-7;
 
-function estimateSampleCount(areaM2: number): number {
-  return Math.max(1, Math.ceil(areaM2 / SAMPLES_PER_CELL_EST));
+function estimateSampleCount(areaM2: number, spacingM: number): number {
+  const samplesPerCellEst = spacingM * spacingM;
+  return Math.max(1, Math.ceil(areaM2 / samplesPerCellEst));
 }
 
 export function estimateCedarSampleCount(areaM2: number): number {
-  return estimateSampleCount(areaM2);
+  return estimateSampleCount(areaM2, getCedarGridSpacingMForAcreage(acreageFromAreaM2(areaM2)));
 }
 
 function expandToPolygonFeatures(feat: Feature<Polygon | MultiPolygon>): Feature<Polygon>[] {
@@ -94,7 +110,8 @@ function splitPastureOnceForResume(poly: Feature<Polygon>): Position[][][] {
 export function getCedarAnalysisChunkPolygons(coords: Position[][]): Position[][][] {
   const poly = turf.polygon(coords);
   const areaM2 = turf.area(poly);
-  const samples = estimateSampleCount(areaM2);
+  const spacingM = getCedarGridSpacingMForAcreage(acreageFromAreaM2(areaM2));
+  const samples = estimateSampleCount(areaM2, spacingM);
 
   // Run stage-by-stage across the whole pasture whenever feasible instead of
   // finishing the full pipeline chunk-by-chunk.
@@ -114,7 +131,7 @@ export function getCedarAnalysisChunkPolygons(coords: Position[][]): Position[][
     const forced = splitPastureOnceForResume(poly);
     chunks = forced.length >= 2 ? forced : [coords];
   } else {
-    const features = splitRecursiveWithBudget(poly, 0, targetMax);
+    const features = splitRecursiveWithBudget(poly, 0, targetMax, spacingM);
     const out: Position[][][] = [];
     for (const f of features) {
       for (const expanded of expandToPolygonFeatures(f)) {
@@ -130,10 +147,11 @@ export function getCedarAnalysisChunkPolygons(coords: Position[][]): Position[][
 function splitRecursiveWithBudget(
   poly: Feature<Polygon>,
   depth: number,
-  maxSamplesPerLeaf: number
+  maxSamplesPerLeaf: number,
+  spacingM: number,
 ): Feature<Polygon | MultiPolygon>[] {
   const areaM2 = turf.area(poly);
-  const samples = estimateSampleCount(areaM2);
+  const samples = estimateSampleCount(areaM2, spacingM);
   if (samples <= maxSamplesPerLeaf || depth >= MAX_SPLIT_DEPTH) {
     return [poly];
   }
@@ -167,7 +185,7 @@ function splitRecursiveWithBudget(
   for (const piece of [leftI, rightI]) {
     if (!piece) continue;
     for (const expanded of expandToPolygonFeatures(piece)) {
-      next.push(...splitRecursiveWithBudget(expanded, depth + 1, maxSamplesPerLeaf));
+      next.push(...splitRecursiveWithBudget(expanded, depth + 1, maxSamplesPerLeaf, spacingM));
     }
   }
 
