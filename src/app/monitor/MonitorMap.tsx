@@ -5,6 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { Bid } from '@/types';
 import { extractTreesFromAnalysis } from '@/lib/cedar-tree-data';
+import {
+  addOverlaySourcesToMap,
+  refreshDynamicOverlaySources,
+  syncOverlayVisibility,
+  type OverlayLayerKey,
+} from '@/lib/map-layers';
 import type { OperatorProfile, ActiveTimeEntry, JobMember } from './MonitorClient';
 
 type JobLike = {
@@ -27,6 +33,9 @@ type Props = {
   cedarOn: boolean;
   radarOn: boolean;
   layers: Record<LayerKey, boolean>;
+  opacities: Record<LayerKey, number>;
+  overlayLayers: Record<OverlayLayerKey, boolean>;
+  overlayOpacities: Record<OverlayLayerKey, number>;
   flyToJobId?: string | null;
   onMapReady?: () => void;
   operatorProfiles: Record<string, OperatorProfile>;
@@ -58,7 +67,7 @@ function formatTime(iso: string): string {
   } catch { return iso; }
 }
 
-export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, flyToJobId, onMapReady, operatorProfiles, activeTimeEntries, membersByJob, operateMode, operateModeUserId, autoRotate = false }: Props) {
+export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsByJob, trailsByJob, layers, opacities, overlayLayers, overlayOpacities, flyToJobId, onMapReady, operatorProfiles, activeTimeEntries, membersByJob, operateMode, operateModeUserId, autoRotate = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const operatorMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -108,8 +117,8 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       map.addSource('soil-wms', { type: 'raster', tiles: ['https://SDMDataAccess.sc.egov.usda.gov/Spatial/SDM.wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=mapunitpoly&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE'], tileSize: 256 });
       map.addLayer({ id: 'soil-overlay', type: 'raster', source: 'soil-wms', paint: { 'raster-opacity': 0.45 }, layout: { visibility: 'none' } });
 
-      // NAIP RGB
-      map.addSource('naip-rgb', { type: 'raster', tiles: ['https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image'], tileSize: 256 });
+      // Esri World Imagery RGB (proxied through our app to avoid browser CORS)
+      map.addSource('naip-rgb', { type: 'raster', tiles: ['/api/world-imagery?bbox={bbox-epsg-3857}&size=256,256'], tileSize: 256 });
       map.addLayer({ id: 'naip-overlay', type: 'raster', source: 'naip-rgb', paint: { 'raster-opacity': 0.85 }, layout: { visibility: 'none' } });
 
       // NAIP CIR
@@ -156,6 +165,8 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       // Operator trails
       map.addSource('operator-trails', { type: 'geojson', data: fc([]) });
       map.addLayer({ id: 'operator-trails-line', type: 'line', source: 'operator-trails', paint: { 'line-color': '#FF6B00', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 14, 2, 17, 4, 18, 7, 19, 14, 22, 80], 'line-opacity': 0.7 } });
+
+      addOverlaySourcesToMap(map);
 
       // Click handlers — property/pasture popup with full job details
       map.on('click', 'monitor-pastures-fill', (e) => {
@@ -339,6 +350,27 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     }
   }, [jobs, clearedByJob, mapLoaded]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    syncOverlayVisibility(map, overlayLayers, overlayOpacities);
+  }, [overlayLayers, overlayOpacities, mapLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    void refreshDynamicOverlaySources(map, overlayLayers);
+    const handleMoveEnd = () => {
+      void refreshDynamicOverlaySources(map, overlayLayers);
+    };
+
+    map.on('moveend', handleMoveEnd);
+    return () => {
+      map.off('moveend', handleMoveEnd);
+    };
+  }, [overlayLayers, mapLoaded]);
+
   // ── Toggle layer visibility ──
   useEffect(() => {
     const map = mapRef.current;
@@ -348,25 +380,27 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     for (const [key, layerId] of Object.entries(rasterMap)) {
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, 'visibility', layers[key as LayerKey] ? 'visible' : 'none');
+        map.setPaintProperty(layerId, 'raster-opacity', opacities[key as LayerKey]);
       }
     }
 
-    // Soil: always on top at 100% opacity when selected
+    // Soil: on top when selected
     if (map.getLayer('soil-overlay')) {
       map.setLayoutProperty('soil-overlay', 'visibility', layers.soil ? 'visible' : 'none');
-      map.setPaintProperty('soil-overlay', 'raster-opacity', 1.0);
+      map.setPaintProperty('soil-overlay', 'raster-opacity', opacities.soil);
       if (layers.soil) map.moveLayer('soil-overlay');
     }
 
     // Radar
     if (map.getLayer('radar-layer')) {
       map.setLayoutProperty('radar-layer', 'visibility', layers.radar ? 'visible' : 'none');
+      map.setPaintProperty('radar-layer', 'raster-opacity', opacities.radar);
     }
 
-    // 3D terrain — exaggeration 2x
+    // 3D terrain
     if (layers.terrain3d) {
       try {
-        map.setTerrain({ source: 'mapbox-dem', exaggeration: 2.0 });
+        map.setTerrain({ source: 'mapbox-dem', exaggeration: opacities.terrain3d });
         if (!map.getLayer('sky')) {
           map.addLayer({ id: 'sky', type: 'sky', paint: { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 90.0], 'sky-atmosphere-sun-intensity': 15 } });
         }
@@ -379,18 +413,36 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
 
     // Cedar cells — respect the toggle directly
     for (const id of ['monitor-cedar-fill', 'monitor-cedar-border']) {
-      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.cedarAI ? 'visible' : 'none');
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', layers.cedarAI ? 'visible' : 'none');
+      }
+    }
+    if (map.getLayer('monitor-cedar-fill')) {
+      map.setPaintProperty('monitor-cedar-fill', 'fill-opacity', ['case', ['==', ['get', 'cleared'], 1], Math.max(0.1, opacities.cedarAI * 0.35), opacities.cedarAI * 0.8]);
+    }
+    if (map.getLayer('monitor-cedar-border')) {
+      map.setPaintProperty('monitor-cedar-border', 'line-opacity', Math.max(0.2, opacities.cedarAI * 0.8));
     }
 
     // Pastures
     for (const id of ['monitor-pastures-fill', 'monitor-pastures-border', 'monitor-pastures-label']) {
       if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', layers.pastures ? 'visible' : 'none');
     }
+    if (map.getLayer('monitor-pastures-fill')) {
+      map.setPaintProperty('monitor-pastures-fill', 'fill-opacity', layers.hologram ? Math.min(0.2, opacities.pastures * 0.08) : opacities.pastures * 0.1);
+    }
+    if (map.getLayer('monitor-pastures-border')) {
+      map.setPaintProperty('monitor-pastures-border', 'line-opacity', opacities.pastures);
+    }
+    if (map.getLayer('monitor-pastures-label')) {
+      map.setPaintProperty('monitor-pastures-label', 'text-opacity', Math.max(0.2, opacities.pastures));
+    }
 
     // ── Hologram mode ──
     if (layers.hologram) {
       // Show mask
       if (map.getLayer('holo-mask-fill')) map.setLayoutProperty('holo-mask-fill', 'visibility', 'visible');
+      if (map.getLayer('holo-mask-fill')) map.setPaintProperty('holo-mask-fill', 'fill-opacity', Math.min(0.96, 0.5 + opacities.hologram * 0.42));
 
       // Desaturate satellite
       for (const bl of (map.getStyle().layers ?? [])) {
@@ -412,18 +464,18 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       // NDVI on if available
       if (map.getLayer('naip-ndvi-overlay')) {
         map.setLayoutProperty('naip-ndvi-overlay', 'visibility', 'visible');
-        map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', 1.0);
+        map.setPaintProperty('naip-ndvi-overlay', 'raster-opacity', Math.max(opacities.naipNDVI, 0.9));
       }
 
       // Green hologram styling on cedar cells
       const holoExpr: mapboxgl.Expression = ['match', ['get', 'classification'], 'cedar', '#00ff41', 'oak', '#ffaa00', 'mixed_brush', '#22dd44', '#00ff41'];
       if (map.getLayer('monitor-cedar-fill')) {
         map.setPaintProperty('monitor-cedar-fill', 'fill-color', holoExpr);
-        map.setPaintProperty('monitor-cedar-fill', 'fill-opacity', 0.7);
+        map.setPaintProperty('monitor-cedar-fill', 'fill-opacity', opacities.hologram * 0.7);
       }
       if (map.getLayer('monitor-cedar-border')) {
         map.setPaintProperty('monitor-cedar-border', 'line-color', holoExpr);
-        map.setPaintProperty('monitor-cedar-border', 'line-opacity', 0.9);
+        map.setPaintProperty('monitor-cedar-border', 'line-opacity', Math.max(0.3, opacities.hologram * 0.9));
         map.setPaintProperty('monitor-cedar-border', 'line-width', 1.5);
       }
 
@@ -434,7 +486,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       }
       if (map.getLayer('monitor-pastures-fill')) {
         map.setPaintProperty('monitor-pastures-fill', 'fill-color', '#00ff41');
-        map.setPaintProperty('monitor-pastures-fill', 'fill-opacity', 0.05);
+        map.setPaintProperty('monitor-pastures-fill', 'fill-opacity', Math.min(0.2, opacities.pastures * 0.08));
       }
 
       // Camera pitch
@@ -464,11 +516,11 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       // Restore cedar styling
       if (map.getLayer('monitor-cedar-fill')) {
         map.setPaintProperty('monitor-cedar-fill', 'fill-color', ['case', ['==', ['get', 'cleared'], 1], '#2a2a2a', ['get', 'holoColor']]);
-        map.setPaintProperty('monitor-cedar-fill', 'fill-opacity', ['case', ['==', ['get', 'cleared'], 1], 0.25, 0.55]);
+        map.setPaintProperty('monitor-cedar-fill', 'fill-opacity', ['case', ['==', ['get', 'cleared'], 1], Math.max(0.1, opacities.cedarAI * 0.35), opacities.cedarAI * 0.8]);
       }
       if (map.getLayer('monitor-cedar-border')) {
         map.setPaintProperty('monitor-cedar-border', 'line-color', ['case', ['==', ['get', 'cleared'], 1], '#555555', ['get', 'holoColor']]);
-        map.setPaintProperty('monitor-cedar-border', 'line-opacity', 0.55);
+        map.setPaintProperty('monitor-cedar-border', 'line-opacity', Math.max(0.2, opacities.cedarAI * 0.8));
         map.setPaintProperty('monitor-cedar-border', 'line-width', 0.5);
       }
 
@@ -479,7 +531,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
       }
       if (map.getLayer('monitor-pastures-fill')) {
         map.setPaintProperty('monitor-pastures-fill', 'fill-color', '#00ff41');
-        map.setPaintProperty('monitor-pastures-fill', 'fill-opacity', 0.08);
+        map.setPaintProperty('monitor-pastures-fill', 'fill-opacity', opacities.pastures * 0.1);
       }
 
       // Reset camera (but keep pitch if terrain is on)
@@ -489,7 +541,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
         map.easeTo({ bearing: 0, duration: 800 });
       }
     }
-  }, [layers, mapLoaded]);
+  }, [layers, opacities, mapLoaded]);
 
   // Auto-rotation: controlled by the autoRotate prop. Disables zoom/pan when active.
   useEffect(() => {
@@ -653,7 +705,7 @@ export default function MonitorMap({ accessToken, jobs, clearedByJob, operatorsB
     for (const layerId of ['monitor-pastures-label', 'monitor-pastures-border']) {
       if (map.getLayer(layerId)) try { map.moveLayer(layerId); } catch {}
     }
-  }, [layers.hologram, mapLoaded, jobs, clearedByJob]);
+  }, [layers.hologram, mapLoaded, jobs, clearedByJob, opacities.hologram]);
 
   // ── Operator markers ──
   useEffect(() => {

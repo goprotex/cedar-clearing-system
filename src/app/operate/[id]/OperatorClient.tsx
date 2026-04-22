@@ -595,7 +595,7 @@ export default function OperatorClient({ bidId }: { bidId: string }) {
             map.addSource('naip-rgb', {
               type: 'raster',
               tiles: [
-                'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
+                '/api/world-imagery?bbox={bbox-epsg-3857}&size=256,256',
               ],
               tileSize: 256,
             });

@@ -5,6 +5,14 @@ import dynamic from 'next/dynamic';
 import { mergeJobsById, loadLocalStorageJobs, loadJobsFromOperatorStorage, type ActiveJobSummary } from '@/lib/active-jobs';
 import { fetchApiAuthed } from '@/lib/auth-client';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
+import {
+  type OverlayLayerKey,
+  defaultOverlayState,
+  defaultOverlayOpacities,
+} from '@/lib/map-layers';
+import MapLayerPanel, {
+  useOverlayActiveCount,
+} from '@/components/map/MapLayerPanel';
 import type { MonitorTelemetryRow } from '@/types/monitor-bootstrap';
 import type { LayerKey } from './MonitorMap';
 
@@ -122,11 +130,26 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     pastures: true,
     hologram: false,
   });
+  const [opacities, setOpacities] = useState<Record<LayerKey, number>>({
+    soil: 0.45,
+    naip: 0.85,
+    naipCIR: 0.85,
+    naipNDVI: 0.75,
+    terrain3d: 2.0,
+    cedarAI: 0.7,
+    radar: 0.65,
+    pastures: 0.8,
+    hologram: 1.0,
+  });
+  const [overlayLayers, setOverlayLayers] = useState<Record<OverlayLayerKey, boolean>>(defaultOverlayState);
+  const [overlayOpacities, setOverlayOpacities] = useState<Record<OverlayLayerKey, number>>(defaultOverlayOpacities);
+  const overlayActiveCount = useOverlayActiveCount(overlayLayers);
+  const preHologramLayersRef = useRef<Record<LayerKey, boolean> | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const supabaseRef = useRef<ReturnType<typeof createSupabaseClient> | null>(null);
 
-  const toggleLayer = (key: LayerKey) => {
+  const toggleLayer = useCallback((key: LayerKey) => {
     setLayers(prev => {
       const next = { ...prev };
       // NAIP variants are mutually exclusive
@@ -137,17 +160,38 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           next.naipNDVI = false;
         }
       }
-      // Hologram on → enable cedar + NDVI
+      // Hologram on → preserve current state and switch to the cinematic view.
       if (key === 'hologram' && !prev.hologram) {
-        next.cedarAI = true;
+        preHologramLayersRef.current = { ...prev };
+        next.soil = true;
+        next.terrain3d = true;
+        next.cedarAI = false;
         next.naipNDVI = true;
         next.naip = false;
         next.naipCIR = false;
       }
+      if (key === 'hologram' && prev.hologram) {
+        const saved = preHologramLayersRef.current;
+        if (saved) {
+          preHologramLayersRef.current = null;
+          return { ...saved, hologram: false };
+        }
+      }
       next[key] = !prev[key];
       return next;
     });
-  };
+    if (key === 'hologram') {
+      setAutoRotate(false);
+    }
+  }, []);
+
+  const toggleOverlay = useCallback((key: OverlayLayerKey) => {
+    setOverlayLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const setOverlayOpacity = useCallback((key: OverlayLayerKey, value: number) => {
+    setOverlayOpacities((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   // Bootstrap: try remote first, fall back to local bids
   useEffect(() => {
@@ -459,18 +503,6 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
     return { total, cleared, pct: pct(cleared, total) };
   }, [jobs, clearedByJob]);
 
-  const LAYER_DEFS: Array<{ key: LayerKey; label: string; group?: string }> = [
-    { key: 'pastures', label: '🟩 Pastures' },
-    { key: 'cedarAI', label: '🤖 AI Cedar' },
-    { key: 'radar', label: '🌧️ Radar' },
-    { key: 'soil', label: '🟫 Soil', group: 'imagery' },
-    { key: 'naip', label: '🛰️ RGB', group: 'imagery' },
-    { key: 'naipCIR', label: '🔴 CIR', group: 'imagery' },
-    { key: 'naipNDVI', label: '🌿 NDVI', group: 'imagery' },
-    { key: 'terrain3d', label: '⛰️ 3D Terrain' },
-    { key: 'hologram', label: '🔮 Hologram' },
-  ];
-
   // Clock-in handler: triggers operate mode
   const [clockingIn, setClockingIn] = useState(false);
   const handleClockIn = useCallback(async (jobId: string) => {
@@ -571,6 +603,9 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
               radarOn={layers.radar}
               cedarOn={layers.cedarAI}
               layers={layers}
+              opacities={opacities}
+              overlayLayers={overlayLayers}
+              overlayOpacities={overlayOpacities}
               flyToJobId={flyToJobId}
               operatorProfiles={operatorProfiles}
               activeTimeEntries={activeTimeEntries}
@@ -598,49 +633,73 @@ export default function MonitorClient({ fullscreen: fullscreenProp }: { fullscre
           {/* Layer control — floating panel on the map */}
           <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom,0px))] left-[max(1rem,env(safe-area-inset-left,0px))] z-10 max-w-[calc(100vw-2rem)]">
             {layersPanelOpen ? (
-              <div className="backdrop-blur rounded-lg shadow-lg p-2 min-w-[180px] max-h-[min(60vh,420px)] overflow-y-auto bg-slate-900/90">
-                <div className="flex items-center justify-between px-1 pb-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Layers</span>
-                  <button onClick={() => setLayersPanelOpen(false)} className="text-slate-400 hover:text-white text-xs leading-none">✕</button>
+              <MapLayerPanel
+                open={layersPanelOpen}
+                onClose={() => setLayersPanelOpen(false)}
+                overlayLayers={overlayLayers}
+                overlayOpacities={overlayOpacities}
+                onToggleOverlay={toggleOverlay}
+                onOverlayOpacity={setOverlayOpacity}
+                holoMode={layers.hologram}
+                legacyGroups={[
+                  {
+                    category: 'imagery',
+                    label: 'Imagery',
+                    emoji: '📡',
+                    layers: [
+                      { key: 'soil', label: 'Soil Map', emoji: '🟫', active: layers.soil, opacity: opacities.soil, onToggle: () => toggleLayer('soil'), onOpacity: (v) => setOpacities((p) => ({ ...p, soil: v })) },
+                      { key: 'naip', label: 'RGB (Hi-Res)', emoji: '🛰️', active: layers.naip, opacity: opacities.naip, onToggle: () => toggleLayer('naip'), onOpacity: (v) => setOpacities((p) => ({ ...p, naip: v })) },
+                      { key: 'naipCIR', label: 'CIR (False Color)', emoji: '🔴', active: layers.naipCIR, opacity: opacities.naipCIR, onToggle: () => toggleLayer('naipCIR'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipCIR: v })) },
+                      { key: 'naipNDVI', label: 'NDVI', emoji: '🌿', active: layers.naipNDVI, opacity: opacities.naipNDVI, onToggle: () => toggleLayer('naipNDVI'), onOpacity: (v) => setOpacities((p) => ({ ...p, naipNDVI: v })) },
+                    ],
+                  },
+                  {
+                    category: 'analysis',
+                    label: 'Analysis',
+                    emoji: '🔬',
+                    layers: [
+                      { key: 'cedarAI', label: 'AI Cedar', emoji: '🤖', active: layers.cedarAI, opacity: opacities.cedarAI, onToggle: () => toggleLayer('cedarAI'), onOpacity: (v) => setOpacities((p) => ({ ...p, cedarAI: v })) },
+                      { key: 'terrain3d', label: '3D Terrain', emoji: '⛰️', active: layers.terrain3d, opacity: opacities.terrain3d, opacityRange: [0.5, 2.5] as [number, number], opacityStep: 0.1, onToggle: () => toggleLayer('terrain3d'), onOpacity: (v) => setOpacities((p) => ({ ...p, terrain3d: v })) },
+                      { key: 'hologram', label: 'Hologram', emoji: '🔮', active: layers.hologram, opacity: opacities.hologram, onToggle: () => toggleLayer('hologram'), onOpacity: (v) => setOpacities((p) => ({ ...p, hologram: v })) },
+                    ],
+                  },
+                  {
+                    category: 'operations',
+                    label: 'Operations',
+                    emoji: '📍',
+                    layers: [
+                      { key: 'pastures', label: 'Pastures', emoji: '🟩', active: layers.pastures, opacity: opacities.pastures, onToggle: () => toggleLayer('pastures'), onOpacity: (v) => setOpacities((p) => ({ ...p, pastures: v })) },
+                      { key: 'radar', label: 'Radar', emoji: '🌧️', active: layers.radar, opacity: opacities.radar, onToggle: () => toggleLayer('radar'), onOpacity: (v) => setOpacities((p) => ({ ...p, radar: v })) },
+                    ],
+                  },
+                ]}
+              >
+                <div className={`px-2 pb-2 pt-1 border-t ${layers.hologram ? 'border-green-800/50' : 'border-slate-700/60'}`}>
+                  <button
+                    onClick={() => setAutoRotate(v => !v)}
+                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                      autoRotate
+                        ? layers.hologram
+                          ? 'bg-green-700/50 text-green-100 shadow-[0_0_6px_rgba(0,255,65,0.2)]'
+                          : 'bg-orange-600 text-white'
+                        : layers.hologram
+                          ? 'text-green-300/60 hover:bg-green-900/30 hover:text-green-200'
+                          : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    }`}
+                    title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled)' : 'Enable auto-rotation (disables zoom/pan)'}
+                  >
+                    <span className="mr-2">🔄</span>
+                    Auto-Rotate
+                    {autoRotate && <span className="float-right text-[9px] opacity-60">ON</span>}
+                  </button>
                 </div>
-                {LAYER_DEFS.map((def, i) => (
-                  <div key={def.key}>
-                    {i > 0 && def.group === 'imagery' && LAYER_DEFS[i - 1]?.group !== 'imagery' && (
-                      <div className="border-t border-slate-700 my-1" />
-                    )}
-                    <button
-                      onClick={() => toggleLayer(def.key)}
-                      className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
-                        layers[def.key]
-                          ? 'bg-amber-600 text-white'
-                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      {def.label}
-                      {layers[def.key] && <span className="float-right text-[10px] opacity-75">ON</span>}
-                    </button>
-                  </div>
-                ))}
-                <div className="border-t border-slate-700 my-1" />
-                <button
-                  onClick={() => setAutoRotate(v => !v)}
-                  className={`w-full text-left px-2 py-1 rounded text-xs font-medium transition-all duration-200 ${
-                    autoRotate
-                      ? 'bg-orange-600 text-white'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                  title={autoRotate ? 'Auto-rotation ON (zoom/pan disabled)' : 'Enable auto-rotation (disables zoom/pan)'}
-                >
-                  🔄 Auto-Rotate
-                  {autoRotate && <span className="float-right text-[10px] opacity-75">ON</span>}
-                </button>
-              </div>
+              </MapLayerPanel>
             ) : (
               <button
                 onClick={() => setLayersPanelOpen(true)}
                 className="backdrop-blur rounded-lg shadow-lg px-3 py-2 text-xs font-medium bg-slate-900/90 text-slate-300 hover:text-white transition-colors"
               >
-                Layers
+                Layers{overlayActiveCount > 0 && ` (${overlayActiveCount})`}
               </button>
             )}
           </div>
