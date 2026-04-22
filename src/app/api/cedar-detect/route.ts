@@ -27,8 +27,8 @@ const HI_RES_FETCH_TIMEOUT_MS = 20000;
 const HI_RES_MIN_DIM = 512;
 const HI_RES_MAX_DIM = 2048;
 const HI_RES_TARGET_METERS_PER_PIXEL = 0.6;
-// Keep SSE sample events comfortably below proxy/browser payload limits.
-const STREAM_SAMPLE_BATCH_SIZE = 200;
+// Keep SSE sample events well below proxy/browser payload limits.
+const STREAM_SAMPLE_BATCH_SIZE = 50;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -1038,16 +1038,22 @@ export async function POST(req: NextRequest) {
           const compactSamples = toSpectralSamples(consensusResults);
           const totalBatches = Math.max(1, Math.ceil(compactSamples.length / STREAM_SAMPLE_BATCH_SIZE));
           push('result_summary', { summary, totalBatches });
+          await sleep(0);
 
           for (let i = 0; i < compactSamples.length; i += STREAM_SAMPLE_BATCH_SIZE) {
+            const batchIndex = Math.floor(i / STREAM_SAMPLE_BATCH_SIZE);
             push('result_samples', {
               samples: compactSamples.slice(i, i + STREAM_SAMPLE_BATCH_SIZE),
-              batchIndex: Math.floor(i / STREAM_SAMPLE_BATCH_SIZE),
+              batchIndex,
               totalBatches,
             });
+            if (batchIndex % 4 === 3) {
+              await sleep(0);
+            }
           }
 
           push('result_done', { totalSamples: compactSamples.length, totalBatches });
+          await sleep(0);
           controller.close();
         } catch (err) {
           push('error', {
