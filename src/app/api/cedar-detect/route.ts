@@ -159,14 +159,14 @@ function oakCirVotes(
   const redOverGreen = r / Math.max(g, 1);
   const redOverBlue = r / Math.max(b, 1);
 
-  if (nir >= 165) oakVotes++; // bright red channel in CIR
-  if (nir >= 145) oakVotes++;
-  if (r >= 92) oakVotes++; // visible red stays elevated for pink/red oak canopy
-  if (brightness >= 92) oakVotes++;
-  if (deciduousRatio > 0.84) oakVotes++;
-  if (nirOverRed < 1.95) oakVotes++; // oak pink keeps visible red closer to NIR than cedar does
-  if (redOverGreen > 1.12) oakVotes++;
-  if (redOverBlue > 1.02) oakVotes++;
+  if (nir >= 160) oakVotes++; // bright NIR drives the pink/red CIR oak signature
+  if (nir >= 140) oakVotes++;
+  if (r >= 88) oakVotes++; // visible red stays elevated for pink/red oak canopy
+  if (brightness >= 88) oakVotes++;
+  if (deciduousRatio > 0.82) oakVotes++;
+  if (nirOverRed < 2.05) oakVotes++; // oak pink keeps visible red closer to NIR than cedar does
+  if (redOverGreen > 1.08) oakVotes++;
+  if (redOverBlue > 1.0) oakVotes++;
 
   return oakVotes;
 }
@@ -206,19 +206,39 @@ function classifyVegetation(
   const idx = computeIndices(r, g, b, nir);
   const brightness = (r + g + b) / 3;
   const redGreenRatio = r / Math.max(g, 1);
+  const redBlueRatio = r / Math.max(b, 1);
+  const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
+  const pinkOakCir =
+    idx.ndvi >= 0.2 &&
+    brightness >= 84 &&
+    nir >= 140 &&
+    r >= 86 &&
+    redGreenRatio > 1.06 &&
+    redBlueRatio > 1.0 &&
+    oakVotes >= 3;
   const highConfidenceOakCir =
-    idx.ndvi >= 0.24 &&
-    brightness >= 88 &&
+    idx.ndvi >= 0.22 &&
+    brightness >= 86 &&
     nir >= 150 &&
-    r >= 90 &&
-    redGreenRatio > 1.08 &&
-    oakCirVotes(r, g, b, nir, brightness, idx) >= 4;
+    r >= 88 &&
+    redGreenRatio > 1.06 &&
+    oakVotes >= 4;
 
   if (highConfidenceOakCir) {
     return {
       classification: 'oak',
-      confidence: Math.min(0.88, 0.52 + oakCirVotes(r, g, b, nir, brightness, idx) * 0.06),
-      bandVotes: oakCirVotes(r, g, b, nir, brightness, idx),
+      confidence: Math.min(0.9, 0.52 + oakVotes * 0.06),
+      bandVotes: oakVotes,
+      gndvi: idx.gndvi,
+      savi: idx.savi,
+    };
+  }
+
+  if (pinkOakCir) {
+    return {
+      classification: 'oak',
+      confidence: Math.min(0.84, 0.46 + oakVotes * 0.06),
+      bandVotes: oakVotes,
       gndvi: idx.gndvi,
       savi: idx.savi,
     };
@@ -294,7 +314,6 @@ function classifyVegetation(
 
     // Oak escape hatch FIRST — bright NIR + brightness = oak, not cedar
     if (nir >= 135 && brightness >= 86) {
-      const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
       if (oakVotes >= 2 || (oakVotes >= 1 && brightness >= 96 && r >= 95)) {
         const conf = Math.min(0.82, 0.38 + oakVotes * 0.08);
         return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
@@ -334,9 +353,8 @@ function classifyVegetation(
 
   // CHECK OAK FIRST — high NIR + bright = deciduous hardwood, not cedar
   if (nir >= 135 && brightness >= 82) {
-    const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
     // Strong oak signal: 3+ votes with high NIR
-    if (oakVotes >= 3 || (oakVotes >= 2 && brightness >= 94 && r >= 94)) {
+    if (oakVotes >= 3 || (oakVotes >= 2 && brightness >= 92 && r >= 90 && redGreenRatio > 1.04)) {
       const conf = Math.min(0.9, 0.42 + oakVotes * 0.07);
       return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
     }
