@@ -130,6 +130,17 @@ function summarizeLiveCounts(results: SampleResult[], acreage: number) {
   };
 }
 
+function haversineM(lng1: number, lat1: number, lng2: number, lat2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function toSpectralSamples(results: SampleResult[]): SpectralSamplePayload[] {
   return results.map((s) => ({
     lng: s.lng,
@@ -462,13 +473,13 @@ async function fetchHiResWindowImage(bbox: number[]): Promise<{
   }
 }
 
-function buildCrownSegmentationCandidates(results: SampleResult[]): Array<{
+function buildCrownSegmentationCandidates(results: SampleResult[], gridSpacingM: number): Array<{
   lng: number;
   lat: number;
   speciesHint: 'cedar' | 'oak';
   confidence: number;
 }> {
-  return results
+  const filtered = results
     .filter((result) => {
       if (result.classification === 'cedar') return result.bandVotes >= 2 || result.confidence >= 0.5;
       if (result.classification === 'oak') return result.bandVotes >= 2 || result.confidence >= 0.45;
@@ -479,7 +490,73 @@ function buildCrownSegmentationCandidates(results: SampleResult[]): Array<{
       lat: result.lat,
       speciesHint: result.classification as 'cedar' | 'oak',
       confidence: result.confidence,
+      bandVotes: result.bandVotes,
     }));
+
+  const supportRadiusM = Math.max(8, gridSpacingM * 1.45);
+  const ranked = filtered
+    .map((candidate) => {
+      let supportCount = 0;
+      let supportConfidence = 0;
+
+      for (const neighbor of filtered) {
+        if (neighbor === candidate || neighbor.speciesHint !== candidate.speciesHint) continue;
+        const dist = haversineM(candidate.lng, candidate.lat, neighbor.lng, neighbor.lat);
+        if (dist > supportRadiusM) continue;
+        supportCount++;
+        supportConfidence += neighbor.confidence;
+      }
+
+      const supportMean = supportCount > 0 ? supportConfidence / supportCount : 0;
+      const score =
+        candidate.confidence +
+        candidate.bandVotes * 0.06 +
+        supportCount * 0.05 +
+        supportMean * 0.12;
+
+      return {
+        ...candidate,
+        supportCount,
+        score,
+      };
+    })
+    .filter((candidate) => {
+      if (candidate.speciesHint === 'oak') {
+        return candidate.supportCount >= 1 || candidate.confidence >= 0.62;
+      }
+      return candidate.supportCount >= 2 || candidate.confidence >= 0.68;
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const kept: Array<{
+    lng: number;
+    lat: number;
+    speciesHint: 'cedar' | 'oak';
+    confidence: number;
+  }> = [];
+
+  for (const candidate of ranked) {
+    const suppressRadiusM =
+      candidate.speciesHint === 'oak'
+        ? Math.max(9, Math.min(16, gridSpacingM * 1.35))
+        : Math.max(7, Math.min(13, gridSpacingM * 1.15));
+    const overlaps = kept.some((existing) => {
+      return (
+        existing.speciesHint === candidate.speciesHint &&
+        haversineM(candidate.lng, candidate.lat, existing.lng, existing.lat) <= suppressRadiusM
+      );
+    });
+    if (overlaps) continue;
+
+    kept.push({
+      lng: candidate.lng,
+      lat: candidate.lat,
+      speciesHint: candidate.speciesHint,
+      confidence: candidate.confidence,
+    });
+  }
+
+  return kept;
 }
 
 function buildCrownCalibrationExamples(results: SampleResult[]): Array<{
@@ -1034,7 +1111,7 @@ export async function POST(req: NextRequest) {
             consensusImprovedCells,
           } = applyTileConsensus(hiResRefinedResults, spacingKm, gridBbox);
 
-          const crownCandidates = buildCrownSegmentationCandidates(consensusResults);
+          const crownCandidates = buildCrownSegmentationCandidates(consensusResults, gridSpacingM);
           const crownCalibrationExamples = buildCrownCalibrationExamples(consensusResults);
           const crownProfile = buildCalibrationProfile(
             hiResImage as HiResImageData | null,
