@@ -35,6 +35,8 @@ export function fuseNaipWithTextureAndSentinel(
   const decidWeak = decidSignal !== null && decidSignal < 0.055;
   const evergreenSignal =
     decidSignal !== null && decidWeak && s2Mean !== null && s2Mean > 0.26;
+  const liveOakLikeSignal =
+    hc && decidSignal !== null && decidSignal >= 0 && decidSignal < 0.08 && s2Mean !== null && s2Mean > 0.28;
 
   if (decidStrong) {
     if (naipClass === 'cedar') {
@@ -45,9 +47,19 @@ export function fuseNaipWithTextureAndSentinel(
       trust += 0.1;
     }
   } else if (evergreenSignal && naipClass === 'oak') {
-    cls = 'cedar';
-    conf = Math.min(0.68, naipConfidence + 0.05);
-    trust -= 0.14;
+    if (liveOakLikeSignal) {
+      cls = 'oak';
+      conf = Math.min(0.78, naipConfidence + 0.04);
+      trust -= 0.04;
+    } else {
+      cls = 'cedar';
+      conf = Math.min(0.68, naipConfidence + 0.05);
+      trust -= 0.14;
+    }
+  } else if (liveOakLikeSignal && naipClass === 'mixed_brush') {
+    cls = 'oak';
+    conf = Math.min(0.64, naipConfidence + 0.08);
+    trust += 0.02;
   } else if (evergreenSignal && naipClass === 'mixed_brush') {
     trust -= 0.06;
   }

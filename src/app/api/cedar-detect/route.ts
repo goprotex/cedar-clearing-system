@@ -27,7 +27,8 @@ const HI_RES_FETCH_TIMEOUT_MS = 20000;
 const HI_RES_MIN_DIM = 512;
 const HI_RES_MAX_DIM = 2048;
 const HI_RES_TARGET_METERS_PER_PIXEL = 0.6;
-const STREAM_SAMPLE_BATCH_SIZE = 500;
+// Keep SSE sample events comfortably below proxy/browser payload limits.
+const STREAM_SAMPLE_BATCH_SIZE = 200;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -287,7 +288,7 @@ function classifyVegetation(
     // Oak escape hatch FIRST — bright NIR + brightness = oak, not cedar
     if (nir >= 135 && brightness >= 86) {
       const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
-      if (oakVotes >= 2) {
+      if (oakVotes >= 2 || (oakVotes >= 1 && brightness >= 96 && r >= 95)) {
         const conf = Math.min(0.82, 0.38 + oakVotes * 0.08);
         return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
       }
@@ -316,7 +317,7 @@ function classifyVegetation(
   if (nir >= 135 && brightness >= 82) {
     const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
     // Strong oak signal: 3+ votes with high NIR
-    if (oakVotes >= 3) {
+    if (oakVotes >= 3 || (oakVotes >= 2 && brightness >= 94 && r >= 94)) {
       const conf = Math.min(0.9, 0.42 + oakVotes * 0.07);
       return { classification: 'oak', confidence: conf, bandVotes: oakVotes, gndvi: idx.gndvi, savi: idx.savi };
     }
@@ -499,9 +500,9 @@ function refineWithHiResImagery(
     hiRes.chroma > 0.07;
 
   const strongOak =
-    hiRes.brightness > 122 &&
-    hiRes.grayFrac > 0.34 &&
-    hiRes.darkFrac < 0.12 &&
+    hiRes.brightness > 116 &&
+    hiRes.grayFrac > 0.26 &&
+    hiRes.darkFrac < 0.18 &&
     hiRes.greenBias < 0.02;
 
   const strongGrass =
@@ -517,10 +518,10 @@ function refineWithHiResImagery(
     hiRes.greenBias > 0.006;
 
   const sparseOak =
-    hiRes.brightness > 108 &&
-    hiRes.grayFrac > 0.18 &&
-    hiRes.textureVar > 0.005 &&
-    hiRes.darkFrac < 0.22;
+    hiRes.brightness > 102 &&
+    hiRes.grayFrac > 0.14 &&
+    hiRes.textureVar > 0.004 &&
+    hiRes.darkFrac < 0.28;
 
   if (strongCedar) {
     return {
