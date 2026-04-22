@@ -85,30 +85,6 @@ function activeProcessIndexForPhase(phase: string): number {
   }
 }
 
-function getCalibrationExamplesFromPasture(pasture: Pasture): Array<{ lng: number; lat: number; species: 'cedar' | 'oak' }> {
-  return (pasture.savedTrees ?? [])
-    .filter((tree) => tree.action === 'calibrate_cedar' || tree.action === 'calibrate_oak')
-    .map((tree) => ({
-      lng: tree.lng,
-      lat: tree.lat,
-      species: tree.action === 'calibrate_oak' ? 'oak' : 'cedar',
-    }));
-}
-
-function mergeAutoMarkedCedars(existing: MarkedTree[], autoMarkedCedars: MarkedTree[]): MarkedTree[] {
-  const preservedManual = existing.filter((tree) => tree.source !== 'auto');
-  const preservedAutoNonRemove = existing.filter(
-    (tree) => tree.source === 'auto' && tree.action !== 'remove'
-  );
-  const manualCoordKeys = new Set(
-    preservedManual.map((tree) => `${tree.lng.toFixed(6)},${tree.lat.toFixed(6)}`)
-  );
-  const filteredAuto = autoMarkedCedars.filter(
-    (tree) => !manualCoordKeys.has(`${tree.lng.toFixed(6)},${tree.lat.toFixed(6)}`)
-  );
-  return [...preservedManual, ...preservedAutoNonRemove, ...filteredAuto];
-}
-
 function createDefaultPasture(sortOrder: number): Pasture {
   return {
     id: uuidv4(),
@@ -852,13 +828,11 @@ export const useBidStore = create<BidStore>((set, get) => ({
       });
 
       try {
-        const calibrationExamples = getCalibrationExamplesFromPasture(get().currentBid.pastures.find((p) => p.id === pastureId) ?? pasture);
         const chunkData = await fetchCedarDetectChunkWithRetry(
           coords,
           chunkAcres,
           new Date().getMonth() + 1,
           pasture.centroid[1],
-          calibrationExamples,
           (payload) => {
             const innerPct = Number(payload.pct ?? payload.percent ?? 0);
             const completedSoFar = parts.filter((p) => p !== null).length;
@@ -1109,7 +1083,6 @@ export const useBidStore = create<BidStore>((set, get) => ({
             label: 'Remove cedar',
             height: t.height,
             canopyDiameter: t.canopyDiameter,
-            source: 'auto' as const,
           }));
         if (cedarTrees.length > 0) {
           setSpectralProgress({
@@ -1131,9 +1104,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
             totalPoints: resultData.summary?.totalSamples,
             completed: resultData.summary?.totalSamples,
           });
-          get().updatePasture(pastureId, {
-            savedTrees: mergeAutoMarkedCedars(updatedPasture.savedTrees ?? [], cedarTrees),
-          });
+          get().updatePasture(pastureId, { savedTrees: cedarTrees });
         }
       }
 

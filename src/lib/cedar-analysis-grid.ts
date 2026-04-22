@@ -74,8 +74,6 @@ export function samplesToGridCells(
 export function normalizeCedarAnalysisPayload(payload: Record<string, unknown>): CedarAnalysis | null {
   const summary = payload.summary as CedarAnalysisSummary | undefined;
   if (!summary) return null;
-  const crowns = Array.isArray(payload.crowns) ? (payload.crowns as CedarAnalysis['crowns']) : undefined;
-  const crownMasks = payload.crownMasks as CedarAnalysis['crownMasks'] | undefined;
 
   if (Array.isArray(payload.samples)) {
     let halfLng = summary.cellHalfLngDeg;
@@ -86,12 +84,12 @@ export function normalizeCedarAnalysisPayload(payload: Record<string, unknown>):
       halfLng = m / 111_320;
     }
     const gridCells = samplesToGridCells(payload.samples as SpectralSamplePayload[], halfLng, halfLat);
-    return { summary, gridCells, crowns, crownMasks };
+    return { summary, gridCells };
   }
 
   const gridCells = payload.gridCells as GeoJSON.FeatureCollection | undefined;
   if (gridCells && gridCells.type === 'FeatureCollection') {
-    return { summary, gridCells, crowns, crownMasks };
+    return { summary, gridCells };
   }
 
   return null;

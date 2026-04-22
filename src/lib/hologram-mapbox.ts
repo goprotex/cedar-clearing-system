@@ -200,15 +200,7 @@ export class HologramMapboxLayers {
         source: MARK_SOURCE,
         paint: {
           'circle-radius': ['*', ['get', 'canopy'], 0.35],
-          'circle-color': [
-            'match',
-            ['get', 'action'],
-            'save', '#00ff44',
-            'remove', '#ff2244',
-            'calibrate_cedar', '#14b8a6',
-            'calibrate_oak', '#f59e0b',
-            '#ff2244',
-          ],
+          'circle-color': ['match', ['get', 'action'], 'save', '#00ff44', '#ff2244'],
           'circle-opacity': 0.85,
           'circle-stroke-width': 2,
           'circle-stroke-color': '#ffffff',

@@ -329,13 +329,6 @@ export function mergeCedarAnalyses(parts: CedarAnalysis[], pastureAcreage: numbe
     (f) => Boolean((f.properties as { lowTrust?: boolean }).lowTrust)
   ).length;
   const base0 = parts[0].summary;
-  const mergedCrowns = parts.flatMap((part) => part.crowns ?? []);
-  const mergedMaskFeatures = parts.flatMap((part) => part.crownMasks?.features ?? []);
-  const cedarCrowns = mergedCrowns.filter((crown) => crown.species === 'cedar').length;
-  const oakCrowns = mergedCrowns.filter((crown) => crown.species === 'oak').length;
-  const avgCrownDiameter = mergedCrowns.length > 0
-    ? mergedCrowns.reduce((sum, crown) => sum + crown.canopyDiameter, 0) / mergedCrowns.length
-    : 0;
 
   const summary: CedarAnalysisSummary = {
     totalSamples: total,
@@ -357,17 +350,6 @@ export function mergeCedarAnalyses(parts: CedarAnalysis[], pastureAcreage: numbe
     lowTrustCells: lowTrustCount,
     lowTrustPct: total > 0 ? Math.round((lowTrustCount / total) * 100) : 0,
     sentinelFusion: base0.sentinelFusion,
-    crownSegmentation: mergedCrowns.length > 0
-      ? {
-          used: true,
-          source: 'hi_res_connected_components',
-          totalCrowns: mergedCrowns.length,
-          cedarCrowns,
-          oakCrowns,
-          averageCanopyDiameter: Math.round(avgCrownDiameter * 10) / 10,
-        }
-      : base0.crownSegmentation,
-    calibration: base0.calibration,
     tileConsensus: {
       tileCount,
       tileOverlapPct: 60,
@@ -387,9 +369,5 @@ export function mergeCedarAnalyses(parts: CedarAnalysis[], pastureAcreage: numbe
   return {
     gridCells: { type: 'FeatureCollection', features: consensusFeatures },
     summary,
-    crowns: mergedCrowns.length > 0 ? mergedCrowns : undefined,
-    crownMasks: mergedMaskFeatures.length > 0
-      ? { type: 'FeatureCollection', features: mergedMaskFeatures }
-      : undefined,
   };
 }

@@ -26,7 +26,7 @@ function seededRandom(seed: number): () => number {
 
 export function extractTreesFromAnalysis(
   pastures: Array<{
-    cedarAnalysis: { gridCells: GeoJSON.FeatureCollection; summary: { gridSpacingM: number; totalSamples?: number }; crowns?: TreePosition[] } | null;
+    cedarAnalysis: { gridCells: GeoJSON.FeatureCollection; summary: { gridSpacingM: number } } | null;
     density: string;
   }>
 ): TreePosition[] {
@@ -35,25 +35,6 @@ export function extractTreesFromAnalysis(
 
   for (const pasture of pastures) {
     if (!pasture.cedarAnalysis?.gridCells?.features) continue;
-
-    const hasFullCrowns =
-      Array.isArray(pasture.cedarAnalysis.crowns) &&
-      pasture.cedarAnalysis.crowns.length > 0 &&
-      pasture.cedarAnalysis.gridCells.features.length ===
-        (pasture.cedarAnalysis.summary.totalSamples ?? pasture.cedarAnalysis.gridCells.features.length);
-
-    if (hasFullCrowns) {
-      trees.push(
-        ...pasture.cedarAnalysis.crowns!.map((crown) => ({
-          lng: crown.lng,
-          lat: crown.lat,
-          species: crown.species,
-          height: crown.height,
-          canopyDiameter: crown.canopyDiameter,
-        }))
-      );
-      continue;
-    }
 
     for (const feature of pasture.cedarAnalysis.gridCells.features) {
       const props = feature.properties ?? {};
