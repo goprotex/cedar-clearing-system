@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 
 import { OVERLAY_LAYERS, type OverlayLayerKey } from '@/lib/map-layers';
 
-const DYNAMIC_OVERLAY_KEYS = new Set<OverlayLayerKey>([
-  'gasPipelines',
-  'transmissionLines',
-  'substations',
-  'cellCoverage',
-]);
+const DYNAMIC_OVERLAY_DEFS = OVERLAY_LAYERS.filter(
+  (candidate) => candidate.sourceType === 'dynamic-geojson',
+);
+
+const DYNAMIC_OVERLAY_KEYS = new Set<OverlayLayerKey>(
+  DYNAMIC_OVERLAY_DEFS.map((candidate) => candidate.key),
+);
 
 function sanitizeFeatureCollection(input: unknown): GeoJSON.FeatureCollection {
   if (!input || typeof input !== 'object') {
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
 
   if (!layer || !DYNAMIC_OVERLAY_KEYS.has(layer)) {
     return NextResponse.json(
-      { error: 'Invalid infrastructure layer.' },
+      { error: 'Invalid overlay layer.' },
       { status: 400 },
     );
   }
@@ -78,17 +79,17 @@ export async function GET(request: Request) {
     );
   }
 
-  const def = OVERLAY_LAYERS.find((candidate) => candidate.key === layer && candidate.sourceType === 'dynamic-geojson');
+  const def = DYNAMIC_OVERLAY_DEFS.find((candidate) => candidate.key === layer);
   if (!def?.serviceUrl) {
     return NextResponse.json(
-      { error: 'Infrastructure layer is not configured.' },
+      { error: 'Overlay layer is not configured.' },
       { status: 404 },
     );
   }
 
   const [west, south, east, north] = bbox;
   const params = new URLSearchParams({
-    where: '1=1',
+    where: def.queryWhere ?? '1=1',
     returnGeometry: 'true',
     outFields: '*',
     f: 'geojson',
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { error: 'Failed to load infrastructure overlay.' },
+      { error: 'Failed to load overlay layer.' },
       { status: 502 },
     );
   }

@@ -16,9 +16,12 @@ export type OverlayLayerKey =
   | 'county'
   | 'parcels'
   | 'femaFlood'
+  | 'floodHazardZones'
   | 'wildfireRisk'
   | 'burnHistory'
   | 'burnBan'
+  | 'forestRisk'
+  | 'viirsHotspots'
   | 'gasPipelines'
   | 'transmissionLines'
   | 'substations'
@@ -37,6 +40,7 @@ export interface OverlayLayerDef {
   tileUrl?: string;
   serviceUrl?: string;
   geometryKind?: 'line' | 'point' | 'fill';
+  queryWhere?: string;
   defaultOpacity: number;
   /** Optional attribution shown in the map's attribution control. */
   attribution?: string;
@@ -115,6 +119,20 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     attribution: 'FEMA NFHL',
   },
   {
+    key: 'floodHazardZones',
+    label: 'Flood Hazard Zones',
+    emoji: '💧',
+    category: 'hazards',
+    sourceId: 'overlay-flood-hazard-zones',
+    layerId: 'overlay-flood-hazard-zones-fill',
+    sourceType: 'dynamic-geojson',
+    geometryKind: 'fill',
+    serviceUrl:
+      'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Flood_Hazard_Reduced_Set_gdb/FeatureServer/0',
+    defaultOpacity: 0.45,
+    attribution: 'FEMA / Esri Living Atlas',
+  },
+  {
     key: 'wildfireRisk',
     label: 'Wildfire Risk',
     emoji: '🔥',
@@ -154,6 +172,33 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
       'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Current_WildlandFire_Perimeters/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
     defaultOpacity: 0.5,
     attribution: 'NIFC',
+  },
+  {
+    key: 'forestRisk',
+    label: 'Forest Pest Risk',
+    emoji: '🐞',
+    category: 'environment',
+    sourceId: 'overlay-forest-risk',
+    layerId: 'overlay-forest-risk-raster',
+    sourceType: 'raster',
+    tileUrl:
+      'https://imagery.geoplatform.gov/iipp/rest/services/Forest_Management/USFS_FHAAST_NIDRM_Map_Watershed_by_NF/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:0,3,4,7,8,11',
+    defaultOpacity: 0.6,
+    attribution: 'USFS FHAAST NIDRM',
+  },
+  {
+    key: 'viirsHotspots',
+    label: 'VIIRS Hotspots',
+    emoji: '🛰️',
+    category: 'hazards',
+    sourceId: 'overlay-viirs-hotspots',
+    layerId: 'overlay-viirs-hotspots-point',
+    sourceType: 'dynamic-geojson',
+    geometryKind: 'point',
+    serviceUrl:
+      'https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/Satellite_VIIRS_Thermal_Hotspots_and_Fire_Activity/FeatureServer/0',
+    defaultOpacity: 0.75,
+    attribution: 'NASA LANCE / Esri Live Feeds',
   },
 
   /* ── Infrastructure ───────────────────────────────────────────── */
@@ -296,11 +341,7 @@ export function addOverlaySourcesToMap(map: mapboxgl.Map): void {
             id: def.layerId,
             type: 'line',
             source: def.sourceId,
-            paint: {
-              'line-color': def.key === 'gasPipelines' ? '#38bdf8' : '#f59e0b',
-              'line-width': def.key === 'gasPipelines' ? 2 : 1.6,
-              'line-opacity': def.defaultOpacity,
-            },
+            paint: getOverlayLinePaint(def),
             layout: { visibility: 'none' },
           });
         } else if (def.geometryKind === 'point') {
@@ -308,14 +349,7 @@ export function addOverlaySourcesToMap(map: mapboxgl.Map): void {
             id: def.layerId,
             type: 'circle',
             source: def.sourceId,
-            paint: {
-              'circle-color': '#f97316',
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2, 9, 3.5, 12, 5],
-              'circle-opacity': def.defaultOpacity,
-              'circle-stroke-color': '#fff7ed',
-              'circle-stroke-width': 0.8,
-              'circle-stroke-opacity': Math.min(1, def.defaultOpacity + 0.15),
-            },
+            paint: getOverlayCirclePaint(def),
             layout: { visibility: 'none' },
           });
         } else {
@@ -323,11 +357,7 @@ export function addOverlaySourcesToMap(map: mapboxgl.Map): void {
             id: def.layerId,
             type: 'fill',
             source: def.sourceId,
-            paint: {
-              'fill-color': '#22c55e',
-              'fill-opacity': def.defaultOpacity,
-              'fill-outline-color': '#166534',
-            },
+            paint: getOverlayFillPaint(def),
             layout: { visibility: 'none' },
           });
         }
@@ -373,6 +403,60 @@ export function syncOverlayVisibility(
 }
 
 const overlayViewportCache = new WeakMap<mapboxgl.Map, Map<OverlayLayerKey, string>>();
+
+function getOverlayLinePaint(def: OverlayLayerDef): mapboxgl.LinePaint {
+  if (def.key === 'gasPipelines') {
+    return {
+      'line-color': '#38bdf8',
+      'line-width': 2,
+      'line-opacity': def.defaultOpacity,
+    };
+  }
+
+  return {
+    'line-color': '#f59e0b',
+    'line-width': 1.6,
+    'line-opacity': def.defaultOpacity,
+  };
+}
+
+function getOverlayCirclePaint(def: OverlayLayerDef): mapboxgl.CirclePaint {
+  if (def.key === 'viirsHotspots') {
+    return {
+      'circle-color': '#ef4444',
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 2, 8, 3.5, 11, 5.5, 14, 7],
+      'circle-opacity': def.defaultOpacity,
+      'circle-stroke-color': '#fff7ed',
+      'circle-stroke-width': 1,
+      'circle-stroke-opacity': Math.min(1, def.defaultOpacity + 0.2),
+    };
+  }
+
+  return {
+    'circle-color': '#f97316',
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 2, 9, 3.5, 12, 5],
+    'circle-opacity': def.defaultOpacity,
+    'circle-stroke-color': '#fff7ed',
+    'circle-stroke-width': 0.8,
+    'circle-stroke-opacity': Math.min(1, def.defaultOpacity + 0.15),
+  };
+}
+
+function getOverlayFillPaint(def: OverlayLayerDef): mapboxgl.FillPaint {
+  if (def.key === 'floodHazardZones') {
+    return {
+      'fill-color': '#2563eb',
+      'fill-opacity': def.defaultOpacity,
+      'fill-outline-color': '#1d4ed8',
+    };
+  }
+
+  return {
+    'fill-color': '#22c55e',
+    'fill-opacity': def.defaultOpacity,
+    'fill-outline-color': '#166534',
+  };
+}
 
 function bboxKey(map: mapboxgl.Map): string {
   const bounds = map.getBounds();
