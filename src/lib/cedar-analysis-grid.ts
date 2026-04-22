@@ -33,52 +33,6 @@ function spectralCellColor(classification: string, ndvi: number): string {
   }
 }
 
-function seededUnit(seed: number): number {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-
-function seedFromPoint(lng: number, lat: number): number {
-  return Math.round(lng * 1e6) * 0.0001 + Math.round(lat * 1e6) * 0.0002;
-}
-
-function buildIrregularCellRing(
-  lng: number,
-  lat: number,
-  halfLngDeg: number,
-  halfLatDeg: number,
-): GeoJSON.Position[] {
-  const minLng = lng - halfLngDeg;
-  const maxLng = lng + halfLngDeg;
-  const minLat = lat - halfLatDeg;
-  const maxLat = lat + halfLatDeg;
-  const width = halfLngDeg * 2;
-  const height = halfLatDeg * 2;
-  const seed = seedFromPoint(lng, lat);
-  const inset = (n: number, min: number, max: number) => min + seededUnit(seed + n) * (max - min);
-
-  const tlx = inset(1, width * 0.12, width * 0.3);
-  const trx = inset(2, width * 0.12, width * 0.3);
-  const tryInset = inset(3, height * 0.12, height * 0.3);
-  const bryInset = inset(4, height * 0.12, height * 0.3);
-  const brx = inset(5, width * 0.12, width * 0.3);
-  const blx = inset(6, width * 0.12, width * 0.3);
-  const blyInset = inset(7, height * 0.12, height * 0.3);
-  const tlyInset = inset(8, height * 0.12, height * 0.3);
-
-  return [
-    [minLng + tlx, minLat],
-    [maxLng - trx, minLat],
-    [maxLng, minLat + tryInset],
-    [maxLng, maxLat - bryInset],
-    [maxLng - brx, maxLat],
-    [minLng + blx, maxLat],
-    [minLng, maxLat - blyInset],
-    [minLng, minLat + tlyInset],
-    [minLng + tlx, minLat],
-  ];
-}
-
 /** Rebuild GeoJSON grid cells from compact samples + cell half-extents (matches server geometry). */
 export function samplesToGridCells(
   samples: SpectralSamplePayload[],
@@ -92,7 +46,13 @@ export function samplesToGridCells(
       geometry: {
         type: 'Polygon' as const,
         coordinates: [
-          buildIrregularCellRing(s.lng, s.lat, halfLngDeg, halfLatDeg),
+          [
+            [s.lng - halfLngDeg, s.lat - halfLatDeg],
+            [s.lng + halfLngDeg, s.lat - halfLatDeg],
+            [s.lng + halfLngDeg, s.lat + halfLatDeg],
+            [s.lng - halfLngDeg, s.lat + halfLatDeg],
+            [s.lng - halfLngDeg, s.lat - halfLatDeg],
+          ],
         ],
       },
       properties: {

@@ -1155,6 +1155,7 @@ export async function POST(req: NextRequest) {
             hiResImage as HiResImageData | null,
             gridBbox,
             crownProfile,
+            gridSpacingM,
           );
 
           const centerLat = (gridBbox[1] + gridBbox[3]) / 2;

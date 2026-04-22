@@ -105,6 +105,12 @@ function pixelToLngLat(image: HiResImageData, bbox: number[], x: number, y: numb
   return [lng, lat];
 }
 
+function offsetLngLatMeters(lng: number, lat: number, dxM: number, dyM: number): [number, number] {
+  const latDeg = dyM / 111_320;
+  const lngDeg = dxM / Math.max(1e-6, 111_320 * Math.cos((lat * Math.PI) / 180));
+  return [lng + lngDeg, lat + latDeg];
+}
+
 function classifyPatchPixel(
   r: number,
   g: number,
@@ -191,6 +197,55 @@ function crownPatchToDetection(
     height: Math.round(height * 10) / 10,
     source: 'hi_res_candidate_patch',
   };
+}
+
+function crownPatchScore(
+  species: 'cedar' | 'oak',
+  stats: CrownPatchStats,
+  candidateConfidence: number,
+): number {
+  const spectralScore =
+    species === 'cedar'
+      ? stats.coverage * 1.25 + Math.max(stats.greenBias, 0) * 2.6 - stats.textureVar * 0.55
+      : stats.coverage * 1.2 + Math.max(stats.redBias, 0) * 3.2 + stats.grayFrac * 0.45 - stats.textureVar * 0.45;
+  const shapePenalty = Math.max(0, stats.aspectRatio - (species === 'oak' ? 1.9 : 1.7)) * 0.18;
+  return spectralScore + candidateConfidence * 0.35 - shapePenalty;
+}
+
+function findBestCrownPatch(
+  image: HiResImageData,
+  bbox: number[],
+  candidate: { lng: number; lat: number; speciesHint: 'cedar' | 'oak'; confidence: number },
+  profile: CrownCalibrationProfile,
+  searchRadiusM: number,
+): CrownPatchStats | null {
+  const offsets: Array<[number, number]> = [
+    [0, 0],
+    [searchRadiusM, 0],
+    [-searchRadiusM, 0],
+    [0, searchRadiusM],
+    [0, -searchRadiusM],
+    [searchRadiusM * 0.7, searchRadiusM * 0.7],
+    [searchRadiusM * 0.7, -searchRadiusM * 0.7],
+    [-searchRadiusM * 0.7, searchRadiusM * 0.7],
+    [-searchRadiusM * 0.7, -searchRadiusM * 0.7],
+  ];
+
+  let bestStats: CrownPatchStats | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const [dxM, dyM] of offsets) {
+    const [probeLng, probeLat] = offsetLngLatMeters(candidate.lng, candidate.lat, dxM, dyM);
+    const stats = sampleCrownPatch(image, bbox, probeLng, probeLat, candidate.speciesHint, profile);
+    if (!stats) continue;
+    const score = crownPatchScore(candidate.speciesHint, stats, candidate.confidence);
+    if (score > bestScore) {
+      bestScore = score;
+      bestStats = stats;
+    }
+  }
+
+  return bestStats;
 }
 
 function crownPatchToMaskFeature(
@@ -388,6 +443,7 @@ export function segmentCrownsFromCandidates(
   image: HiResImageData | null,
   bbox: number[],
   profile: CrownCalibrationProfile,
+  gridSpacingM = 15,
 ): CrownSegmentationResult {
   if (!image) return { crowns: [], maskFeatures: [] };
 
@@ -395,7 +451,8 @@ export function segmentCrownsFromCandidates(
   const patchMasks: GeoJSON.Feature<GeoJSON.Polygon, CrownMaskFeatureProperties>[] = [];
 
   for (const candidate of candidates) {
-    const stats = sampleCrownPatch(image, bbox, candidate.lng, candidate.lat, candidate.speciesHint, profile);
+    const searchRadiusM = Math.max(1.5, Math.min(6, gridSpacingM * 0.38));
+    const stats = findBestCrownPatch(image, bbox, candidate, profile, searchRadiusM);
     if (!stats) continue;
 
     const minDiameterM = candidate.speciesHint === 'oak' ? 3.6 : 2.4;
