@@ -285,6 +285,13 @@ function classifyVegetation(
     if (idx.gndvi / Math.max(idx.ndvi, 0.01) < 0.90) cedarVotes++; // GNDVI < NDVI → evergreen tendency
     if (idx.savi > 0.18) cedarVotes++;           // soil-adjusted veg present
 
+    const brightTransition = brightness >= 108;
+    const pastureLikeTransition =
+      brightTransition &&
+      idx.exg > 0.05 &&
+      idx.savi < 0.32 &&
+      (idx.gndvi / Math.max(idx.ndvi, 0.01)) > 0.8;
+
     // Oak escape hatch FIRST — bright NIR + brightness = oak, not cedar
     if (nir >= 135 && brightness >= 86) {
       const oakVotes = oakCirVotes(r, g, b, nir, brightness, idx);
@@ -294,8 +301,20 @@ function classifyVegetation(
       }
     }
 
-    // Cedar: need at least 2 votes in transitional zone
-    if (cedarVotes >= 2) {
+    if (pastureLikeTransition && cedarVotes <= 2) {
+      return {
+        classification: 'grass',
+        confidence: Math.min(0.78, 0.52 + idx.exg * 0.25 + Math.max(0, brightness - 108) * 0.003),
+        bandVotes: Math.max(1, cedarVotes),
+        gndvi: idx.gndvi,
+        savi: idx.savi,
+      };
+    }
+
+    // Bright transition pixels need stronger evidence than dark canopy edges.
+    const cedarVoteFloor = brightTransition ? 3 : 2;
+
+    if (cedarVotes >= cedarVoteFloor) {
       const conf = Math.min(0.8, 0.35 + cedarVotes * 0.1 + (idx.ndvi - 0.22) * 0.5);
       return { classification: 'cedar', confidence: conf, bandVotes: cedarVotes, gndvi: idx.gndvi, savi: idx.savi };
     }
@@ -511,6 +530,11 @@ function refineWithHiResImagery(
     hiRes.greenBias > 0.015 &&
     hiRes.chroma > 0.05;
 
+  const weakCedarInOpenPasture =
+    original.classification === 'cedar' &&
+    original.bandVotes <= 2 &&
+    original.confidence < 0.68;
+
   const sparseCedar =
     hiRes.brightness < 136 &&
     hiRes.darkFrac > 0.09 &&
@@ -551,10 +575,14 @@ function refineWithHiResImagery(
     };
   }
 
-  if (strongGrass && ['grass', 'mixed_brush', 'bare'].includes(original.classification)) {
+  if (strongGrass && (['grass', 'mixed_brush', 'bare'].includes(original.classification) || weakCedarInOpenPasture)) {
     return {
       classification: 'grass',
-      confidence: Math.min(0.88, Math.max(original.confidence, 0.54) + hiRes.greenBias * 0.5),
+      confidence: Math.min(
+        0.88,
+        Math.max(weakCedarInOpenPasture ? 0.5 : original.confidence, 0.54) +
+          hiRes.greenBias * 0.5,
+      ),
     };
   }
 
