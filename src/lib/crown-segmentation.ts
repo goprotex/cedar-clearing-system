@@ -22,6 +22,7 @@ export interface CrownPatchStats {
   grayFrac: number;
   redBias: number;
   diameterM: number;
+  aspectRatio: number;
   centroidLng: number;
   centroidLat: number;
 }
@@ -263,6 +264,9 @@ export function sampleCrownPatch(
   let sumGray = 0;
   let matchX = 0;
   let matchY = 0;
+  let matchXX = 0;
+  let matchYY = 0;
+  let matchXY = 0;
 
   for (let y = Math.max(0, cy - radiusPx); y <= Math.min(image.height - 1, cy + radiusPx); y++) {
     for (let x = Math.max(0, cx - radiusPx); x <= Math.min(image.width - 1, cx + radiusPx); x++) {
@@ -291,6 +295,9 @@ export function sampleCrownPatch(
         matched++;
         matchX += x;
         matchY += y;
+        matchXX += x * x;
+        matchYY += y * y;
+        matchXY += x * y;
       }
     }
   }
@@ -307,6 +314,15 @@ export function sampleCrownPatch(
     (Math.max(meanBrightness, 1) * Math.max(meanBrightness, 1));
   const centroidX = matched > 0 ? matchX / matched : cx;
   const centroidY = matched > 0 ? matchY / matched : cy;
+  const varX = matched > 0 ? Math.max(0, matchXX / matched - centroidX * centroidX) : 0;
+  const varY = matched > 0 ? Math.max(0, matchYY / matched - centroidY * centroidY) : 0;
+  const covXY = matched > 0 ? matchXY / matched - centroidX * centroidY : 0;
+  const trace = varX + varY;
+  const det = Math.max(0, varX * varY - covXY * covXY);
+  const root = Math.sqrt(Math.max(0, trace * trace - 4 * det));
+  const majorAxis = Math.max((trace + root) / 2, 0.05);
+  const minorAxis = Math.max((trace - root) / 2, 0.05);
+  const aspectRatio = Math.sqrt(majorAxis / minorAxis);
   const [centroidLng, centroidLat] = pixelToLngLat(image, bbox, centroidX, centroidY);
   const areaM2 = matched * image.metersPerPixel * image.metersPerPixel;
   const diameterM = clamp(Math.sqrt(Math.max(areaM2, 1) / Math.PI) * 2 * 1.12, 2.2, 14);
@@ -318,6 +334,7 @@ export function sampleCrownPatch(
     grayFrac: sumGray / total,
     redBias: sumRedBias / total,
     diameterM,
+    aspectRatio,
     centroidLng,
     centroidLat,
   };
@@ -383,8 +400,10 @@ export function segmentCrownsFromCandidates(
 
     const minDiameterM = candidate.speciesHint === 'oak' ? 3.6 : 2.4;
     const maxTextureVar = candidate.speciesHint === 'oak' ? 0.075 : 0.09;
+    const maxAspectRatio = candidate.speciesHint === 'oak' ? 1.85 : 1.65;
     if (stats.diameterM < minDiameterM) continue;
     if (stats.textureVar > maxTextureVar) continue;
+    if (stats.aspectRatio > maxAspectRatio) continue;
 
     const detection = crownPatchToDetection(image, bbox, candidate.speciesHint, stats, candidate.confidence);
     patchDetections.push(detection);
