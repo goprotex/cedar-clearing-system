@@ -144,6 +144,62 @@ function createDefaultBid(): Bid {
   };
 }
 
+function compactBidForLocalCache(bid: Bid, level: 'full' | 'trimmed' | 'lean'): Bid {
+  const pastures = bid.pastures.map((pasture) => {
+    if (!pasture.cedarAnalysis) return pasture;
+
+    if (level === 'full') {
+      return {
+        ...pasture,
+        cedarAnalysis: {
+          ...pasture.cedarAnalysis,
+          crownMasks: undefined,
+        },
+      };
+    }
+
+    if (level === 'trimmed') {
+      return {
+        ...pasture,
+        cedarAnalysis: {
+          ...pasture.cedarAnalysis,
+          gridCells: { ...pasture.cedarAnalysis.gridCells, features: [] },
+          crownMasks: undefined,
+        },
+      };
+    }
+
+    return {
+      ...pasture,
+      cedarAnalysis: null,
+    };
+  });
+
+  return {
+    ...bid,
+    pastures,
+  };
+}
+
+function persistBidToLocalCache(key: string, bid: Bid): void {
+  const variants: Array<'full' | 'trimmed' | 'lean'> = ['full', 'trimmed', 'lean'];
+  let lastError: unknown;
+
+  for (const variant of variants) {
+    try {
+      const cachedBid = compactBidForLocalCache(bid, variant);
+      localStorage.setItem(key, JSON.stringify(cachedBid));
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    console.warn('[store] Failed to persist bid to localStorage cache:', lastError);
+  }
+}
+
 interface BidStore {
   // Current bid being edited
   currentBid: Bid;
@@ -420,7 +476,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
 
     // Always save to localStorage as offline cache
     const key = `ccc_bid_${currentBid.id}`;
-    localStorage.setItem(key, JSON.stringify(currentBid));
+    persistBidToLocalCache(key, currentBid);
     const listKey = 'ccc_bid_list';
     const existingList: BidSummary[] = JSON.parse(localStorage.getItem(listKey) || '[]');
     const summary: BidSummary = {
@@ -468,7 +524,7 @@ export const useBidStore = create<BidStore>((set, get) => ({
           if (!error && bid) {
             set({ currentBid: bid, selectedPastureId: null, drawingMode: false });
             // Update localStorage cache
-            localStorage.setItem(`ccc_bid_${id}`, JSON.stringify(bid));
+            persistBidToLocalCache(`ccc_bid_${id}`, bid);
             return;
           }
 

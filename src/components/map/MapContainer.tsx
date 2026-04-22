@@ -282,15 +282,14 @@ export default function MapContainer({ accessToken }: MapContainerProps) {
         layout: { visibility: 'none' },
       });
 
-      // ── ESRI World Imagery (sub-meter for TX, sourced from TNRIS StratMap) ──
-      // XYZ tile cache — no CORS issues, no bbox params needed
+      // ── USGS NAIP RGB (true-color) ──
       map.addSource('naip-rgb', {
         type: 'raster',
         tiles: [
-          'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          'https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&f=image',
         ],
         tileSize: 256,
-        attribution: 'Esri, DigitalGlobe, GeoEye, i-cubed, USDA FSA, USGS, AEX, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+        attribution: 'USDA Farm Service Agency / USGS NAIP',
       });
 
       map.addLayer({
