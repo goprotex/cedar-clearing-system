@@ -396,6 +396,9 @@ function componentToDetection(
   component: RasterComponent,
 ): CrownDetection | null {
   const compactness = component.pixelCount / Math.max(component.bboxAreaPx, 1);
+  const aspectRatio =
+    Math.max(component.bboxWidthPx, component.bboxHeightPx) /
+    Math.max(1, Math.min(component.bboxWidthPx, component.bboxHeightPx));
   const areaM2 = component.pixelCount * image.metersPerPixel * image.metersPerPixel;
   const canopyDiameter = clamp(Math.sqrt(Math.max(areaM2, 1) / Math.PI) * 2, 2.2, 18);
   const supportBoost =
@@ -408,8 +411,10 @@ function componentToDetection(
       ? component.meanGreenBias > -0.005 && component.meanBrightness <= 148 && component.vividFrac > 0.38
       : component.meanBrightness >= 88 && (component.grayFrac > 0.08 || component.meanRedBias > 0.015);
   if (!passesSpeciesCheck) return null;
-  if (component.supportCount === 0 && compactness < 0.22) return null;
-  if (component.supportCount === 0 && canopyDiameter < (component.species === 'oak' ? 4.4 : 3.1)) return null;
+  if (component.supportCount <= 0) return null;
+  if (aspectRatio > (component.species === 'oak' ? 2.8 : 2.4)) return null;
+  if (compactness < (component.species === 'oak' ? 0.3 : 0.26)) return null;
+  if (canopyDiameter < (component.species === 'oak' ? 4.0 : 2.8)) return null;
 
   const baseConfidence =
     component.species === 'cedar'
