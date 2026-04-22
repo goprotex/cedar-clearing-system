@@ -13,21 +13,12 @@ import type mapboxgl from 'mapbox-gl';
 /* ------------------------------------------------------------------ */
 
 export type OverlayLayerKey =
-  | 'county'
-  | 'parcels'
-  | 'femaFlood'
   | 'floodHazardZones'
-  | 'wildfireRisk'
-  | 'burnHistory'
-  | 'burnBan'
   | 'forestRisk'
   | 'viirsHotspots'
   | 'gasPipelines'
   | 'transmissionLines'
-  | 'substations'
-  | 'cellCoverage'
-  | 'treeCanopy'
-  | 'vegetationType';
+  | 'substations';
 
 export interface OverlayLayerDef {
   key: OverlayLayerKey;
@@ -39,7 +30,7 @@ export interface OverlayLayerDef {
   sourceType: 'raster' | 'dynamic-geojson';
   tileUrl?: string;
   serviceUrl?: string;
-  geometryKind?: 'line' | 'point' | 'fill';
+  geometryKind?: 'line' | 'point' | 'fill' | 'symbol';
   queryWhere?: string;
   defaultOpacity: number;
   /** Optional attribution shown in the map's attribution control. */
@@ -74,50 +65,7 @@ export const LAYER_CATEGORIES: LayerCategoryDef[] = [
 /* ------------------------------------------------------------------ */
 
 export const OVERLAY_LAYERS: OverlayLayerDef[] = [
-  /* ── Boundaries ───────────────────────────────────────────────── */
-  {
-    key: 'county',
-    label: 'County Lines',
-    emoji: '🗺️',
-    category: 'boundaries',
-    sourceId: 'overlay-county',
-    layerId: 'overlay-county-raster',
-    sourceType: 'raster',
-    tileUrl:
-      'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&f=image&layers=show:84',
-    defaultOpacity: 0.7,
-    attribution: 'US Census Bureau TIGER',
-  },
-  {
-    key: 'parcels',
-    label: 'Parcel Boundaries',
-    emoji: '📐',
-    category: 'boundaries',
-    sourceId: 'overlay-parcels',
-    layerId: 'overlay-parcels-raster',
-    sourceType: 'raster',
-    // Census block-level land divisions (free/public). For precise TX parcel lines,
-    // replace with your county CAD ArcGIS service URL (e.g. Kerr CAD GIS server).
-    tileUrl:
-      'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&f=image&layers=show:18,22',
-    defaultOpacity: 0.6,
-    attribution: 'US Census Bureau TIGER',
-  },
-
   /* ── Hazards ──────────────────────────────────────────────────── */
-  {
-    key: 'femaFlood',
-    label: 'FEMA Flood Zones',
-    emoji: '🌊',
-    category: 'hazards',
-    sourceId: 'overlay-fema-flood',
-    layerId: 'overlay-fema-flood-raster',
-    sourceType: 'raster',
-    tileUrl:
-      'https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:28',
-    defaultOpacity: 0.55,
-    attribution: 'FEMA NFHL',
-  },
   {
     key: 'floodHazardZones',
     label: 'Flood Hazard Zones',
@@ -133,47 +81,6 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     attribution: 'FEMA / Esri Living Atlas',
   },
   {
-    key: 'wildfireRisk',
-    label: 'Wildfire Risk',
-    emoji: '🔥',
-    category: 'hazards',
-    sourceId: 'overlay-wildfire-risk',
-    layerId: 'overlay-wildfire-risk-raster',
-    sourceType: 'raster',
-    tileUrl:
-      'https://apps.fs.usda.gov/arcgis/rest/services/RDW_Wildfire/ProbabilisticWildfireRisk/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
-    defaultOpacity: 0.55,
-    attribution: 'USFS',
-  },
-  {
-    key: 'burnHistory',
-    label: 'Burn History',
-    emoji: '🪵',
-    category: 'hazards',
-    sourceId: 'overlay-burn-history',
-    layerId: 'overlay-burn-history-raster',
-    sourceType: 'raster',
-    tileUrl:
-      'https://apps.fs.usda.gov/arcgis/rest/services/RDW_Wildfire/MTBS_BurnSeverity/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:0',
-    defaultOpacity: 0.55,
-    attribution: 'USFS MTBS',
-  },
-  {
-    key: 'burnBan',
-    label: 'Burn Ban Status',
-    emoji: '🚫',
-    category: 'hazards',
-    sourceId: 'overlay-burn-ban',
-    layerId: 'overlay-burn-ban-raster',
-    sourceType: 'raster',
-    // NIFC (National Interagency Fire Center) active fire perimeters — replaces
-    // retired USGS GeoMAC service (shut down 2020)
-    tileUrl:
-      'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Current_WildlandFire_Perimeters/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image',
-    defaultOpacity: 0.5,
-    attribution: 'NIFC',
-  },
-  {
     key: 'forestRisk',
     label: 'Forest Pest Risk',
     emoji: '🐞',
@@ -183,7 +90,7 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
     sourceType: 'raster',
     tileUrl:
       'https://imagery.geoplatform.gov/iipp/rest/services/Forest_Management/USFS_FHAAST_NIDRM_Map_Watershed_by_NF/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image&layers=show:0,3,4,7,8,11',
-    defaultOpacity: 0.6,
+    defaultOpacity: 0.36,
     attribution: 'USFS FHAAST NIDRM',
   },
   {
@@ -233,58 +140,16 @@ export const OVERLAY_LAYERS: OverlayLayerDef[] = [
   {
     key: 'substations',
     label: 'Substations',
-    emoji: '🔌',
+    emoji: '⚡',
     category: 'infrastructure',
     sourceId: 'overlay-substations',
     layerId: 'overlay-substations-point',
     sourceType: 'dynamic-geojson',
-    geometryKind: 'point',
+    geometryKind: 'symbol',
     serviceUrl:
       'https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/Electric_Substations/FeatureServer/0',
     defaultOpacity: 0.7,
     attribution: 'HIFLD',
-  },
-  {
-    key: 'cellCoverage',
-    label: 'Cell Coverage',
-    emoji: '📶',
-    category: 'infrastructure',
-    sourceId: 'overlay-cell-coverage',
-    layerId: 'overlay-cell-coverage-fill',
-    sourceType: 'dynamic-geojson',
-    geometryKind: 'fill',
-    serviceUrl:
-      'https://services3.arcgis.com/HVjI8GKrRtjcQ4Ry/arcgis/rest/services/Cell_towers_by_state_MB/FeatureServer/0',
-    defaultOpacity: 0.35,
-    attribution: 'Public cell coverage dataset',
-  },
-
-  /* ── Environment ──────────────────────────────────────────────── */
-  {
-    key: 'treeCanopy',
-    label: 'Tree Canopy',
-    emoji: '🌳',
-    category: 'environment',
-    sourceId: 'overlay-tree-canopy',
-    layerId: 'overlay-tree-canopy-raster',
-    sourceType: 'raster',
-    tileUrl:
-      'https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Tree_Canopy_L48/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=NLCD_2021_Tree_Canopy_L48&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE',
-    defaultOpacity: 0.6,
-    attribution: 'USGS NLCD',
-  },
-  {
-    key: 'vegetationType',
-    label: 'Vegetation Type',
-    emoji: '🌾',
-    category: 'environment',
-    sourceId: 'overlay-vegetation-type',
-    layerId: 'overlay-vegetation-type-raster',
-    sourceType: 'raster',
-    tileUrl:
-      'https://landfire.cr.usgs.gov/arcgis/rest/services/Landfire/US_230/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&dpi=96&f=image&layers=show:2',
-    defaultOpacity: 0.55,
-    attribution: 'USGS LANDFIRE',
   },
 ];
 
@@ -352,6 +217,14 @@ export function addOverlaySourcesToMap(map: mapboxgl.Map): void {
             paint: getOverlayCirclePaint(def),
             layout: { visibility: 'none' },
           });
+        } else if (def.geometryKind === 'symbol') {
+          map.addLayer({
+            id: def.layerId,
+            type: 'symbol',
+            source: def.sourceId,
+            layout: getOverlaySymbolLayout(def),
+            paint: getOverlaySymbolPaint(def),
+          });
         } else {
           map.addLayer({
             id: def.layerId,
@@ -393,6 +266,8 @@ export function syncOverlayVisibility(
       } else if (def.geometryKind === 'point') {
         map.setPaintProperty(def.layerId, 'circle-opacity', overlayOpacities[def.key]);
         map.setPaintProperty(def.layerId, 'circle-stroke-opacity', Math.min(1, overlayOpacities[def.key] + 0.15));
+      } else if (def.geometryKind === 'symbol') {
+        map.setPaintProperty(def.layerId, 'text-opacity', overlayOpacities[def.key]);
       } else {
         map.setPaintProperty(def.layerId, 'fill-opacity', overlayOpacities[def.key]);
       }
@@ -407,7 +282,7 @@ const overlayViewportCache = new WeakMap<mapboxgl.Map, Map<OverlayLayerKey, stri
 function getOverlayLinePaint(def: OverlayLayerDef): mapboxgl.LinePaint {
   if (def.key === 'gasPipelines') {
     return {
-      'line-color': '#38bdf8',
+      'line-color': '#dc2626',
       'line-width': 2,
       'line-opacity': def.defaultOpacity,
     };
@@ -439,6 +314,40 @@ function getOverlayCirclePaint(def: OverlayLayerDef): mapboxgl.CirclePaint {
     'circle-stroke-color': '#fff7ed',
     'circle-stroke-width': 0.8,
     'circle-stroke-opacity': Math.min(1, def.defaultOpacity + 0.15),
+  };
+}
+
+function getOverlaySymbolLayout(def: OverlayLayerDef): mapboxgl.SymbolLayout {
+  if (def.key === 'substations') {
+    return {
+      'text-field': '⚡',
+      'text-size': ['interpolate', ['linear'], ['zoom'], 5, 12, 9, 15, 12, 18],
+      'text-allow-overlap': true,
+      visibility: 'none',
+    };
+  }
+
+  return {
+    'text-field': '•',
+    'text-size': 12,
+    'text-allow-overlap': true,
+    visibility: 'none',
+  };
+}
+
+function getOverlaySymbolPaint(def: OverlayLayerDef): mapboxgl.SymbolPaint {
+  if (def.key === 'substations') {
+    return {
+      'text-color': '#facc15',
+      'text-halo-color': '#1f2937',
+      'text-halo-width': 1.2,
+      'text-opacity': def.defaultOpacity,
+    };
+  }
+
+  return {
+    'text-color': '#f8fafc',
+    'text-opacity': def.defaultOpacity,
   };
 }
 
