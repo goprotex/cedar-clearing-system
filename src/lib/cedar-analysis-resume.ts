@@ -6,6 +6,7 @@
 import type { CedarAnalysis } from '@/types';
 
 const STORAGE_PREFIX = 'ccc_cedar_resume_';
+const MAX_REMOTE_CHECKPOINT_BYTES = 900_000;
 
 export const CEDAR_RESUME_VERSION = 2 as const;
 
@@ -105,6 +106,20 @@ export function clearCedarChunkResume(bidId: string, pastureId: string): void {
   }
 }
 
+function buildRemoteCheckpointState(state: CedarChunkResumeState): CedarChunkResumeState {
+  return {
+    ...state,
+    parts: state.parts.map((part) => {
+      if (!part) return null;
+      const compactPart: CedarAnalysis = {
+        ...part,
+        crownMasks: undefined,
+      };
+      return compactPart;
+    }),
+  };
+}
+
 function pickNewerResume(
   a: CedarChunkResumeState,
   b: CedarChunkResumeState
@@ -158,11 +173,18 @@ export async function loadCedarChunkResumeHybrid(
 /** Save to localStorage and Supabase (when API is configured). */
 export async function saveCedarChunkResumeHybrid(state: CedarChunkResumeState): Promise<void> {
   saveCedarChunkResume(state);
+
+  const remoteState = buildRemoteCheckpointState(state);
+  const remoteJson = JSON.stringify(remoteState);
+  if (remoteJson.length > MAX_REMOTE_CHECKPOINT_BYTES) {
+    return;
+  }
+
   try {
     await fetch('/api/cedar-checkpoint', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state),
+      body: remoteJson,
     });
   } catch {
     /* remote optional */
