@@ -161,313 +161,69 @@ function computePixelFeatures(image: HiResImageData): PixelFeatures {
   return { brightness, greenBias, redBias, grayish, vivid };
 }
 
-function neighborCount(mask: Uint8Array, width: number, height: number, x: number, y: number): number {
-  let count = 0;
-  for (let ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny++) {
-    for (let nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx++) {
-      if (nx === x && ny === y) continue;
-      count += mask[ny * width + nx];
-    }
-  }
-  return count;
-}
-
-function orthogonalCount(mask: Uint8Array, width: number, height: number, x: number, y: number): number {
-  let count = 0;
-  if (x > 0) count += mask[y * width + (x - 1)];
-  if (x + 1 < width) count += mask[y * width + (x + 1)];
-  if (y > 0) count += mask[(y - 1) * width + x];
-  if (y + 1 < height) count += mask[(y + 1) * width + x];
-  return count;
-}
-
-function cleanMask(mask: Uint8Array, width: number, height: number, species: 'cedar' | 'oak'): Uint8Array {
-  let current = mask.slice();
-  const passes = species === 'oak' ? 2 : 1;
-
-  for (let pass = 0; pass < passes; pass++) {
-    const next = current.slice();
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = y * width + x;
-        const neighbors = neighborCount(current, width, height, x, y);
-        const orthogonal = orthogonalCount(current, width, height, x, y);
-
-        if (current[index] === 1) {
-          const minKeep = species === 'oak' ? 2 : 1;
-          if (neighbors < minKeep || (neighbors <= 2 && orthogonal === 0)) {
-            next[index] = 0;
-          }
-        } else {
-          const fillThreshold = species === 'oak' ? 6 : 5;
-          if (neighbors >= fillThreshold || (neighbors >= 4 && orthogonal >= 3)) {
-            next[index] = 1;
-          }
-        }
-      }
-    }
-    current = next;
-  }
-
-  const smoothed = current.slice();
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const index = y * width + x;
-      const neighbors = neighborCount(current, width, height, x, y);
-      if (current[index] === 1 && neighbors <= 1) {
-        smoothed[index] = 0;
-      } else if (current[index] === 0 && neighbors >= (species === 'oak' ? 6 : 5)) {
-        smoothed[index] = 1;
-      }
-    }
-  }
-
-  return smoothed;
-}
-
-function buildSpeciesMask(
-  image: HiResImageData,
-  features: PixelFeatures,
-  species: 'cedar' | 'oak',
-  profile: CrownCalibrationProfile,
-): Uint8Array {
-  const total = image.width * image.height;
-  const mask = new Uint8Array(total);
-
-  for (let i = 0; i < total; i++) {
-    const bright = features.brightness[i];
-    const gBias = features.greenBias[i];
-    const rBias = features.redBias[i];
-    const isGray = features.grayish[i] === 1;
-    const isVivid = features.vivid[i] === 1;
-
-    const on =
-      species === 'cedar'
-        ? bright <= profile.cedarBrightnessCeil &&
-          ((gBias >= profile.cedarGreenBiasFloor && isVivid) || (gBias >= profile.cedarGreenBiasFloor + 0.012))
-        : bright >= profile.oakBrightnessFloor &&
-          gBias < 0.03 &&
-          (isGray || rBias > 0.04 || (rBias > 0.015 && bright > profile.oakBrightnessFloor + 12));
-    if (on) mask[i] = 1;
-  }
-
-  return cleanMask(mask, image.width, image.height, species);
-}
-
-function extractRasterComponents(
-  image: HiResImageData,
-  mask: Uint8Array,
-  features: PixelFeatures,
-  species: 'cedar' | 'oak',
-  minPixels: number,
-): { labels: Int32Array; components: RasterComponent[] } {
-  const labels = new Int32Array(image.width * image.height);
-  const components: RasterComponent[] = [];
-  let nextLabel = 1;
-  const queue = new Int32Array(image.width * image.height);
-
-  for (let start = 0; start < mask.length; start++) {
-    if (mask[start] === 0 || labels[start] !== 0) continue;
-
-    let qHead = 0;
-    let qTail = 0;
-    queue[qTail++] = start;
-    labels[start] = nextLabel;
-    const componentPixels: number[] = [start];
-
-    const acc: ComponentAccumulator = {
-      pixelCount: 0,
-      sumX: 0,
-      sumY: 0,
-      sumBrightness: 0,
-      sumGreenBias: 0,
-      sumRedBias: 0,
-      grayPixels: 0,
-      vividPixels: 0,
-      minX: image.width,
-      minY: image.height,
-      maxX: 0,
-      maxY: 0,
-    };
-
-    while (qHead < qTail) {
-      const index = queue[qHead++];
-      const x = index % image.width;
-      const y = Math.floor(index / image.width);
-
-      acc.pixelCount++;
-      acc.sumX += x;
-      acc.sumY += y;
-      acc.sumBrightness += features.brightness[index];
-      acc.sumGreenBias += features.greenBias[index];
-      acc.sumRedBias += features.redBias[index];
-      acc.grayPixels += features.grayish[index];
-      acc.vividPixels += features.vivid[index];
-      if (x < acc.minX) acc.minX = x;
-      if (y < acc.minY) acc.minY = y;
-      if (x > acc.maxX) acc.maxX = x;
-      if (y > acc.maxY) acc.maxY = y;
-
-      for (let ny = Math.max(0, y - 1); ny <= Math.min(image.height - 1, y + 1); ny++) {
-        for (let nx = Math.max(0, x - 1); nx <= Math.min(image.width - 1, x + 1); nx++) {
-          if (nx === x && ny === y) continue;
-          const neighbor = ny * image.width + nx;
-          if (mask[neighbor] === 0 || labels[neighbor] !== 0) continue;
-          labels[neighbor] = nextLabel;
-          queue[qTail++] = neighbor;
-          componentPixels.push(neighbor);
-        }
-      }
-    }
-
-    if (acc.pixelCount >= minPixels) {
-      const bboxWidthPx = acc.maxX - acc.minX + 1;
-      const bboxHeightPx = acc.maxY - acc.minY + 1;
-      components.push({
-        label: nextLabel,
-        species,
-        pixelCount: acc.pixelCount,
-        centroidX: acc.sumX / acc.pixelCount,
-        centroidY: acc.sumY / acc.pixelCount,
-        meanBrightness: acc.sumBrightness / acc.pixelCount,
-        meanGreenBias: acc.sumGreenBias / acc.pixelCount,
-        meanRedBias: acc.sumRedBias / acc.pixelCount,
-        grayFrac: acc.grayPixels / acc.pixelCount,
-        vividFrac: acc.vividPixels / acc.pixelCount,
-        bboxWidthPx,
-        bboxHeightPx,
-        bboxAreaPx: bboxWidthPx * bboxHeightPx,
-        supportCount: 0,
-        supportConfidence: 0,
-      });
-      nextLabel++;
-    } else {
-      for (const pixel of componentPixels) {
-        labels[pixel] = 0;
-      }
-    }
-  }
-
-  return { labels, components };
-}
-
-function attachCandidateSupport(
+function crownPatchToDetection(
   image: HiResImageData,
   bbox: number[],
-  labels: Int32Array,
-  components: RasterComponent[],
-  candidates: Array<{ lng: number; lat: number; speciesHint: 'cedar' | 'oak'; confidence: number }>,
   species: 'cedar' | 'oak',
-) {
-  const byLabel = new Map<number, RasterComponent>(components.map((component) => [component.label, component]));
-  const searchRadius = clamp(Math.round(3 / Math.max(0.5, image.metersPerPixel)), 2, 8);
-
-  for (const candidate of candidates) {
-    if (candidate.speciesHint !== species) continue;
-    const [cx, cy] = lngLatToPixel(image, bbox, candidate.lng, candidate.lat);
-
-    let matchedLabel = 0;
-    let bestDist = Number.POSITIVE_INFINITY;
-    for (let y = Math.max(0, cy - searchRadius); y <= Math.min(image.height - 1, cy + searchRadius); y++) {
-      for (let x = Math.max(0, cx - searchRadius); x <= Math.min(image.width - 1, cx + searchRadius); x++) {
-        const label = labels[y * image.width + x];
-        if (label === 0) continue;
-        const dx = x - cx;
-        const dy = y - cy;
-        const dist = dx * dx + dy * dy;
-        if (dist < bestDist) {
-          bestDist = dist;
-          matchedLabel = label;
-        }
-      }
-    }
-
-    if (matchedLabel === 0) continue;
-    const component = byLabel.get(matchedLabel);
-    if (!component) continue;
-    component.supportCount++;
-    component.supportConfidence += candidate.confidence;
-  }
-}
-
-function componentToDetection(
-  image: HiResImageData,
-  bbox: number[],
-  component: RasterComponent,
-): CrownDetection | null {
-  const compactness = component.pixelCount / Math.max(component.bboxAreaPx, 1);
-  const aspectRatio =
-    Math.max(component.bboxWidthPx, component.bboxHeightPx) /
-    Math.max(1, Math.min(component.bboxWidthPx, component.bboxHeightPx));
-  const areaM2 = component.pixelCount * image.metersPerPixel * image.metersPerPixel;
-  const canopyDiameter = clamp(Math.sqrt(Math.max(areaM2, 1) / Math.PI) * 2, 2.2, 18);
-  const supportBoost =
-    component.supportCount > 0
-      ? Math.min(0.18, (component.supportConfidence / component.supportCount) * 0.12 + component.supportCount * 0.015)
-      : 0;
-
-  const passesSpeciesCheck =
-    component.species === 'cedar'
-      ? component.meanGreenBias > -0.005 && component.meanBrightness <= 148 && component.vividFrac > 0.38
-      : component.meanBrightness >= 88 && (component.grayFrac > 0.08 || component.meanRedBias > 0.015);
-  if (!passesSpeciesCheck) return null;
-  if (component.supportCount <= 0) return null;
-  if (aspectRatio > (component.species === 'oak' ? 2.8 : 2.4)) return null;
-  if (compactness < (component.species === 'oak' ? 0.3 : 0.26)) return null;
-  if (canopyDiameter < (component.species === 'oak' ? 4.0 : 2.8)) return null;
-
+  stats: CrownPatchStats,
+  candidateConfidence: number,
+): CrownDetection {
+  const crownId = `crown-${species}-${Math.round(stats.centroidLng * 1e6)}-${Math.round(stats.centroidLat * 1e6)}`;
   const baseConfidence =
-    component.species === 'cedar'
-      ? 0.38 + compactness * 0.24 + component.vividFrac * 0.12 + Math.max(component.meanGreenBias, 0) * 1.5
-      : 0.36 + compactness * 0.22 + component.grayFrac * 0.16 + Math.max(component.meanRedBias, 0) * 1.4;
-  const confidence = clamp(baseConfidence + supportBoost, 0.35, 0.98);
-  const [lng, lat] = pixelToLngLat(image, bbox, component.centroidX, component.centroidY);
+    species === 'cedar'
+      ? 0.34 + stats.coverage * 0.34 + Math.max(stats.greenBias, 0) * 1.2 - stats.textureVar * 0.12
+      : 0.34 + stats.coverage * 0.3 + Math.max(stats.redBias, 0) * 1.5 + stats.grayFrac * 0.12;
+  const confidence = clamp(baseConfidence + candidateConfidence * 0.18, 0.35, 0.96);
   const height = clamp(
-    (component.species === 'oak' ? 1.18 : 1.65) * canopyDiameter + (component.species === 'oak' ? 3.8 : 2.4),
+    (species === 'oak' ? 1.18 : 1.65) * stats.diameterM + (species === 'oak' ? 3.8 : 2.4),
     2.5,
     22,
   );
 
   return {
-    id: `crown-${Math.round(lng * 1e6)}-${Math.round(lat * 1e6)}`,
-    lng,
-    lat,
-    species: component.species,
+    id: crownId,
+    lng: stats.centroidLng,
+    lat: stats.centroidLat,
+    species,
     confidence: Math.round(confidence * 100) / 100,
-    canopyDiameter: Math.round(canopyDiameter * 10) / 10,
+    canopyDiameter: Math.round(stats.diameterM * 10) / 10,
     height: Math.round(height * 10) / 10,
-    source: 'hi_res_connected_components',
+    source: 'hi_res_candidate_patch',
   };
 }
 
-function componentToMaskFeature(
+function crownPatchToMaskFeature(
   image: HiResImageData,
   bbox: number[],
-  component: RasterComponent,
+  species: 'cedar' | 'oak',
+  stats: CrownPatchStats,
+  confidence: number,
 ): GeoJSON.Feature<GeoJSON.Polygon, CrownMaskFeatureProperties> {
-  const rx = Math.max(1.2, component.bboxWidthPx / 2);
-  const ry = Math.max(1.2, component.bboxHeightPx / 2);
+  const crownId = `crown-${species}-${Math.round(stats.centroidLng * 1e6)}-${Math.round(stats.centroidLat * 1e6)}`;
+  const [cx, cy] = lngLatToPixel(image, bbox, stats.centroidLng, stats.centroidLat);
+  const radiusPx = Math.max(1.2, (stats.diameterM / 2) / Math.max(0.25, image.metersPerPixel));
+  const rx = radiusPx;
+  const ry = radiusPx;
   const ring: GeoJSON.Position[] = [];
   const steps = 18;
 
   for (let i = 0; i <= steps; i++) {
     const theta = (i / steps) * Math.PI * 2;
-    const px = component.centroidX + Math.cos(theta) * rx;
-    const py = component.centroidY + Math.sin(theta) * ry;
+    const px = cx + Math.cos(theta) * rx;
+    const py = cy + Math.sin(theta) * ry;
     const [lng, lat] = pixelToLngLat(image, bbox, px, py);
     ring.push([lng, lat]);
   }
 
-  const detection = componentToDetection(image, bbox, component);
   return {
     type: 'Feature',
     geometry: { type: 'Polygon', coordinates: [ring] },
     properties: {
-      id: `mask-${component.species}-${component.label}`,
-      species: component.species,
-      confidence: detection?.confidence ?? 0.35,
-      supportCount: component.supportCount,
-      source: 'hi_res_connected_components',
+      id: crownId,
+      species,
+      confidence,
+      supportCount: 1,
+      source: 'hi_res_candidate_patch',
     },
   };
 }
@@ -618,27 +374,32 @@ export function segmentCrownsFromCandidates(
 ): CrownSegmentationResult {
   if (!image) return { crowns: [], maskFeatures: [] };
 
-  const features = computePixelFeatures(image);
-  const cedarMask = buildSpeciesMask(image, features, 'cedar', profile);
-  const oakMask = buildSpeciesMask(image, features, 'oak', profile);
-  const minCedarPixels = clamp(Math.round(6 / Math.max(0.2, image.metersPerPixel * image.metersPerPixel)), 6, 64);
-  const minOakPixels = clamp(Math.round(9 / Math.max(0.2, image.metersPerPixel * image.metersPerPixel)), 8, 90);
-  const cedar = extractRasterComponents(image, cedarMask, features, 'cedar', minCedarPixels);
-  const oak = extractRasterComponents(image, oakMask, features, 'oak', minOakPixels);
+  const patchDetections: CrownDetection[] = [];
+  const patchMasks: GeoJSON.Feature<GeoJSON.Polygon, CrownMaskFeatureProperties>[] = [];
 
-  attachCandidateSupport(image, bbox, cedar.labels, cedar.components, candidates, 'cedar');
-  attachCandidateSupport(image, bbox, oak.labels, oak.components, candidates, 'oak');
+  for (const candidate of candidates) {
+    const stats = sampleCrownPatch(image, bbox, candidate.lng, candidate.lat, candidate.speciesHint, profile);
+    if (!stats) continue;
 
-  const validComponents = [...cedar.components, ...oak.components].filter(
-    (component) => componentToDetection(image, bbox, component) !== null,
-  );
-  const detections = validComponents
-    .map((component) => componentToDetection(image, bbox, component))
-    .filter((item): item is CrownDetection => item !== null);
-  const maskFeatures = validComponents.map((component) => componentToMaskFeature(image, bbox, component));
+    const minDiameterM = candidate.speciesHint === 'oak' ? 3.6 : 2.4;
+    const maxTextureVar = candidate.speciesHint === 'oak' ? 0.075 : 0.09;
+    if (stats.diameterM < minDiameterM) continue;
+    if (stats.textureVar > maxTextureVar) continue;
+
+    const detection = crownPatchToDetection(image, bbox, candidate.speciesHint, stats, candidate.confidence);
+    patchDetections.push(detection);
+    patchMasks.push(crownPatchToMaskFeature(image, bbox, candidate.speciesHint, stats, detection.confidence));
+  }
+
+  const crowns = suppressOverlappingSpecies(patchDetections);
+  const keptIds = new Set(crowns.map((crown) => crown.id));
+  const maskFeatures = patchMasks.filter((feature) => {
+    const props = feature.properties;
+    return typeof props?.id === 'string' && keptIds.has(props.id);
+  });
 
   return {
-    crowns: suppressOverlappingSpecies(detections),
+    crowns,
     maskFeatures,
   };
 }
