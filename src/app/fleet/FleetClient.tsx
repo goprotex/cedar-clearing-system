@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient, isSupabaseConfigured } from '@/utils/supabase/client';
 import { fetchApiAuthed } from '@/lib/auth-client';
+import { normalizeImageForUpload } from '@/lib/image-normalize';
 import {
   type Machine,
   type MachineStatus,
@@ -919,8 +920,10 @@ function MachineDetailPanel({
     setPhotoUploading(true);
     const newUrls: string[] = [];
 
-    for (const file of toRead) {
+    for (const rawFile of toRead) {
       try {
+        // Re-encode to JPEG so iPhone HEIC captures aren't rejected by the bucket.
+        const file = await normalizeImageForUpload(rawFile);
         // Try uploading to Supabase Storage first
         const supabase = createClient();
         const { data: { user: authUser } } = await supabase.auth.getUser();

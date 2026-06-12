@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { fetchApiAuthed } from '@/lib/auth-client';
+import { normalizeImageForUpload } from '@/lib/image-normalize';
 import type { ActiveJobSummary } from '@/lib/active-jobs';
 
 type NoteRow = {
@@ -136,7 +137,10 @@ export default function JobNotesAndProgressPanel({ job, onJobPatch }: Props) {
       if (!uid) throw new Error('Sign in to upload');
 
       const next: Array<{ url: string; kind: 'image' | 'pdf'; name: string }> = [...pendingUrls];
-      for (const file of Array.from(files)) {
+      for (const rawFile of Array.from(files)) {
+        // Re-encode images to JPEG so iPhone HEIC captures aren't rejected by the
+        // bucket; PDFs and other non-images pass through unchanged.
+        const file = await normalizeImageForUpload(rawFile);
         const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
         const path = `${job.id}/${uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error: upErr } = await supabase.storage.from('job-media').upload(path, file, {
