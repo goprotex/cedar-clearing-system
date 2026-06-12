@@ -7,6 +7,7 @@ import type { UserAppPreferences } from '@/types/profile';
 import { useAuth } from '@/components/AuthProvider';
 import { createClient, isSupabaseConfigured } from '@/utils/supabase/client';
 import { fetchApiAuthed } from '@/lib/auth-client';
+import { normalizeImageForUpload } from '@/lib/image-normalize';
 
 type SettingsPayload = {
   email: string | null;
@@ -237,11 +238,13 @@ export default function SettingsClient() {
       const { data: { user } } = await supabase.auth.getUser();
       const uid = user?.id;
       if (!uid) throw new Error('Not signed in');
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      // Re-encode to JPEG so iPhone HEIC captures aren't rejected by the bucket.
+      const upload = await normalizeImageForUpload(file);
+      const ext = upload.name.split('.').pop()?.toLowerCase() || 'jpg';
       const path = `${uid}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, upload, {
         upsert: true,
-        contentType: file.type || 'image/jpeg',
+        contentType: upload.type || 'image/jpeg',
       });
       if (upErr) throw new Error(upErr.message);
       const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
@@ -261,11 +264,13 @@ export default function SettingsClient() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error('Not signed in');
       if (!company?.id) throw new Error('No company linked');
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      // Re-encode to JPEG so iPhone HEIC captures aren't rejected by the bucket.
+      const upload = await normalizeImageForUpload(file);
+      const ext = upload.name.split('.').pop()?.toLowerCase() || 'jpg';
       const path = `${company.id}/logo-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('company-logos').upload(path, file, {
+      const { error: upErr } = await supabase.storage.from('company-logos').upload(path, upload, {
         upsert: true,
-        contentType: file.type || 'image/jpeg',
+        contentType: upload.type || 'image/jpeg',
       });
       if (upErr) throw new Error(upErr.message);
       const { data: pub } = supabase.storage.from('company-logos').getPublicUrl(path);
